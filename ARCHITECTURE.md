@@ -50,4 +50,12 @@ Public contracts do not import repository internals. Protocol and host packages
 may depend on public contracts; the kernel does not depend on transport, UI, or
 provider implementations.
 
+`common/v1` and `engine/v1` are the only initial Protobuf process boundary.
+They encode protocol negotiation, typed status, health, run/event replay,
+cancellation, interaction, and snapshot transfer. Handwritten validators fail
+closed before state mutation. The packages deliberately contain no listener,
+daemon, client lifecycle, registry, or translation into kernel internals. The
+quality gate rejects gRPC, Protobuf, and generated protocol imports from kernel
+packages.
+
 See `docs/adr/0001-spice-native-composition.md` for the rejected parallel graph.

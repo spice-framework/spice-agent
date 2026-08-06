@@ -82,6 +82,17 @@ Daemon startup targets 250 ms, warm connection 75 ms, and local event delivery
 p95 10 ms. Evidence records OS/build, endpoint type, handshake timing, replay
 cursor, terminal transcript, and generated target source map.
 
-Status is **planned**. Placeholder packages deliberately contain no fake
-executable behavior; implementation begins after phase 2 snapshot/interaction
-contracts are green.
+Status is **in progress**. Slice 1 is implemented: provisional schemas,
+generated Go, handwritten boundary validation, compatibility/freshness gate,
+protocol tests, and fuzz smoke are green. This is intentionally not a daemon.
+Slices 2 through 6 remain pending, including OS transport, authentication,
+managed startup, client/session translation, Bubble Tea behavior, and real
+Windows/Linux reconnect acceptance. See
+[`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
+
+The baseline remains intentionally provisional. Before the final Phase 4
+freeze, the daemon host slice must close interaction-delivery/run-identity,
+reconnect ownership, snapshot suspend/import identity, atomic replay bounds,
+and RPC-context/run-lifetime seams. Buf protects changes against the committed
+baseline so every amendment is explicit; it does not imply those semantics are
+already stable.

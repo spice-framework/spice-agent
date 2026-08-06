@@ -1,0 +1,288 @@
+syntax = "proto3";
+
+package spice.agent.engine.v1;
+
+import "spice/agent/common/v1/common.proto";
+
+option go_package = "github.com/spice-framework/spice-agent/engine/v1;enginev1";
+
+// MessageRole identifies a provider-neutral conversation author.
+enum MessageRole {
+  MESSAGE_ROLE_UNSPECIFIED = 0;
+  MESSAGE_ROLE_SYSTEM = 1;
+  MESSAGE_ROLE_USER = 2;
+  MESSAGE_ROLE_ASSISTANT = 3;
+  MESSAGE_ROLE_TOOL = 4;
+}
+
+// EventKind identifies one stable engine event.
+enum EventKind {
+  EVENT_KIND_UNSPECIFIED = 0;
+  EVENT_KIND_RUN_STARTED = 1;
+  EVENT_KIND_RUN_COMPLETED = 2;
+  EVENT_KIND_RUN_FAILED = 3;
+  EVENT_KIND_RUN_CANCELLED = 4;
+  EVENT_KIND_TURN_STARTED = 5;
+  EVENT_KIND_TURN_COMPLETED = 6;
+  EVENT_KIND_TURN_FAILED = 7;
+  EVENT_KIND_MODEL_STARTED = 8;
+  EVENT_KIND_MODEL_DELTA = 9;
+  EVENT_KIND_MODEL_COMPLETED = 10;
+  EVENT_KIND_MODEL_FAILED = 11;
+  EVENT_KIND_TOOL_STARTED = 12;
+  EVENT_KIND_TOOL_PROGRESS = 13;
+  EVENT_KIND_TOOL_COMPLETED = 14;
+  EVENT_KIND_TOOL_FAILED = 15;
+  EVENT_KIND_INTERACTION_STARTED = 16;
+  EVENT_KIND_INTERACTION_COMPLETED = 17;
+  EVENT_KIND_INTERACTION_FAILED = 18;
+  EVENT_KIND_INTERACTION_CANCELLED = 19;
+}
+
+// SnapshotLifecycle is a safe export/import boundary.
+enum SnapshotLifecycle {
+  SNAPSHOT_LIFECYCLE_UNSPECIFIED = 0;
+  SNAPSHOT_LIFECYCLE_SUSPENDED = 1;
+  SNAPSHOT_LIFECYCLE_COMPLETED = 2;
+  SNAPSHOT_LIFECYCLE_FAILED = 3;
+  SNAPSHOT_LIFECYCLE_CANCELLED = 4;
+}
+
+// ToolCallPart is a bounded model-requested tool invocation.
+message ToolCallPart {
+  string call_id = 1;
+  string name = 2;
+  bytes arguments_json = 3;
+}
+
+// ToolResultPart is a bounded tool result correlated to one call.
+message ToolResultPart {
+  string call_id = 1;
+  string name = 2;
+  bytes result_json = 3;
+}
+
+// ExtensionPart is portable namespaced JSON content.
+message ExtensionPart {
+  string namespace = 1;
+  bytes value_json = 2;
+}
+
+// ContentPart contains exactly one provider-neutral message payload.
+message ContentPart {
+  oneof value {
+    string text = 1;
+    ToolCallPart tool_call = 2;
+    ToolResultPart tool_result = 3;
+    ExtensionPart extension = 4;
+  }
+}
+
+// Message is one bounded provider-neutral conversation entry.
+message Message {
+  string id = 1;
+  MessageRole role = 2;
+  repeated ContentPart parts = 3;
+}
+
+// AgentDefinitionRef identifies a validated generated execution definition.
+message AgentDefinitionRef {
+  string id = 1;
+  string revision = 2;
+  string model = 3;
+  uint32 max_turns = 4;
+  // expected_static_plan_fingerprint is an assertion, not client authority.
+  string expected_static_plan_fingerprint = 5;
+  reserved 6;
+}
+
+// InitializeRequest is the mandatory first authenticated client operation.
+message InitializeRequest {
+  spice.agent.common.v1.ProtocolRange protocol = 1;
+  spice.agent.common.v1.BuildIdentity client = 2;
+  spice.agent.common.v1.CapabilitySet supported_capabilities = 3;
+  spice.agent.common.v1.CapabilitySet required_capabilities = 4;
+  spice.agent.common.v1.Limits requested_limits = 5;
+  bytes authentication_token = 6;
+}
+
+// InitializeResponse contains the negotiated connection contract.
+message InitializeResponse {
+  spice.agent.common.v1.Status status = 1;
+  spice.agent.common.v1.ProtocolVersion protocol = 2;
+  spice.agent.common.v1.BuildIdentity server = 3;
+  spice.agent.common.v1.CapabilitySet capabilities = 4;
+  spice.agent.common.v1.Limits limits = 5;
+  spice.agent.common.v1.Health health = 6;
+  string client_id = 7;
+  uint64 ownership_epoch = 8;
+}
+
+// HealthRequest identifies the initialized client.
+message HealthRequest {
+  string client_id = 1;
+  uint64 ownership_epoch = 2;
+}
+
+// HealthResponse reports bounded readiness and limits.
+message HealthResponse {
+  spice.agent.common.v1.Status status = 1;
+  spice.agent.common.v1.BuildIdentity server = 2;
+  spice.agent.common.v1.ProtocolVersion protocol = 3;
+  spice.agent.common.v1.Health health = 4;
+}
+
+// StartRunRequest creates one run exactly once per client operation ID.
+message StartRunRequest {
+  string client_id = 1;
+  uint64 ownership_epoch = 2;
+  string client_operation_id = 3;
+  AgentDefinitionRef definition = 4;
+  Message input = 5;
+}
+
+// StartRunResponse returns the stable run identity and first sequence.
+message StartRunResponse {
+  spice.agent.common.v1.Status status = 1;
+  string run_id = 2;
+  uint64 initial_sequence = 3;
+  bool duplicate_operation = 4;
+  // plan_id authoritatively identifies the server-selected immutable plan.
+  string plan_id = 5;
+}
+
+// StreamEventsRequest replays and tails events after an acknowledged sequence.
+message StreamEventsRequest {
+  string client_id = 1;
+  uint64 ownership_epoch = 2;
+  string run_id = 3;
+  uint64 after_sequence = 4;
+  uint32 replay_limit = 5;
+  bool tail = 6;
+}
+
+// RunEvent is one strictly increasing authoritative event envelope.
+message RunEvent {
+  string run_id = 1;
+  uint64 sequence = 2;
+  int64 unix_nano = 3;
+  EventKind kind = 4;
+  bytes payload_json = 5;
+  bool terminal = 6;
+  string operation_id = 7;
+}
+
+// StreamControl marks replay bounds, terminal status, or disconnect position.
+message StreamControl {
+  spice.agent.common.v1.Status status = 1;
+  uint64 earliest_sequence = 2;
+  uint64 latest_sequence = 3;
+  uint64 last_delivered_sequence = 4;
+  bool tailing = 5;
+}
+
+// StreamEventsResponse contains one event or one explicit control record.
+message StreamEventsResponse {
+  oneof payload {
+    RunEvent event = 1;
+    StreamControl control = 2;
+  }
+}
+
+// CancelRunRequest idempotently asks the engine to cancel one run.
+message CancelRunRequest {
+  string client_id = 1;
+  uint64 ownership_epoch = 2;
+  string client_operation_id = 3;
+  string run_id = 4;
+  string reason = 5;
+}
+
+// CancelRunResponse distinguishes new cancellation from an existing terminal.
+message CancelRunResponse {
+  spice.agent.common.v1.Status status = 1;
+  bool cancellation_requested = 2;
+  bool already_terminal = 3;
+  uint64 terminal_sequence = 4;
+}
+
+// RespondInteractionRequest completes one pending interaction exactly once.
+message RespondInteractionRequest {
+  string client_id = 1;
+  uint64 ownership_epoch = 2;
+  string client_operation_id = 3;
+  string run_id = 4;
+  string interaction_id = 5;
+  string response_id = 6;
+  bytes value_json = 7;
+}
+
+// RespondInteractionResponse reports duplicate and committed responses.
+message RespondInteractionResponse {
+  spice.agent.common.v1.Status status = 1;
+  bool accepted = 2;
+  bool duplicate_response = 3;
+  uint64 committed_sequence = 4;
+}
+
+// SnapshotEnvelope carries one checksummed provider-neutral safe snapshot.
+message SnapshotEnvelope {
+  string format = 1;
+  string run_id = 2;
+  uint64 last_sequence = 3;
+  SnapshotLifecycle lifecycle = 4;
+  bytes payload = 5;
+  bytes sha256 = 6;
+}
+
+// ExportSnapshotRequest requests a safe completed-turn or terminal boundary.
+message ExportSnapshotRequest {
+  string client_id = 1;
+  uint64 ownership_epoch = 2;
+  string run_id = 3;
+}
+
+// ExportSnapshotResponse contains the safe snapshot or typed refusal.
+message ExportSnapshotResponse {
+  spice.agent.common.v1.Status status = 1;
+  SnapshotEnvelope snapshot = 2;
+}
+
+// ImportSnapshotRequest resumes a suspended snapshot with explicit ownership.
+message ImportSnapshotRequest {
+  string client_id = 1;
+  uint64 ownership_epoch = 2;
+  string client_operation_id = 3;
+  string new_run_id = 4;
+  string expected_static_plan_fingerprint = 5;
+  string expected_plan_id = 6;
+  SnapshotEnvelope snapshot = 7;
+}
+
+// ImportSnapshotResponse returns the imported run and continuation sequence.
+message ImportSnapshotResponse {
+  spice.agent.common.v1.Status status = 1;
+  string run_id = 2;
+  uint64 next_sequence = 3;
+  bool duplicate_operation = 4;
+}
+
+// EngineService is the local daemon/client process boundary.
+service EngineService {
+  // Initialize negotiates protocol, capabilities, limits, and ownership.
+  rpc Initialize(InitializeRequest) returns (InitializeResponse);
+  // Health returns bounded local daemon readiness.
+  rpc Health(HealthRequest) returns (HealthResponse);
+  // StartRun creates a run idempotently for one client operation ID.
+  rpc StartRun(StartRunRequest) returns (StartRunResponse);
+  // StreamEvents replays and optionally tails authoritative ordered events.
+  rpc StreamEvents(StreamEventsRequest) returns (stream StreamEventsResponse);
+  // CancelRun cooperatively and idempotently cancels one run.
+  rpc CancelRun(CancelRunRequest) returns (CancelRunResponse);
+  // RespondInteraction completes one pending interaction exactly once.
+  rpc RespondInteraction(RespondInteractionRequest) returns (RespondInteractionResponse);
+  // ExportSnapshot returns one validated safe snapshot boundary.
+  rpc ExportSnapshot(ExportSnapshotRequest) returns (ExportSnapshotResponse);
+  // ImportSnapshot resumes one suspended snapshot under new ownership.
+  rpc ImportSnapshot(ImportSnapshotRequest) returns (ImportSnapshotResponse);
+}

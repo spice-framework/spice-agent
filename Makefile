@@ -1,4 +1,10 @@
-.PHONY: fast check coverage verify verify-release
+.PHONY: tools-bootstrap proto fast check coverage verify verify-release
+
+tools-bootstrap:
+	go run ./internal/qualitygate -mode=tools-bootstrap
+
+proto:
+	go run ./internal/qualitygate -mode=proto
 
 fast:
 	go run ./internal/qualitygate -mode=fast

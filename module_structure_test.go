@@ -18,6 +18,8 @@ func TestModulithUsesOneRepositoryRootAndUniquePublicInterfaces(t *testing.T) {
 	expected := map[string]string{
 		"agent/doc.go":            "kernel",
 		"annotation/agent/doc.go": "annotations",
+		"common/v1/doc.go":        "protocol-common-v1",
+		"engine/v1/doc.go":        "protocol-engine-v1",
 		"event/doc.go":            "event",
 		"interaction/doc.go":      "interaction",
 		"message/doc.go":          "message",

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -31,7 +32,7 @@ func main() {
 }
 
 func execute() int {
-	mode := flag.String("mode", "verify", "verification mode: fast, check, coverage, or verify")
+	mode := flag.String("mode", "verify", "verification mode: tools-bootstrap, proto, fast, check, coverage, or verify")
 	flag.Parse()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
@@ -54,6 +55,12 @@ type step struct {
 func run(ctx context.Context, root, mode string) error {
 	if runtime.Version() != requiredGoVersion {
 		return fmt.Errorf("go version is %s; require exactly %s", runtime.Version(), requiredGoVersion)
+	}
+	if networkAllowed(mode) {
+		return bootstrapDependencies(ctx, root, networkCommand)
+	}
+	if mode == "proto" {
+		return generateProtocol(ctx, root, root)
 	}
 	productEnvironment := map[string]string{
 		"GOFLAGS":     "-mod=vendor",
@@ -78,6 +85,7 @@ func run(ctx context.Context, root, mode string) error {
 			diffHygiene,
 			{"formatting", func() error { return checkFormatting(ctx, root) }},
 			{"module and vendor", func() error { return checkModule(ctx, root) }},
+			{"protobuf", func() error { return checkProtocol(ctx, root) }},
 			{"architecture", func() error { return checkArchitecture(root) }},
 			{"go vet", func() error { return command(ctx, root, productEnvironment, "go", "vet", "./...") }},
 			tests,
@@ -111,6 +119,97 @@ func run(ctx context.Context, root, mode string) error {
 	return nil
 }
 
+func networkAllowed(mode string) bool { return mode == "tools-bootstrap" }
+
+type bootstrapRunner func(context.Context, string, ...string) error
+
+type moduleGraph struct {
+	directory string
+	optional  bool
+}
+
+func bootstrapDependencies(
+	ctx context.Context,
+	root string,
+	runner bootstrapRunner,
+) (returnErr error) {
+	before, err := sourceTreeDigests(root)
+	if err != nil {
+		return fmt.Errorf("snapshot repository before bootstrap: %w", err)
+	}
+	defer func() {
+		after, snapshotErr := sourceTreeDigests(root)
+		if snapshotErr != nil {
+			returnErr = errors.Join(
+				returnErr,
+				fmt.Errorf("snapshot repository after bootstrap: %w", snapshotErr),
+			)
+			return
+		}
+		if !maps.Equal(before, after) {
+			returnErr = errors.Join(
+				returnErr,
+				errors.New("dependency bootstrap modified the repository"),
+			)
+		}
+	}()
+
+	graphs := []moduleGraph{
+		{directory: root},
+		{directory: filepath.Join(root, "tools"), optional: true},
+	}
+	for _, graph := range graphs {
+		if err := bootstrapModuleGraph(ctx, graph, runner); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func bootstrapModuleGraph(
+	ctx context.Context,
+	graph moduleGraph,
+	runner bootstrapRunner,
+) (returnErr error) {
+	moduleFile := filepath.Join(graph.directory, "go.mod")
+	moduleContent, err := os.ReadFile(moduleFile) // #nosec G304 -- repository-owned module graph.
+	if errors.Is(err, os.ErrNotExist) && graph.optional {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read %s: %w", moduleFile, err)
+	}
+	temporary, err := os.MkdirTemp("", "spice-agent-tools-bootstrap-*")
+	if err != nil {
+		return fmt.Errorf("create dependency bootstrap directory: %w", err)
+	}
+	defer func() { returnErr = errors.Join(returnErr, os.RemoveAll(temporary)) }()
+	temporaryRoot, err := os.OpenRoot(temporary)
+	if err != nil {
+		return fmt.Errorf("open dependency bootstrap directory: %w", err)
+	}
+	defer func() { returnErr = errors.Join(returnErr, temporaryRoot.Close()) }()
+
+	temporaryModule := filepath.Join(temporary, "graph.mod")
+	if writeErr := temporaryRoot.WriteFile("graph.mod", moduleContent, 0o600); writeErr != nil {
+		return fmt.Errorf("write temporary module file: %w", writeErr)
+	}
+	sumFile := filepath.Join(graph.directory, "go.sum")
+	sumContent, err := os.ReadFile(sumFile) // #nosec G304 -- repository-owned module graph.
+	if err == nil {
+		if writeErr := temporaryRoot.WriteFile("graph.sum", sumContent, 0o600); writeErr != nil {
+			return fmt.Errorf("write temporary checksum file: %w", writeErr)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("read %s: %w", sumFile, err)
+	}
+	return runner(ctx, graph.directory, bootstrapDownloadArguments(temporaryModule)...)
+}
+
+func bootstrapDownloadArguments(moduleFile string) []string {
+	return []string{"mod", "download", "-modfile=" + moduleFile, "all"}
+}
+
 func checkIdentity(root string) error {
 	content, err := os.ReadFile(filepath.Join(root, "go.mod")) // #nosec G304 -- repository-owned path.
 	if err != nil {
@@ -131,6 +230,9 @@ func checkFormatting(ctx context.Context, root string) error {
 	if err != nil {
 		return err
 	}
+	files = slices.DeleteFunc(files, func(path string) bool {
+		return strings.HasSuffix(path, ".pb.go")
+	})
 	for _, name := range []string{"goimports", "gofumpt"} {
 		executable, pathErr := toolPath(ctx, root, name)
 		if pathErr != nil {
@@ -196,6 +298,118 @@ func checkModule(ctx context.Context, root string) error {
 	return nil
 }
 
+type bufGenerationTemplate struct {
+	Version string                `json:"version"`
+	Plugins []bufGenerationPlugin `json:"plugins"`
+	Inputs  []bufGenerationInput  `json:"inputs"`
+}
+
+type bufGenerationPlugin struct {
+	Local  []string `json:"local"`
+	Out    string   `json:"out"`
+	Option []string `json:"opt"`
+}
+
+type bufGenerationInput struct {
+	Directory string `json:"directory"`
+}
+
+func checkProtocol(ctx context.Context, root string) (returnErr error) {
+	buf, err := toolPath(ctx, root, "buf")
+	if err != nil {
+		return err
+	}
+	if err = command(ctx, root, nil, buf, "lint", "."); err != nil {
+		return err
+	}
+	if err = command(ctx, root, nil, buf, "breaking", ".", "--against", "schema-baseline"); err != nil {
+		return err
+	}
+	temporary, err := os.MkdirTemp("", "spice-agent-protobuf-*")
+	if err != nil {
+		return fmt.Errorf("create protobuf comparison directory: %w", err)
+	}
+	defer func() { returnErr = errors.Join(returnErr, os.RemoveAll(temporary)) }()
+	if err = generateProtocol(ctx, root, temporary); err != nil {
+		return err
+	}
+	want, err := generatedProtocolDigests(temporary)
+	if err != nil {
+		return err
+	}
+	got, err := generatedProtocolDigests(root)
+	if err != nil {
+		return err
+	}
+	if !maps.Equal(got, want) {
+		return errors.New("generated Protobuf Go differs from repository schemas; run make proto")
+	}
+	return nil
+}
+
+func generateProtocol(ctx context.Context, root, output string) (returnErr error) {
+	buf, err := toolPath(ctx, root, "buf")
+	if err != nil {
+		return err
+	}
+	temporary, err := os.MkdirTemp("", "spice-agent-buf-template-*")
+	if err != nil {
+		return fmt.Errorf("create Buf template directory: %w", err)
+	}
+	defer func() { returnErr = errors.Join(returnErr, os.RemoveAll(temporary)) }()
+	template := bufGenerationTemplate{
+		Version: "v2",
+		Plugins: []bufGenerationPlugin{
+			{
+				Local:  []string{exactGoExecutable(), "-C", filepath.Join(root, "tools"), "tool", "protoc-gen-go"},
+				Out:    output,
+				Option: []string{"module=" + modulePath},
+			},
+			{
+				Local:  []string{exactGoExecutable(), "-C", filepath.Join(root, "tools"), "tool", "protoc-gen-go-grpc"},
+				Out:    output,
+				Option: []string{"module=" + modulePath},
+			},
+		},
+		Inputs: []bufGenerationInput{{Directory: filepath.Join(root, "proto")}},
+	}
+	content, err := json.Marshal(template)
+	if err != nil {
+		return fmt.Errorf("encode Buf generation template: %w", err)
+	}
+	temporaryRoot, err := os.OpenRoot(temporary)
+	if err != nil {
+		return fmt.Errorf("open Buf template directory: %w", err)
+	}
+	defer func() { returnErr = errors.Join(returnErr, temporaryRoot.Close()) }()
+	if err = temporaryRoot.WriteFile("buf.gen.json", content, 0o600); err != nil {
+		return fmt.Errorf("write Buf generation template: %w", err)
+	}
+	return command(ctx, root, nil, buf, "generate", "--template", filepath.Join(temporary, "buf.gen.json"))
+}
+
+func generatedProtocolDigests(root string) (map[string][sha256.Size]byte, error) {
+	result := make(map[string][sha256.Size]byte)
+	for _, directory := range []string{"common/v1", "engine/v1"} {
+		path := filepath.Join(root, filepath.FromSlash(directory))
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			return nil, fmt.Errorf("read generated protocol directory %s: %w", directory, err)
+		}
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".pb.go") {
+				continue
+			}
+			content, readErr := os.ReadFile(filepath.Join(path, entry.Name())) // #nosec G304 -- bounded generated paths.
+			if readErr != nil {
+				return nil, readErr
+			}
+			result[filepath.ToSlash(filepath.Join(directory, entry.Name()))] = sha256.Sum256(content)
+		}
+	}
+	return result, nil
+}
+
 func lint(ctx context.Context, root string) error {
 	environment := map[string]string{"GOWORK": "off", "GOTOOLCHAIN": "local", "GOFLAGS": "-mod=vendor"}
 	golangci, err := toolPath(ctx, root, "golangci-lint")
@@ -234,6 +448,8 @@ func fuzz(ctx context.Context, root string, environment map[string]string) error
 		{"./tool", "FuzzToolCall"},
 		{"./agent", "FuzzParseSnapshot"},
 		{"./annotation/agent", "FuzzToolHandler"},
+		{"./common/v1", "FuzzCommonEnvelope"},
+		{"./engine/v1", "FuzzEngineEnvelope"},
 	} {
 		if err := command(ctx, root, environment, "go", "test", "-run=^$", "-fuzz=^"+target.name+"$", "-fuzztime=1s", target.pkg); err != nil {
 			return err
@@ -243,9 +459,13 @@ func fuzz(ctx context.Context, root string, environment map[string]string) error
 }
 
 func toolPath(ctx context.Context, root, name string) (string, error) {
-	output, err := capture(ctx, root, map[string]string{"GOWORK": "off", "GOTOOLCHAIN": "local"}, "go", "-C", "tools", "tool", "-n", name)
+	output, err := capture(ctx, root, nil, "go", "-C", "tools", "tool", "-n", name)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf(
+			"resolve tool %q offline; run make tools-bootstrap once: %w",
+			name,
+			err,
+		)
 	}
 	path := strings.TrimSpace(output)
 	if path == "" {
@@ -255,6 +475,14 @@ func toolPath(ctx context.Context, root, name string) (string, error) {
 }
 
 func treeDigests(root string) (map[string][sha256.Size]byte, error) {
+	return digests(root, false)
+}
+
+func sourceTreeDigests(root string) (map[string][sha256.Size]byte, error) {
+	return digests(root, true)
+}
+
+func digests(root string, excludeGit bool) (map[string][sha256.Size]byte, error) {
 	opened, err := os.OpenRoot(root)
 	if err != nil {
 		return nil, fmt.Errorf("open tree root: %w", err)
@@ -266,6 +494,9 @@ func treeDigests(root string) (map[string][sha256.Size]byte, error) {
 			return walkErr
 		}
 		if entry.IsDir() {
+			if excludeGit && path == ".git" {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		content, readErr := opened.ReadFile(path)
@@ -298,6 +529,23 @@ func checkArchitecture(root string) error {
 		} {
 			if bytes.Contains(content, []byte(forbidden)) {
 				return fmt.Errorf("%s contains forbidden compiled composition mechanism %q", path, forbidden)
+			}
+		}
+		relative, relativeErr := filepath.Rel(root, path)
+		if relativeErr != nil {
+			return relativeErr
+		}
+		first, _, _ := strings.Cut(filepath.ToSlash(relative), "/")
+		if slices.Contains([]string{"agent", "event", "interaction", "message", "model", "stage", "tool"}, first) {
+			for _, forbiddenImport := range []string{
+				`"google.golang.org/grpc`,
+				`"google.golang.org/protobuf`,
+				`"` + modulePath + `/common/v1"`,
+				`"` + modulePath + `/engine/v1"`,
+			} {
+				if bytes.Contains(content, []byte(forbiddenImport)) {
+					return fmt.Errorf("kernel file %s imports process-boundary package %s", relative, forbiddenImport)
+				}
 			}
 		}
 	}
@@ -359,7 +607,8 @@ func excludeGeneratedCoverage(path string) error {
 	filtered = append(filtered, lines[0])
 	generatedPrefix := modulePath + "/internal/spicegen/"
 	for _, line := range lines[1:] {
-		if line == "" || strings.Contains(line, generatedPrefix) {
+		if line == "" || strings.Contains(line, generatedPrefix) ||
+			(strings.HasPrefix(line, modulePath+"/") && strings.Contains(line, ".pb.go:")) {
 			continue
 		}
 		filtered = append(filtered, line)
@@ -416,6 +665,7 @@ func capture(ctx context.Context, directory string, environment map[string]strin
 }
 
 func runCommand(ctx context.Context, directory string, environment map[string]string, captureOutput bool, executable string, arguments ...string) (string, error) {
+	executable = qualityExecutable(executable)
 	// #nosec G204,G702 -- commands and arguments are fixed repository-owned values.
 	process := exec.CommandContext(ctx, executable, arguments...)
 	process.Dir = directory
@@ -433,8 +683,62 @@ func runCommand(ctx context.Context, directory string, environment map[string]st
 	return output.String(), nil
 }
 
+func networkCommand(
+	ctx context.Context,
+	directory string,
+	arguments ...string,
+) error {
+	// #nosec G204,G702 -- only exact copied module graphs are downloaded.
+	process := exec.CommandContext(ctx, exactGoExecutable(), arguments...)
+	process.Dir = directory
+	process.Env = commandEnvironment(true, nil)
+	process.Stdout = os.Stdout
+	process.Stderr = os.Stderr
+	if err := process.Run(); err != nil {
+		return fmt.Errorf("go %s: %w", strings.Join(arguments, " "), err)
+	}
+	return nil
+}
+
+func qualityExecutable(executable string) string {
+	if executable == "go" {
+		return exactGoExecutable()
+	}
+	return executable
+}
+
+func exactGoExecutable() string {
+	//nolint:staticcheck // Gate runs in place under the selected exact toolchain.
+	return filepath.Join(runtime.GOROOT(), "bin", goExecutableName(runtime.GOOS))
+}
+
+func goExecutableName(goos string) string {
+	if goos == "windows" {
+		return "go.exe"
+	}
+	return "go"
+}
+
 func mergedEnvironment(overrides map[string]string) []string {
-	values := make(map[string]string, len(overrides))
+	return commandEnvironment(false, overrides)
+}
+
+func commandEnvironment(network bool, overrides map[string]string) []string {
+	values := map[string]string{
+		"GOFLAGS":     "",
+		"GOTOOLCHAIN": "local",
+		"GOWORK":      "off",
+	}
+	if network {
+		values["GOAUTH"] = "off"
+		values["GONOPROXY"] = ""
+		values["GONOSUMDB"] = ""
+		values["GOPRIVATE"] = ""
+		values["GOPROXY"] = "https://proxy.golang.org"
+		values["GOSUMDB"] = "sum.golang.org"
+	} else {
+		values["GOPROXY"] = "off"
+	}
 	for key, value := range overrides {
 		values[strings.ToUpper(key)] = value
 	}
@@ -442,15 +746,27 @@ func mergedEnvironment(overrides map[string]string) []string {
 	for _, entry := range os.Environ() {
 		key, _, found := strings.Cut(entry, "=")
 		if found {
-			if _, replaced := values[strings.ToUpper(key)]; replaced {
+			upperKey := strings.ToUpper(key)
+			if sensitiveEnvironmentKey(upperKey) {
 				continue
 			}
+			if _, replaced := values[upperKey]; !replaced {
+				result = append(result, entry)
+			}
 		}
-		result = append(result, entry)
 	}
 	for key, value := range values {
 		result = append(result, key+"="+value)
 	}
 	slices.Sort(result)
 	return result
+}
+
+func sensitiveEnvironmentKey(key string) bool {
+	return strings.Contains(key, "TOKEN") ||
+		strings.Contains(key, "PASSWORD") ||
+		strings.Contains(key, "SECRET") ||
+		strings.HasSuffix(key, "API_KEY") ||
+		strings.HasSuffix(key, "ACCESS_KEY") ||
+		strings.HasSuffix(key, "PRIVATE_KEY")
 }

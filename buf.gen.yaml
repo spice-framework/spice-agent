@@ -1,0 +1,12 @@
+version: v2
+plugins:
+  - local: ["go", "-C", "tools", "tool", "protoc-gen-go"]
+    out: .
+    opt:
+      - module=github.com/spice-framework/spice-agent
+  - local: ["go", "-C", "tools", "tool", "protoc-gen-go-grpc"]
+    out: .
+    opt:
+      - module=github.com/spice-framework/spice-agent
+inputs:
+  - directory: proto

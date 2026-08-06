@@ -15,6 +15,9 @@ func TestExcludeGeneratedCoverageKeepsHandwrittenStatements(t *testing.T) {
 		modulePath + "/agent/engine.go:10.1,12.2 1 1",
 		modulePath + "/internal/spicegen/proof/spice_providers_gen.go:10.1,12.2 1 1",
 		modulePath + "/internal/spicegen/proof/sources/app/app_spice_gen.go:8.1,9.2 1 1",
+		modulePath + "/common/v1/common.pb.go:8.1,9.2 1 1",
+		modulePath + "/engine/v1/engine_grpc.pb.go:8.1,9.2 1 1",
+		"example.com/external/common/v1/external.pb.go:1.1,2.2 1 1",
 		"example.com/external/internal/spicegen/handwritten.go:1.1,2.2 1 1",
 	}, "\n") + "\n"
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
@@ -31,9 +34,14 @@ func TestExcludeGeneratedCoverageKeepsHandwrittenStatements(t *testing.T) {
 	if strings.Contains(text, modulePath+"/internal/spicegen/") {
 		t.Fatalf("generated coverage remains: %s", text)
 	}
+	if strings.Contains(text, modulePath+"/common/v1/common.pb.go") ||
+		strings.Contains(text, modulePath+"/engine/v1/engine_grpc.pb.go") {
+		t.Fatalf("generated Protobuf coverage remains: %s", text)
+	}
 	for _, expected := range []string{
 		"mode: atomic",
 		modulePath + "/agent/engine.go",
+		"example.com/external/common/v1/external.pb.go",
 		"example.com/external/internal/spicegen/handwritten.go",
 	} {
 		if !strings.Contains(text, expected) {

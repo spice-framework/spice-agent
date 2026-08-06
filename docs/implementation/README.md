@@ -6,10 +6,10 @@ Repository roadmaps link here and must not duplicate status.
 | Phase | State | Exit evidence |
 | --- | --- | --- |
 | 0 — product and repositories | In progress | repository governance, exact toolchain, offline build, quality gate |
-| 1 — Spice-native composition | In progress | annotation/DI fixture, generated graph diagnostics |
+| 1 — Spice-native composition | Complete for preview | generated static DI, auto-configuration, cross-repository continuation |
 | 2 — deterministic kernel | Complete for preview | `841edd3`; deterministic lifecycle, interaction, snapshot, race/fuzz proof |
 | 3 — provider and coding tools | In progress | generated cross-repository continuation and opt-in live acceptance |
-| 4 — daemon and TUI | Planned | local protocol and reconnect proof |
+| 4 — daemon and TUI | In progress | provisional local protocol baseline; host/reconnect proof pending |
 | 5 — runtime plugins | Planned | Go/Python conformance and generation leases |
 | 6 — architecture proof | Planned | signed `v0.1.0-preview.1` distribution |
 | 7 — stress prototypes | Planned | permission, SQLite, alternate UI, two-worker experiments |
@@ -33,26 +33,58 @@ race, replay-gap, identifier-reuse, and tool-plan-fingerprint tests. Commit
 `841edd3` passed `make verify` in 29.9s at 86.2% repository coverage. Durable
 SQLite recovery remains the isolated Phase 7 stress proof.
 
-## Current Phase 1 boundary
+## Phase 1 preview completion
 
 Canonical `@Stage`, `@Tool`, and `@ModelProvider` descriptors and their
 authorized v1alpha2 process are implemented using only generic Spice provider
 and bean-metadata contributions. The in-module `CompositionProof` application
 now commits and executes the real generated graph, selection matrix, ordered
 collections, canonical tool map, cleanup/rollback, typed override, ownership,
-diagnostic, module, and source-mapping proof. Exact reproducible commands and
-asserted output are recorded in
-[`evidence/phase1-composition.md`](evidence/phase1-composition.md). Phase 1
-remains in progress until auto-configuration contracts and cross-repository
-compiled continuation evidence are complete.
+diagnostic, module, and source-mapping proof. Provider, coding-tool, and TUI
+repositories now contribute through explicit auto-configuration, and
+distribution commit `4cfd19a` proves the generated cross-repository compiled
+continuation without a registry or `RuntimeGraph`. Exact reproducible commands
+and asserted core output are recorded in
+[`evidence/phase1-composition.md`](evidence/phase1-composition.md). This closes
+Phase 1 for the preview; pre-1.0 contract changes remain governed by the later
+stress and external-author phases.
 
 ## Current Phase 3 boundary
 
-The provider and coding-tool repositories are implemented and independently
-repinned, but Phase 3 is not complete. Remaining exit evidence is a generated
-cross-repository compiled tool-call continuation through the kernel and the
-opt-in live OpenAI acceptance, which has not been run because no credentials
-were supplied. Offline scripted acceptance remains the mandatory default.
+The provider and coding-tool repositories, including the opt-in live test path,
+are implemented and independently repinned. The generated cross-repository architecture proof is green at
+`spice-agent-coding` commit `16244f5`: Windows `make fast` was 15.2 seconds,
+`make check` was 18.2 seconds, and `make verify` was 65 seconds at 86.0%
+coverage. A clean WSL2 Linux/amd64 clone at that commit ran Go 1.26.5,
+`make tools-bootstrap` in 1.35 seconds, and full `make verify` in approximately
+75 seconds with zero lint findings, no reachable vulnerabilities, race tests,
+and vendor-offline acceptance; the worktree remained clean. Phase 3 is not
+complete because opt-in live OpenAI acceptance has not been run with supplied
+credentials. Distribution commit `4cfd19a` (including follow-up `1dbef3d` and
+exact provider `4beed383` / coding-tools `17cbef3b`) proves real provider HTTP-request
+cancellation, exact model/turn/run terminal events, and secret scans across
+events, generated source, and manifests; `make verify` passed in 73.8 seconds
+at 86.4% coverage with zero lint findings, no reachable vulnerabilities, race,
+and vendor-offline checks. Offline scripted acceptance remains the mandatory
+default.
+
+## Current Phase 4 boundary
+
+`common/v1` and `engine/v1` now define the provisional repository-owned Protobuf boundary
+and handwritten fail-closed validation for negotiation, health, run creation,
+ordered bounded replay, cancellation, stale interactions, and safe snapshot
+transfer. Buf lint, FILE-level breaking comparison against
+`schema-baseline`, exact local Go-tool generation, and byte-identical freshness
+are normal offline gates. Unknown fields, old/new peers, capabilities, overload,
+replay gaps, stale clients, snapshot version skew, generated service shape, and
+protocol fuzzing are covered. No daemon, listener, transport authentication,
+managed startup, or TUI implementation is claimed by this slice. Reproducible
+commands are recorded in
+[`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
+The schema is not the final Phase 4 freeze: the host slice must reconcile
+interaction delivery and run identity, reconnect ownership, suspend/import
+semantics, atomic replay bounds, and RPC-context versus run-lifetime ownership
+before the baseline can be declared stable.
 
 ## Current infrastructure blocker
 
@@ -72,18 +104,34 @@ starting; diagnosing organization billing/policy requires unavailable
 not be dismissed, although their tools modules already pin v1.82.1 and local
 `govulncheck` is clean.
 
+Development catalog commit `a8990e3f` adds topological concurrent
+five-repository fast verification, an exact compatibility snapshot, and
+vendor-only macOS amd64/arm64 compile proof; its `make verify` passed at 85.6%
+coverage. Organization-profile commit `3ee0039d` records reusable workflow and
+Actions-queue governance. macOS remains compile-only: real race, UI, process,
+and runtime acceptance still requires a macOS runner.
+
 ## Completed evidence
 
 - Organization governance/profile: `.github` `11e9470`.
 - Development catalog/workspace: `36a3bf5`; `make verify` 98s, 85.5% coverage.
+- Phase 0 catalog/governance follow-up: development `a8990e3f` (85.6% coverage,
+  concurrent five-repository fast and macOS vendor compile), organization
+  profile `3ee0039d`.
 - Core foundation: `spice-agent` `218ffbb`.
 - Professional quality baseline: `829dd0a`; `make verify` 27.6s, 87.7% coverage.
 - Hardened deterministic kernel: `eaf1918`; `make verify` 23.9s, 88.4% coverage.
 - Completed preview kernel: `841edd3`; `make verify` 29.9s, 86.2% coverage.
+- Spice-native composition proof: `1f07284`; `make verify` 137.3s, 86.2% coverage.
 - OpenAI provider final repin `88c3044`; `make verify` 29.25s, 89.3% coverage.
 - Coding-tools final repin `653b405`; `make verify` 33.19s, 87.7% coverage.
 - TUI foundation through `spice-agent-tui` `28a89dc`.
 - Reference distribution through `spice-agent-coding` `2809a1a`.
+- Generated Phase 3 architecture proof: `spice-agent-coding` `16244f5`;
+  Windows and clean-clone WSL2 Linux full verification green at 86.0% coverage.
+- Current Phase 3 distribution proof: `spice-agent-coding` `4cfd19a` (provider
+  `4beed383`, coding tools `17cbef3b`);
+  `make verify` 73.8s, 86.4% coverage.
 
 Active follow-up slices are not recorded as completed evidence until their
 repositories publish green commits.

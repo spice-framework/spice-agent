@@ -10,10 +10,17 @@ This project is pre-1.0. See [the implementation ledger](docs/implementation/REA
 and [architecture](ARCHITECTURE.md) before adopting its APIs.
 
 ```text
-make fast    # affected feedback
-make check   # broad edit loop
-make verify  # commit gate
+make tools-bootstrap # explicit fresh-cache dependency download
+make proto           # regenerate committed Protobuf Go with local tools
+make fast            # affected feedback
+make check           # broad edit loop, including protocol compatibility
+make verify          # commit gate
 ```
 
-Spice Agent is licensed under Apache-2.0.
+The repository also owns the transport-only `common/v1` and `engine/v1`
+Protobuf contracts. These packages define daemon/client wire messages and
+validation; they do not implement a daemon and are not imported by the kernel.
+Normal generation and verification are offline. See
+[verification](docs/verification.md) for the one explicit bootstrap exception.
 
+Spice Agent is licensed under Apache-2.0.
