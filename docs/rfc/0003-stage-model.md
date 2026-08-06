@@ -62,3 +62,12 @@ primary/qualifier resolution, ordered decorators, named tool maps, test override
 capability snapshots, panic/cancellation, and absence of registry/reflection
 source. A future permission stress prototype must intercept every executable
 route without kernel changes.
+
+The in-module `CompositionProof` target is the canonical compiled-composition
+fixture. It returns exact aliased interfaces from the agent annotations, uses
+the official typed `@Primary` and parameter `@Qualifier` metadata, and commits
+the ordinary generated graph, ownership manifest, and source mappings. Its
+application tests execute construction, selection, ordered transforms,
+canonical map injection, typed override, rollback, and reverse cleanup. The
+separate negative fixtures are compiled by the real CLI and retain stable
+source-positioned diagnostics.

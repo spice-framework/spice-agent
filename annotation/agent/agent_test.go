@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"reflect"
 	"slices"
 	"strings"
@@ -121,22 +122,32 @@ func TestModelProviderSelectionIsNeverImplicit(t *testing.T) {
 }
 
 func TestHandlersPreserveStandardProviderCleanupAndErrorForms(t *testing.T) {
-	for _, typeID := range []string{
-		"func() (github.com/spice-framework/spice-agent/tool.Tool, error)",
-		"func() (github.com/spice-framework/spice-agent/tool.Tool, github.com/spice-framework/spice/lifecycle.Cleanup)",
-		"func() (github.com/spice-framework/spice-agent/tool.Tool, github.com/spice-framework/spice/lifecycle.Cleanup, error)",
-		"func() (result github.com/spice-framework/spice-agent/tool.Tool, cleanup github.com/spice-framework/spice/lifecycle.Cleanup, err error)",
-		"func() example.com/app.ToolAlias",
+	for _, test := range []struct {
+		typeID  string
+		results []sdk.FunctionResultFact
+	}{
+		{"func() (github.com/spice-framework/spice-agent/tool.Tool, error)", []sdk.FunctionResultFact{toolResult("github.com/spice-framework/spice-agent/tool.Tool"), errorResult()}},
+		{"func() (github.com/spice-framework/spice-agent/tool.Tool, github.com/spice-framework/spice/lifecycle.Cleanup)", []sdk.FunctionResultFact{toolResult("github.com/spice-framework/spice-agent/tool.Tool"), cleanupResult()}},
+		{"func() (github.com/spice-framework/spice-agent/tool.Tool, github.com/spice-framework/spice/lifecycle.Cleanup, error)", []sdk.FunctionResultFact{toolResult("github.com/spice-framework/spice-agent/tool.Tool"), cleanupResult(), errorResult()}},
+		{"func() (result github.com/spice-framework/spice-agent/tool.Tool, cleanup github.com/spice-framework/spice/lifecycle.Cleanup, err error)", []sdk.FunctionResultFact{toolResult("github.com/spice-framework/spice-agent/tool.Tool"), cleanupResult(), errorResult()}},
+		{"func() example.com/app.ToolAlias", []sdk.FunctionResultFact{toolResult("example.com/app.ToolAlias")}},
 	} {
-		invocation := validInvocation("Tool", typeID, argument("name", sdk.KindString, "read"))
+		invocation := withResults(
+			validInvocation("Tool", test.typeID, argument("name", sdk.KindString, "read")),
+			test.results...,
+		)
 		if _, err := agentannotation.ToolHandler(t.Context(), invocation); err != nil {
-			t.Fatalf("ToolHandler(%q) = %v", typeID, err)
+			t.Fatalf("ToolHandler(%q) = %v", test.typeID, err)
 		}
 	}
-	stageInvocation := validInvocation(
-		"Stage",
-		"func() (github.com/spice-framework/spice-agent/stage.Stage[example.com/Input, example.com/Output], error)",
-		argument("name", sdk.KindString, "transform"),
+	stageInvocation := withResults(
+		validInvocation(
+			"Stage",
+			"func() (github.com/spice-framework/spice-agent/stage.Stage[example.com/Input, example.com/Output], error)",
+			argument("name", sdk.KindString, "transform"),
+		),
+		stageResult("github.com/spice-framework/spice-agent/stage.Stage[example.com/Input, example.com/Output]"),
+		errorResult(),
 	)
 	if _, err := agentannotation.StageHandler(t.Context(), stageInvocation); err != nil {
 		t.Fatalf("StageHandler(cleanup/error form) = %v", err)
@@ -157,7 +168,7 @@ func TestHandlersRejectInvalidTargetsArgumentsAndSelection(t *testing.T) {
 		{"wrong descriptor", withDescriptor(valid, "Stage"), "received descriptor"},
 		{"unexported", withDeclarationName(valid, "newRead"), "must be exported"},
 		{"method", withFact(valid, "receiver", "*Reader"), "must not be a method"},
-		{"no result", withType(valid, "func()"), "must return a provider value"},
+		{"no result", withResults(withType(valid, "func()")), "must return one provider value"},
 		{"missing name", validInvocation("Tool", "func() github.com/spice-framework/spice-agent/tool.Tool"), "name\" is required"},
 		{"noncanonical name", withArguments(valid, argument("name", sdk.KindString, "Read Tool")), "not canonical"},
 		{"duplicate alias", withArguments(valid, argument("name", sdk.KindString, "read"), argument("aliases", sdk.KindList, []string{"reader", "reader"})), "duplicated"},
@@ -182,10 +193,13 @@ func TestHandlersRejectInvalidTargetsArgumentsAndSelection(t *testing.T) {
 }
 
 func TestStageAcceptsNarrowExactApplicationInterface(t *testing.T) {
-	invocation := validInvocation(
-		"Stage",
-		"func(dependency func(context.Context) error) example.com/app.PromptStage",
-		argument("name", sdk.KindString, "prompt"),
+	invocation := withResults(
+		validInvocation(
+			"Stage",
+			"func(dependency func(context.Context) error) example.com/app.PromptStage",
+			argument("name", sdk.KindString, "prompt"),
+		),
+		narrowStageResult("example.com/app.PromptStage", "example.com/app", "PromptStage"),
 	)
 	if _, err := agentannotation.StageHandler(t.Context(), invocation); err != nil {
 		t.Fatal(err)
@@ -210,8 +224,64 @@ func TestOrderAcceptsPublishedInclusiveBounds(t *testing.T) {
 	}
 }
 
+func TestHandlersRejectMissingOrWrongFunctionResultFacts(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		handler    sdk.Handler
+		invocation sdk.Invocation
+		contains   string
+	}{
+		{
+			"legacy facts absent",
+			agentannotation.ToolHandler,
+			withoutResultFacts(validInvocation("Tool", "func() example.com/app.ToolAlias", argument("name", sdk.KindString, "tool"))),
+			"requires compiler function-result facts",
+		},
+		{
+			"tool concrete",
+			agentannotation.ToolHandler,
+			withResults(validInvocation("Tool", "func() *example.com/app.Tool", argument("name", sdk.KindString, "tool")), concreteResult("*example.com/app.Tool")),
+			"must be exact github.com/spice-framework/spice-agent/tool.Tool",
+		},
+		{
+			"model basic",
+			agentannotation.ModelProviderHandler,
+			withResults(validInvocation("ModelProvider", "func() string", argument("name", sdk.KindString, "model")), basicResult("string")),
+			"must be exact github.com/spice-framework/spice-agent/model.Provider",
+		},
+		{
+			"stage concrete",
+			agentannotation.StageHandler,
+			withResults(validInvocation("Stage", "func() *example.com/app.Stage", argument("name", sdk.KindString, "stage")), concreteResult("*example.com/app.Stage")),
+			"must be a named Go interface",
+		},
+		{
+			"stage anonymous",
+			agentannotation.StageHandler,
+			withResults(validInvocation("Stage", "func() interface{ Process() }", argument("name", sdk.KindString, "stage")), anonymousInterfaceResult()),
+			"must have a named interface origin",
+		},
+		{
+			"invalid auxiliary",
+			agentannotation.ToolHandler,
+			withResults(validInvocation("Tool", "func() (example.com/app.ToolAlias, string)", argument("name", sdk.KindString, "tool")), toolResult("example.com/app.ToolAlias"), basicResult("string")),
+			"factory results must be",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := test.handler(t.Context(), test.invocation)
+			if err == nil || !strings.Contains(err.Error(), test.contains) {
+				t.Fatalf("handler error = %v, want %q", err, test.contains)
+			}
+		})
+	}
+}
+
 func validInvocation(symbol, typeID string, arguments ...sdk.InvocationArgument) sdk.Invocation {
-	return sdk.Invocation{
+	invocation := sdk.Invocation{
 		DescriptorPackage: descriptorPackage,
 		DescriptorSymbol:  symbol,
 		CanonicalName:     "agent." + symbol,
@@ -224,6 +294,16 @@ func validInvocation(symbol, typeID string, arguments ...sdk.InvocationArgument)
 			TypeID:      typeID,
 		},
 		Facts: map[string]string{"symbol_kind": "function"},
+	}
+	switch symbol {
+	case "ModelProvider":
+		return withResults(invocation, modelProviderResult(primaryReadableType(typeID)))
+	case "Stage":
+		return withResults(invocation, stageResult(primaryReadableType(typeID)))
+	case "Tool":
+		return withResults(invocation, toolResult(primaryReadableType(typeID)))
+	default:
+		return invocation
 	}
 }
 
@@ -251,13 +331,133 @@ func withType(invocation sdk.Invocation, typeID string) sdk.Invocation {
 }
 
 func withFact(invocation sdk.Invocation, name, value string) sdk.Invocation {
-	invocation.Facts = map[string]string{name: value}
+	invocation.Facts = maps.Clone(invocation.Facts)
+	invocation.Facts[name] = value
 	return invocation
 }
 
 func withArguments(invocation sdk.Invocation, arguments ...sdk.InvocationArgument) sdk.Invocation {
 	invocation.Arguments = arguments
 	return invocation
+}
+
+func withResults(invocation sdk.Invocation, results ...sdk.FunctionResultFact) sdk.Invocation {
+	resultFacts, err := sdk.EncodeFunctionResultFacts(results)
+	if err != nil {
+		panic(err)
+	}
+	facts := make(map[string]string, len(invocation.Facts)+len(resultFacts))
+	for name, value := range invocation.Facts {
+		if !strings.HasPrefix(name, sdk.FunctionResultFactNamespace) {
+			facts[name] = value
+		}
+	}
+	maps.Copy(facts, resultFacts)
+	invocation.Facts = facts
+	return invocation
+}
+
+func withoutResultFacts(invocation sdk.Invocation) sdk.Invocation {
+	facts := make(map[string]string)
+	for name, value := range invocation.Facts {
+		if !strings.HasPrefix(name, sdk.FunctionResultFactNamespace) {
+			facts[name] = value
+		}
+	}
+	invocation.Facts = facts
+	return invocation
+}
+
+func primaryReadableType(typeID string) string {
+	for _, candidate := range []string{
+		"example.com/app.ToolAlias",
+		"example.com/app.StageAlias",
+		"example.com/app.PromptStage",
+		"github.com/spice-framework/spice-agent/model.Provider",
+		"github.com/spice-framework/spice-agent/tool.Tool",
+		"github.com/spice-framework/spice-agent/stage.Stage[example.com/agent.Input, example.com/agent.Output]",
+		"github.com/spice-framework/spice-agent/stage.Stage[example.com/Input, example.com/Output]",
+	} {
+		if strings.Contains(typeID, candidate) {
+			return candidate
+		}
+	}
+	return "example.com/app.ResultAlias"
+}
+
+func modelProviderResult(typeID string) sdk.FunctionResultFact {
+	return sdk.FunctionResultFact{
+		TypeID:             typeID,
+		CanonicalTypeID:    "github.com/spice-framework/spice-agent/model.Provider",
+		Kind:               sdk.GoTypeInterface,
+		NamedOriginPackage: "github.com/spice-framework/spice-agent/model",
+		NamedOriginName:    "Provider",
+	}
+}
+
+func toolResult(typeID string) sdk.FunctionResultFact {
+	return sdk.FunctionResultFact{
+		TypeID:             typeID,
+		CanonicalTypeID:    "github.com/spice-framework/spice-agent/tool.Tool",
+		Kind:               sdk.GoTypeInterface,
+		NamedOriginPackage: "github.com/spice-framework/spice-agent/tool",
+		NamedOriginName:    "Tool",
+	}
+}
+
+func stageResult(typeID string) sdk.FunctionResultFact {
+	return sdk.FunctionResultFact{
+		TypeID:             typeID,
+		CanonicalTypeID:    "github.com/spice-framework/spice-agent/stage.Stage[example.com/Input, example.com/Output]",
+		Kind:               sdk.GoTypeInterface,
+		NamedOriginPackage: "github.com/spice-framework/spice-agent/stage",
+		NamedOriginName:    "Stage",
+	}
+}
+
+func narrowStageResult(typeID, packagePath, name string) sdk.FunctionResultFact {
+	return sdk.FunctionResultFact{
+		TypeID:             typeID,
+		CanonicalTypeID:    typeID,
+		Kind:               sdk.GoTypeInterface,
+		NamedOriginPackage: packagePath,
+		NamedOriginName:    name,
+	}
+}
+
+func concreteResult(typeID string) sdk.FunctionResultFact {
+	return sdk.FunctionResultFact{TypeID: typeID, CanonicalTypeID: typeID, Kind: sdk.GoTypePointer}
+}
+
+func basicResult(typeID string) sdk.FunctionResultFact {
+	return sdk.FunctionResultFact{TypeID: typeID, CanonicalTypeID: typeID, Kind: sdk.GoTypeBasic}
+}
+
+func anonymousInterfaceResult() sdk.FunctionResultFact {
+	return sdk.FunctionResultFact{
+		TypeID:          "interface{ Process() }",
+		CanonicalTypeID: "interface{ Process() }",
+		Kind:            sdk.GoTypeInterface,
+	}
+}
+
+func cleanupResult() sdk.FunctionResultFact {
+	return sdk.FunctionResultFact{
+		TypeID:             "github.com/spice-framework/spice/lifecycle.Cleanup",
+		CanonicalTypeID:    "github.com/spice-framework/spice/lifecycle.Cleanup",
+		Kind:               sdk.GoTypeSignature,
+		NamedOriginPackage: "github.com/spice-framework/spice/lifecycle",
+		NamedOriginName:    "Cleanup",
+	}
+}
+
+func errorResult() sdk.FunctionResultFact {
+	return sdk.FunctionResultFact{
+		TypeID:          "error",
+		CanonicalTypeID: "error",
+		Kind:            sdk.GoTypeInterface,
+		NamedOriginName: "error",
+	}
 }
 
 func TestHandlersPreserveContextCancellationIdentity(t *testing.T) {

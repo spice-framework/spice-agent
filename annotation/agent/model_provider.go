@@ -16,8 +16,8 @@ import (
 // it, so multiple normal providers remain a deterministic ambiguity.
 //
 // An exact model.Provider return needs no InterfaceContribution and no runtime
-// assignability scan. The generic compiler uses go/types identity, including
-// valid aliases; the string-based handler does not guess assignability. The
+// assignability scan. The generic compiler supplies canonical go/types result
+// facts, including valid aliases; missing or non-exact facts fail closed. The
 // authorized native tool is selected by go.mod, runs with user privileges, and
 // returns only generic Spice contributions.
 //
@@ -50,8 +50,8 @@ func ModelProvider() sdk.Definition {
 	}
 }
 
-// ModelProviderHandler validates provider shape and returns only generic
-// provider and explicit bean-selection metadata. Exact Go identity is compiler-owned.
+// ModelProviderHandler validates provider shape and canonical compiler-owned
+// result facts, then returns only generic provider and bean-selection metadata.
 func ModelProviderHandler(ctx context.Context, invocation sdk.Invocation) (sdk.Result, error) {
-	return providerMetadata(ctx, invocation, "ModelProvider", factoryContract{requireName: true})
+	return providerMetadata(ctx, invocation, "ModelProvider", factoryContract{requireName: true, result: resultModelProvider})
 }

@@ -1,0 +1,596 @@
+{
+  "schema": 5,
+  "target": {
+    "id": "compositionproof",
+    "layout": "generated-package",
+    "module": "github.com/spice-framework/spice-agent",
+    "package": "github.com/spice-framework/spice-agent/internal/spicegen/compositionproof",
+    "output_dir": "internal/spicegen/compositionproof",
+    "manifest_path": ".spice/compositionproof.manifest.json"
+  },
+  "generator_version": "0.1.0-dev",
+  "go_format_line": "1.26",
+  "input_sha256": "sha256:e8a791a1abcb68536e0dcea5bf812563d3de358c9ac025cc9bdb1b7a4989e7c3",
+  "files": [
+    {
+      "path": "internal/spicegen/compositionproof/sources/internal_/compositionfixture/application_spice_gen.go",
+      "sha256": "sha256:5ff296568c7d1f1e3a230bc78e3ace80cceac2426982da8f470f5e1ef9a19b70",
+      "role": "source-unit",
+      "primary_source": {
+        "path": "internal/compositionfixture/application.go",
+        "line": 7,
+        "column": 4,
+        "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|16:CompositionProof"
+      },
+      "mappings": [
+        {
+          "kind": "application-target",
+          "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|16:CompositionProof",
+          "source": {
+            "path": "internal/compositionfixture/application.go",
+            "line": 7,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|16:CompositionProof"
+          },
+          "generated": {
+            "start_line": 8,
+            "start_column": 4,
+            "end_line": 8,
+            "end_column": 46
+          }
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/compositionproof/sources/internal_/compositionfixture/cleanup_spice_gen.go",
+      "sha256": "sha256:dbf2e526363e7abce2890e9ccda7e044884679463210bc1e3540337a09253d3c",
+      "role": "source-unit",
+      "primary_source": {
+        "path": "internal/compositionfixture/cleanup.go",
+        "line": 15,
+        "column": 4,
+        "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|13:NewCleanupLog"
+      },
+      "mappings": [
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|13:NewCleanupLog",
+          "source": {
+            "path": "internal/compositionfixture/cleanup.go",
+            "line": 15,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|13:NewCleanupLog"
+          },
+          "generated": {
+            "start_line": 13,
+            "start_column": 4,
+            "end_line": 13,
+            "end_column": 29
+          }
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/compositionproof/sources/internal_/compositionfixture/proof_spice_gen.go",
+      "sha256": "sha256:9cd467516e74dc7290a432ca6578bb9221db385a915c8691d0e0856dc9c04a32",
+      "role": "source-unit",
+      "primary_source": {
+        "path": "internal/compositionfixture/proof.go",
+        "line": 24,
+        "column": 4,
+        "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|8:NewProof"
+      },
+      "mappings": [
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|8:NewProof",
+          "source": {
+            "path": "internal/compositionfixture/proof.go",
+            "line": 24,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|8:NewProof"
+          },
+          "generated": {
+            "start_line": 13,
+            "start_column": 4,
+            "end_line": 13,
+            "end_column": 27
+          }
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/compositionproof/sources/internal_/compositionfixture/providers_spice_gen.go",
+      "sha256": "sha256:ade644f51d469304ac48864dbce615f41d324de13a75ea75b631d0ea0a88caa3",
+      "role": "source-unit",
+      "primary_source": {
+        "path": "internal/compositionfixture/providers.go",
+        "line": 38,
+        "column": 4,
+        "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|19:NewFallbackProvider"
+      },
+      "mappings": [
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|15:NewBetaProvider",
+          "source": {
+            "path": "internal/compositionfixture/providers.go",
+            "line": 52,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|15:NewBetaProvider"
+          },
+          "generated": {
+            "start_line": 15,
+            "start_column": 4,
+            "end_line": 15,
+            "end_column": 26
+          }
+        },
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|16:NewAlphaProvider",
+          "source": {
+            "path": "internal/compositionfixture/providers.go",
+            "line": 45,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|16:NewAlphaProvider"
+          },
+          "generated": {
+            "start_line": 22,
+            "start_column": 4,
+            "end_line": 22,
+            "end_column": 27
+          }
+        },
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|19:NewFallbackProvider",
+          "source": {
+            "path": "internal/compositionfixture/providers.go",
+            "line": 38,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|19:NewFallbackProvider"
+          },
+          "generated": {
+            "start_line": 29,
+            "start_column": 4,
+            "end_line": 29,
+            "end_column": 30
+          }
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/compositionproof/sources/internal_/compositionfixture/stages_spice_gen.go",
+      "sha256": "sha256:99ea77954333ee117367c5b706945461f7fbb29fe1d0aa1bfb2fd1536596e693",
+      "role": "source-unit",
+      "primary_source": {
+        "path": "internal/compositionfixture/stages.go",
+        "line": 32,
+        "column": 4,
+        "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|12:NewTrimStage"
+      },
+      "mappings": [
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|12:NewTrimStage",
+          "source": {
+            "path": "internal/compositionfixture/stages.go",
+            "line": 32,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|12:NewTrimStage"
+          },
+          "generated": {
+            "start_line": 17,
+            "start_column": 4,
+            "end_line": 17,
+            "end_column": 26
+          }
+        },
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|14:NewSuffixStage",
+          "source": {
+            "path": "internal/compositionfixture/stages.go",
+            "line": 39,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|14:NewSuffixStage"
+          },
+          "generated": {
+            "start_line": 24,
+            "start_column": 4,
+            "end_line": 24,
+            "end_column": 28
+          }
+        },
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|20:NewFallbackOnlyStage",
+          "source": {
+            "path": "internal/compositionfixture/stages.go",
+            "line": 46,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|20:NewFallbackOnlyStage"
+          },
+          "generated": {
+            "start_line": 31,
+            "start_column": 4,
+            "end_line": 31,
+            "end_column": 34
+          }
+        },
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|25:NewReplaceableNormalStage",
+          "source": {
+            "path": "internal/compositionfixture/stages.go",
+            "line": 60,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|25:NewReplaceableNormalStage"
+          },
+          "generated": {
+            "start_line": 38,
+            "start_column": 4,
+            "end_line": 38,
+            "end_column": 39
+          }
+        },
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|26:NewReplaceableDefaultStage",
+          "source": {
+            "path": "internal/compositionfixture/stages.go",
+            "line": 53,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|26:NewReplaceableDefaultStage"
+          },
+          "generated": {
+            "start_line": 45,
+            "start_column": 4,
+            "end_line": 45,
+            "end_column": 40
+          }
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/compositionproof/sources/internal_/compositionfixture/tools_spice_gen.go",
+      "sha256": "sha256:dab580436ef30d67b7418b8b151fcbf9044abfdea635d0e837dae83aa20c7fe4",
+      "role": "source-unit",
+      "primary_source": {
+        "path": "internal/compositionfixture/tools.go",
+        "line": 50,
+        "column": 4,
+        "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|11:NewReadTool"
+      },
+      "mappings": [
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|11:NewReadTool",
+          "source": {
+            "path": "internal/compositionfixture/tools.go",
+            "line": 50,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|11:NewReadTool"
+          },
+          "generated": {
+            "start_line": 16,
+            "start_column": 4,
+            "end_line": 16,
+            "end_column": 26
+          }
+        },
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|12:NewWriteTool",
+          "source": {
+            "path": "internal/compositionfixture/tools.go",
+            "line": 64,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|12:NewWriteTool"
+          },
+          "generated": {
+            "start_line": 27,
+            "start_column": 4,
+            "end_line": 27,
+            "end_column": 27
+          }
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/compositionproof/spice_assembly_gen.go",
+      "sha256": "sha256:26c7f3d349676ebdad2d7e1b1f0e2dd3eb4f5726d149ca6e1585c808e8bca15e",
+      "role": "target-assembly",
+      "related_sources": [
+        {
+          "path": "internal/compositionfixture/application.go",
+          "line": 7,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|16:CompositionProof"
+        },
+        {
+          "path": "internal/compositionfixture/cleanup.go",
+          "line": 15,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|13:NewCleanupLog"
+        },
+        {
+          "path": "internal/compositionfixture/proof.go",
+          "line": 24,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|8:NewProof"
+        },
+        {
+          "path": "internal/compositionfixture/providers.go",
+          "line": 38,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|19:NewFallbackProvider"
+        },
+        {
+          "path": "internal/compositionfixture/providers.go",
+          "line": 45,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|16:NewAlphaProvider"
+        },
+        {
+          "path": "internal/compositionfixture/providers.go",
+          "line": 52,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|15:NewBetaProvider"
+        },
+        {
+          "path": "internal/compositionfixture/stages.go",
+          "line": 32,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|12:NewTrimStage"
+        },
+        {
+          "path": "internal/compositionfixture/stages.go",
+          "line": 39,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|14:NewSuffixStage"
+        },
+        {
+          "path": "internal/compositionfixture/stages.go",
+          "line": 46,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|20:NewFallbackOnlyStage"
+        },
+        {
+          "path": "internal/compositionfixture/stages.go",
+          "line": 53,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|26:NewReplaceableDefaultStage"
+        },
+        {
+          "path": "internal/compositionfixture/stages.go",
+          "line": 60,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|25:NewReplaceableNormalStage"
+        },
+        {
+          "path": "internal/compositionfixture/tools.go",
+          "line": 50,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|11:NewReadTool"
+        },
+        {
+          "path": "internal/compositionfixture/tools.go",
+          "line": 64,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|12:NewWriteTool"
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/compositionproof/spice_command_gen.go",
+      "sha256": "sha256:2afaeb2f943191295594a8584a6f2412f3de75279b790db1b9767d7b82d93096",
+      "role": "target-command",
+      "related_sources": [
+        {
+          "path": "internal/compositionfixture/application.go",
+          "line": 7,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|16:CompositionProof"
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/compositionproof/spice_configuration_gen.go",
+      "sha256": "sha256:99802b022ee243ea84e9e518162c373f49b3753d04f5d1d9c415efa53302e8a4",
+      "role": "target-configuration",
+      "related_sources": [
+        {
+          "path": "internal/compositionfixture/application.go",
+          "line": 7,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|16:CompositionProof"
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/compositionproof/spice_contracts_gen.go",
+      "sha256": "sha256:a55f82096d7a7f573418b0147e528f91a13820ee360380358bd05c102e8e0f0d",
+      "role": "target-contracts",
+      "related_sources": [
+        {
+          "path": "internal/compositionfixture/application.go",
+          "line": 7,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|16:CompositionProof"
+        },
+        {
+          "path": "internal/compositionfixture/cleanup.go",
+          "line": 15,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|13:NewCleanupLog"
+        },
+        {
+          "path": "internal/compositionfixture/proof.go",
+          "line": 24,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|8:NewProof"
+        },
+        {
+          "path": "internal/compositionfixture/providers.go",
+          "line": 38,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|19:NewFallbackProvider"
+        },
+        {
+          "path": "internal/compositionfixture/providers.go",
+          "line": 45,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|16:NewAlphaProvider"
+        },
+        {
+          "path": "internal/compositionfixture/providers.go",
+          "line": 52,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|15:NewBetaProvider"
+        },
+        {
+          "path": "internal/compositionfixture/stages.go",
+          "line": 32,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|12:NewTrimStage"
+        },
+        {
+          "path": "internal/compositionfixture/stages.go",
+          "line": 39,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|14:NewSuffixStage"
+        },
+        {
+          "path": "internal/compositionfixture/stages.go",
+          "line": 46,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|20:NewFallbackOnlyStage"
+        },
+        {
+          "path": "internal/compositionfixture/stages.go",
+          "line": 53,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|26:NewReplaceableDefaultStage"
+        },
+        {
+          "path": "internal/compositionfixture/stages.go",
+          "line": 60,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|25:NewReplaceableNormalStage"
+        },
+        {
+          "path": "internal/compositionfixture/tools.go",
+          "line": 50,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|11:NewReadTool"
+        },
+        {
+          "path": "internal/compositionfixture/tools.go",
+          "line": 64,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|12:NewWriteTool"
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/compositionproof/spice_lifecycle_gen.go",
+      "sha256": "sha256:0184facdc6475b5fa879631e6537990f88ac70adf9bd61e191d1506f959f3508",
+      "role": "target-lifecycle",
+      "related_sources": [
+        {
+          "path": "internal/compositionfixture/application.go",
+          "line": 7,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|16:CompositionProof"
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/compositionproof/spice_providers_gen.go",
+      "sha256": "sha256:5b0d614ecb7453297b2e5761520bdda9c1e53ad998aba975166aca097f7e0cfb",
+      "role": "target-providers",
+      "related_sources": [
+        {
+          "path": "internal/compositionfixture/application.go",
+          "line": 7,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|16:CompositionProof"
+        },
+        {
+          "path": "internal/compositionfixture/cleanup.go",
+          "line": 15,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|13:NewCleanupLog"
+        },
+        {
+          "path": "internal/compositionfixture/proof.go",
+          "line": 24,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|8:NewProof"
+        },
+        {
+          "path": "internal/compositionfixture/providers.go",
+          "line": 38,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|19:NewFallbackProvider"
+        },
+        {
+          "path": "internal/compositionfixture/providers.go",
+          "line": 45,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|16:NewAlphaProvider"
+        },
+        {
+          "path": "internal/compositionfixture/providers.go",
+          "line": 52,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|15:NewBetaProvider"
+        },
+        {
+          "path": "internal/compositionfixture/stages.go",
+          "line": 32,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|12:NewTrimStage"
+        },
+        {
+          "path": "internal/compositionfixture/stages.go",
+          "line": 39,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|14:NewSuffixStage"
+        },
+        {
+          "path": "internal/compositionfixture/stages.go",
+          "line": 46,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|20:NewFallbackOnlyStage"
+        },
+        {
+          "path": "internal/compositionfixture/stages.go",
+          "line": 53,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|26:NewReplaceableDefaultStage"
+        },
+        {
+          "path": "internal/compositionfixture/stages.go",
+          "line": 60,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|25:NewReplaceableNormalStage"
+        },
+        {
+          "path": "internal/compositionfixture/tools.go",
+          "line": 50,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|11:NewReadTool"
+        },
+        {
+          "path": "internal/compositionfixture/tools.go",
+          "line": 64,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|12:NewWriteTool"
+        }
+      ]
+    }
+  ]
+}

@@ -55,12 +55,22 @@ func run(ctx context.Context, root, mode string) error {
 	if runtime.Version() != requiredGoVersion {
 		return fmt.Errorf("go version is %s; require exactly %s", runtime.Version(), requiredGoVersion)
 	}
+	productEnvironment := map[string]string{
+		"GOFLAGS":     "-mod=vendor",
+		"GOPROXY":     "off",
+		"GOTOOLCHAIN": "local",
+		"GOWORK":      "off",
+	}
 	identity := step{"repository identity", func() error { return checkIdentity(root) }}
 	diffHygiene := step{"diff hygiene", func() error { return command(ctx, root, nil, "git", "diff", "--check", "HEAD", "--") }}
-	tests := step{"tests", func() error { return command(ctx, root, nil, "go", "test", "-shuffle=on", "-count=1", "./...") }}
+	tests := step{"tests", func() error {
+		return command(ctx, root, productEnvironment, "go", "test", "-shuffle=on", "-count=1", "./...")
+	}}
 	steps := []step{identity, diffHygiene, tests}
 	if mode == "coverage" {
-		steps = []step{identity, diffHygiene, {"coverage", func() error { return coverage(ctx, root) }}}
+		steps = []step{identity, diffHygiene, {"coverage", func() error {
+			return coverage(ctx, root, productEnvironment)
+		}}}
 	}
 	if mode == "check" || mode == "verify" {
 		steps = []step{
@@ -69,7 +79,7 @@ func run(ctx context.Context, root, mode string) error {
 			{"formatting", func() error { return checkFormatting(ctx, root) }},
 			{"module and vendor", func() error { return checkModule(ctx, root) }},
 			{"architecture", func() error { return checkArchitecture(root) }},
-			{"go vet", func() error { return command(ctx, root, nil, "go", "vet", "./...") }},
+			{"go vet", func() error { return command(ctx, root, productEnvironment, "go", "vet", "./...") }},
 			tests,
 		}
 	}
@@ -79,10 +89,10 @@ func run(ctx context.Context, root, mode string) error {
 			step{"lint and nil safety", func() error { return lint(ctx, root) }},
 			step{"security", func() error { return security(ctx, root) }},
 			step{"race tests", func() error {
-				return command(ctx, root, nil, "go", "test", "-race", "-shuffle=on", "-count=1", "./...")
+				return command(ctx, root, productEnvironment, "go", "test", "-race", "-shuffle=on", "-count=1", "./...")
 			}},
-			step{"fuzz smoke", func() error { return fuzz(ctx, root) }},
-			step{"coverage", func() error { return coverage(ctx, root) }},
+			step{"fuzz smoke", func() error { return fuzz(ctx, root, productEnvironment) }},
+			step{"coverage", func() error { return coverage(ctx, root, productEnvironment) }},
 			step{"offline vendor", func() error { return offline(ctx, root) }},
 		)
 	}
@@ -218,14 +228,14 @@ func security(ctx context.Context, root string) error {
 	return command(ctx, root, environment, govulncheck, "./...")
 }
 
-func fuzz(ctx context.Context, root string) error {
+func fuzz(ctx context.Context, root string, environment map[string]string) error {
 	for _, target := range []struct{ pkg, name string }{
 		{"./message", "FuzzNewID"},
 		{"./tool", "FuzzToolCall"},
 		{"./agent", "FuzzParseSnapshot"},
 		{"./annotation/agent", "FuzzToolHandler"},
 	} {
-		if err := command(ctx, root, nil, "go", "test", "-run=^$", "-fuzz=^"+target.name+"$", "-fuzztime=1s", target.pkg); err != nil {
+		if err := command(ctx, root, environment, "go", "test", "-run=^$", "-fuzz=^"+target.name+"$", "-fuzztime=1s", target.pkg); err != nil {
 			return err
 		}
 	}
@@ -294,7 +304,7 @@ func checkArchitecture(root string) error {
 	return nil
 }
 
-func coverage(ctx context.Context, root string) (returnErr error) {
+func coverage(ctx context.Context, root string, environment map[string]string) (returnErr error) {
 	profile, err := os.CreateTemp("", "spice-agent-coverage-*.out")
 	if err != nil {
 		return err
@@ -304,7 +314,7 @@ func coverage(ctx context.Context, root string) (returnErr error) {
 		return err
 	}
 	defer func() { returnErr = errors.Join(returnErr, os.Remove(path)) }()
-	packageOutput, err := capture(ctx, root, nil, "go", "list", "./...")
+	packageOutput, err := capture(ctx, root, environment, "go", "list", "./...")
 	if err != nil {
 		return err
 	}
@@ -315,10 +325,13 @@ func coverage(ctx context.Context, root string) (returnErr error) {
 		}
 	}
 	arguments := append([]string{"test", "-covermode=atomic", "-coverprofile=" + path}, packages...)
-	if err = command(ctx, root, nil, "go", arguments...); err != nil {
+	if err = command(ctx, root, environment, "go", arguments...); err != nil {
 		return err
 	}
-	report, err := capture(ctx, root, nil, "go", "tool", "cover", "-func="+path)
+	if err = excludeGeneratedCoverage(path); err != nil {
+		return err
+	}
+	report, err := capture(ctx, root, environment, "go", "tool", "cover", "-func="+path)
 	if err != nil {
 		return err
 	}
@@ -331,6 +344,28 @@ func coverage(ctx context.Context, root string) (returnErr error) {
 		return fmt.Errorf("coverage %.1f%% is below %.1f%%", total, minimumCoverage)
 	}
 	return nil
+}
+
+func excludeGeneratedCoverage(path string) error {
+	content, err := os.ReadFile(path) // #nosec G304 -- path is the gate-owned temporary profile.
+	if err != nil {
+		return fmt.Errorf("read coverage profile: %w", err)
+	}
+	lines := strings.Split(string(content), "\n")
+	if len(lines) == 0 || !strings.HasPrefix(lines[0], "mode: ") {
+		return errors.New("coverage profile has no mode header")
+	}
+	filtered := make([]string, 0, len(lines))
+	filtered = append(filtered, lines[0])
+	generatedPrefix := modulePath + "/internal/spicegen/"
+	for _, line := range lines[1:] {
+		if line == "" || strings.Contains(line, generatedPrefix) {
+			continue
+		}
+		filtered = append(filtered, line)
+	}
+	// #nosec G304,G703 -- path is the gate-owned temporary profile created by coverage.
+	return os.WriteFile(path, []byte(strings.Join(filtered, "\n")+"\n"), 0o600)
 }
 
 func totalCoverage(report string) (float64, error) {

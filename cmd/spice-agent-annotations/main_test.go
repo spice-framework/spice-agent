@@ -21,6 +21,17 @@ func TestRunServesOnlyFramedProtocolOnStdout(t *testing.T) {
 	})
 	writeRequest(t, requests, 2, "describe", protocol.DescribeParams{})
 	name, _ := json.Marshal("read")
+	facts, err := sdk.EncodeFunctionResultFacts([]sdk.FunctionResultFact{{
+		TypeID:             "github.com/spice-framework/spice-agent/tool.Tool",
+		CanonicalTypeID:    "github.com/spice-framework/spice-agent/tool.Tool",
+		Kind:               sdk.GoTypeInterface,
+		NamedOriginPackage: "github.com/spice-framework/spice-agent/tool",
+		NamedOriginName:    "Tool",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	facts["symbol_kind"] = "function"
 	writeRequest(t, requests, 3, "analyze", protocol.AnalyzeParams{
 		Descriptor: sdk.Symbol{Package: "github.com/spice-framework/spice-agent/annotation/agent", Name: "Tool"},
 		Invocation: sdk.Invocation{
@@ -32,7 +43,7 @@ func TestRunServesOnlyFramedProtocolOnStdout(t *testing.T) {
 				Target: sdk.TargetFunction, SymbolID: "example.com/app.NewRead", Name: "NewRead",
 				PackagePath: "example.com/app", TypeID: "func() github.com/spice-framework/spice-agent/tool.Tool",
 			},
-			Facts: map[string]string{"symbol_kind": "function"},
+			Facts: facts,
 		},
 	})
 	writeRequest(t, requests, 4, "shutdown", protocol.ShutdownParams{})

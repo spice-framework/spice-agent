@@ -16,10 +16,11 @@ import (
 // preference, and ordering use normal generated Spice bean selection.
 //
 // An exact interface-returning factory needs no InterfaceContribution: its Go
-// output already is tool.Tool. The generic compiler uses go/types identity,
-// including valid aliases, to enforce that output; the string-based handler does
-// not guess assignability. The authorized tool process contributes generic
-// provider/metadata records only and has the caller's native process privileges.
+// output already is tool.Tool. The generic compiler derives canonical result
+// facts with go/types, including valid aliases, and the handler rejects missing
+// or non-exact facts. Display strings never determine assignability. The
+// authorized tool process contributes generic provider/metadata records only
+// and has the caller's native process privileges.
 //
 //	// @import { Tool } from "github.com/spice-framework/spice-agent/annotation/agent"
 //	// @Tool(name="read", qualifiers=["coding"], order=10)
@@ -50,8 +51,8 @@ func Tool() sdk.Definition {
 	}
 }
 
-// ToolHandler validates provider shape and contributes only generic provider
-// and bean-selection metadata. The generic compiler owns exact Go type identity.
+// ToolHandler validates provider shape and canonical compiler-owned result facts,
+// then contributes only generic provider and bean-selection metadata.
 func ToolHandler(ctx context.Context, invocation sdk.Invocation) (sdk.Result, error) {
-	return providerMetadata(ctx, invocation, "Tool", factoryContract{requireName: true})
+	return providerMetadata(ctx, invocation, "Tool", factoryContract{requireName: true, result: resultTool})
 }

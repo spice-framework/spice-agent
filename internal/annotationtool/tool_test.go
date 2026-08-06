@@ -148,6 +148,25 @@ func TestHandlerRegistrationsAreDeterministicAndValid(t *testing.T) {
 
 func toolInvocation() sdk.Invocation {
 	name, _ := json.Marshal("read")
+	facts, err := sdk.EncodeFunctionResultFacts([]sdk.FunctionResultFact{
+		{
+			TypeID:             "github.com/spice-framework/spice-agent/tool.Tool",
+			CanonicalTypeID:    "github.com/spice-framework/spice-agent/tool.Tool",
+			Kind:               sdk.GoTypeInterface,
+			NamedOriginPackage: "github.com/spice-framework/spice-agent/tool",
+			NamedOriginName:    "Tool",
+		},
+		{
+			TypeID:          "error",
+			CanonicalTypeID: "error",
+			Kind:            sdk.GoTypeInterface,
+			NamedOriginName: "error",
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	facts["symbol_kind"] = "function"
 	return sdk.Invocation{
 		DescriptorPackage: descriptorPackage,
 		DescriptorSymbol:  "Tool",
@@ -162,6 +181,6 @@ func toolInvocation() sdk.Invocation {
 			PackagePath: "example.com/app",
 			TypeID:      "func() (github.com/spice-framework/spice-agent/tool.Tool, error)",
 		},
-		Facts: map[string]string{"symbol_kind": "function"},
+		Facts: facts,
 	}
 }

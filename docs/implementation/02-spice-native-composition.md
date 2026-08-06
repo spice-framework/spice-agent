@@ -3,9 +3,9 @@
 ## Objective and prerequisites
 
 Prove that every compiled agent extension is an ordinary Spice bean selected by
-the existing typed DI rules. This phase requires the Spice core/toolchain
-`v0.1.0-preview.1`, the public annotation SDK, deterministic per-source
-generation, and the repository foundation from phase 0.
+the existing typed DI rules. This phase requires the exact Spice core/toolchain
+preview revisions pinned in `go.mod`, the public annotation SDK, deterministic
+per-source generation, and the repository foundation from phase 0.
 
 ## Public contracts
 
@@ -14,8 +14,11 @@ generation, and the repository foundation from phase 0.
   bean-name/alias/qualifier/fallback/primary/order metadata contributions; the
   Spice compiler contains no agent annotation-name switch. Exact
   interface-returning factories need no interface-binding contribution. The
-  generic compiler owns `go/types` identity and alias resolution; annotation
-  handlers validate only normalized function/provider shape.
+  generic compiler owns `go/types` identity and alias resolution and supplies
+  canonical per-result type facts to authorized handlers. Handlers fail closed
+  when those facts are absent: Tool and ModelProvider require their exact named
+  interfaces (including aliases), while Stage requires a named interface result.
+  Display strings never participate in type validation.
 - Every annotation has one canonical descriptor/handler Go file. Go to
   Definition opens the descriptor; Go to Implementation opens the typed handler.
 - External defaults activate only through an explicit blank import of that
@@ -88,7 +91,9 @@ application startup targets 100 ms. Exact source-to-generated-file mappings and
 selected bean reasons are retained as artifacts.
 
 Status is **in progress**. The typed Stage SPI, three canonical descriptors, and
-authorized deterministic v1alpha2 tool now exist. The generated embedded
-fixture, auto-configuration contracts, and complete DI acceptance matrix remain
-pending. No later repository may introduce a substitute static composition
-mechanism while this work is pending.
+authorized deterministic v1alpha2 tool now exist. The committed
+`CompositionProof` target completes the embedded generated-graph slice and is
+covered by the evidence in `evidence/phase1-composition.md`. Auto-configuration
+contracts and the cross-repository compiled continuation remain pending, so
+Phase 1 is still in progress. No later repository may introduce a substitute
+static composition mechanism while this work is pending.

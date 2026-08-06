@@ -12,13 +12,33 @@ import (
 )
 
 const (
-	descriptorPackage = "github.com/spice-framework/spice-agent/annotation/agent"
-	maximumOrder      = int64(1_000_000)
+	descriptorPackage       = "github.com/spice-framework/spice-agent/annotation/agent"
+	modelProviderTypeID     = "github.com/spice-framework/spice-agent/model.Provider"
+	modelProviderOrigin     = "github.com/spice-framework/spice-agent/model"
+	toolTypeID              = "github.com/spice-framework/spice-agent/tool.Tool"
+	toolOrigin              = "github.com/spice-framework/spice-agent/tool"
+	stageOrigin             = "github.com/spice-framework/spice-agent/stage"
+	cleanupTypeID           = "github.com/spice-framework/spice/lifecycle.Cleanup"
+	cleanupOrigin           = "github.com/spice-framework/spice/lifecycle"
+	maximumOrder            = int64(1_000_000)
+	modelProviderOriginName = "Provider"
+	toolOriginName          = "Tool"
+	stageOriginName         = "Stage"
+	cleanupOriginName       = "Cleanup"
 )
 
 type factoryContract struct {
 	requireName bool
+	result      resultContract
 }
+
+type resultContract uint8
+
+const (
+	resultStage resultContract = iota + 1
+	resultTool
+	resultModelProvider
+)
 
 func providerMetadata(
 	ctx context.Context,
@@ -35,7 +55,7 @@ func providerMetadata(
 	if err := invocation.RequireDescriptor(descriptorPackage, symbol); err != nil {
 		return sdk.Result{}, err
 	}
-	if err := validateFactory(invocation); err != nil {
+	if err := validateFactory(invocation, contract.result); err != nil {
 		return sdk.Result{}, err
 	}
 	arguments, err := sdk.BindArguments(
@@ -107,7 +127,7 @@ func providerMetadata(
 	)
 }
 
-func validateFactory(invocation sdk.Invocation) error {
+func validateFactory(invocation sdk.Invocation, contract resultContract) error {
 	declaration := invocation.Declaration
 	if declaration.Target != sdk.TargetFunction {
 		return errors.New("agent annotation target must be a package-level function")
@@ -128,64 +148,112 @@ func validateFactory(invocation sdk.Invocation) error {
 	if kind := invocation.Facts["symbol_kind"]; kind != "" && kind != "function" {
 		return errors.New("agent annotation target must resolve to a function")
 	}
-	_, err := firstFunctionResult(declaration.TypeID)
-	return err
+	if !strings.HasPrefix(declaration.TypeID, "func(") {
+		return errors.New("agent annotation target must have a non-generic function signature")
+	}
+	primary, err := primaryFunctionResult(invocation)
+	if err != nil {
+		return err
+	}
+	return validatePrimaryResult(contract, primary)
 }
 
-func firstFunctionResult(typeID string) (string, error) {
-	if !strings.HasPrefix(typeID, "func(") {
-		return "", errors.New("agent annotation target must have a non-generic function signature")
+func primaryFunctionResult(invocation sdk.Invocation) (sdk.FunctionResultFact, error) {
+	results, present, err := invocation.FunctionResultFacts()
+	if err != nil {
+		return sdk.FunctionResultFact{}, fmt.Errorf("decode agent factory result facts: %w", err)
 	}
-	depth := 0
-	for index := len("func"); index < len(typeID); index++ {
-		switch typeID[index] {
-		case '(':
-			depth++
-		case ')':
-			depth--
-			if depth == 0 {
-				return firstResultField(strings.TrimSpace(typeID[index+1:]))
-			}
-			if depth < 0 {
-				return "", errors.New("agent annotation target has an invalid function type identity")
-			}
+	if !present {
+		return sdk.FunctionResultFact{}, errors.New(
+			"agent annotation requires compiler function-result facts; upgrade the Spice toolchain",
+		)
+	}
+	if len(results) == 0 || len(results) > 3 {
+		return sdk.FunctionResultFact{}, errors.New(
+			"agent annotation factory must return one provider value with optional lifecycle.Cleanup and error",
+		)
+	}
+	switch len(results) {
+	case 1:
+		return results[0], nil
+	case 2:
+		if isErrorResult(results[1]) || isCleanupResult(results[1]) {
+			return results[0], nil
+		}
+	case 3:
+		if isCleanupResult(results[1]) && isErrorResult(results[2]) {
+			return results[0], nil
 		}
 	}
-	return "", errors.New("agent annotation target has an incomplete function type identity")
+	return sdk.FunctionResultFact{}, errors.New(
+		"agent annotation factory results must be T, (T, error), (T, lifecycle.Cleanup), or (T, lifecycle.Cleanup, error)",
+	)
 }
 
-func firstResultField(results string) (string, error) {
-	if results == "" {
-		return "", errors.New("agent annotation factory must return a provider value")
-	}
-	if results[0] != '(' {
-		return results, nil
-	}
-	depth := 0
-	for index := 0; index < len(results); index++ {
-		switch results[index] {
-		case '(', '[', '{':
-			depth++
-		case ')', ']', '}':
-			depth--
-			if depth == 0 {
-				first := strings.TrimSpace(results[1:index])
-				if first == "" {
-					return "", errors.New("agent annotation factory must return a provider value")
-				}
-				return first, nil
-			}
-		case ',':
-			if depth == 1 {
-				first := strings.TrimSpace(results[1:index])
-				if first == "" {
-					return "", errors.New("agent annotation factory has an empty first result")
-				}
-				return first, nil
-			}
+func isErrorResult(result sdk.FunctionResultFact) bool {
+	return result.CanonicalTypeID == "error" &&
+		result.Kind == sdk.GoTypeInterface &&
+		result.NamedOriginPackage == "" &&
+		result.NamedOriginName == "error"
+}
+
+func isCleanupResult(result sdk.FunctionResultFact) bool {
+	return result.CanonicalTypeID == cleanupTypeID &&
+		result.Kind == sdk.GoTypeSignature &&
+		result.NamedOriginPackage == cleanupOrigin &&
+		result.NamedOriginName == cleanupOriginName
+}
+
+func validatePrimaryResult(
+	contract resultContract,
+	result sdk.FunctionResultFact,
+) error {
+	switch contract {
+	case resultTool:
+		return requireExactInterfaceResult("Tool", result, toolTypeID, toolOrigin, toolOriginName)
+	case resultModelProvider:
+		return requireExactInterfaceResult(
+			"ModelProvider",
+			result,
+			modelProviderTypeID,
+			modelProviderOrigin,
+			modelProviderOriginName,
+		)
+	case resultStage:
+		if result.Kind != sdk.GoTypeInterface {
+			return fmt.Errorf("@Stage factory result %s must be a named Go interface", result.TypeID)
 		}
+		if result.NamedOriginPackage == "" || result.NamedOriginName == "" {
+			return fmt.Errorf("@Stage factory result %s must have a named interface origin", result.TypeID)
+		}
+		if result.NamedOriginPackage == stageOrigin && result.NamedOriginName != stageOriginName {
+			return fmt.Errorf("@Stage factory result %s has unsupported Spice stage origin %s.%s", result.TypeID, result.NamedOriginPackage, result.NamedOriginName)
+		}
+		return nil
+	default:
+		return errors.New("agent annotation has an unsupported result contract")
 	}
-	return "", errors.New("agent annotation target has an incomplete result type identity")
+}
+
+func requireExactInterfaceResult(
+	annotationName string,
+	result sdk.FunctionResultFact,
+	expectedTypeID string,
+	expectedOriginPackage string,
+	expectedOriginName string,
+) error {
+	if result.Kind == sdk.GoTypeInterface &&
+		result.CanonicalTypeID == expectedTypeID &&
+		result.NamedOriginPackage == expectedOriginPackage &&
+		result.NamedOriginName == expectedOriginName {
+		return nil
+	}
+	return fmt.Errorf(
+		"@%s factory result must be exact %s (a Go alias is allowed); got %s",
+		annotationName,
+		expectedTypeID,
+		result.TypeID,
+	)
 }
 
 func validateIdentities(name string, aliases []string) error {

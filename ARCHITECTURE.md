@@ -19,10 +19,20 @@ generation; activation never changes existing runs and never alters compiled DI.
 `annotation/agent` exposes `@Stage`, `@Tool`, and `@ModelProvider`. Their typed
 handlers return only Spice's generic provider and bean-metadata contributions.
 Factory signatures remain ordinary Go and the generic compiler owns exact type
-identity, aliases, cleanup, and error validation. The authorized
+identity and aliases. It transports canonical per-result facts; handlers
+validate their public interface contract and standard cleanup/error forms
+without parsing display strings. The authorized
 `cmd/spice-agent-annotations` process is protocol dispatch only; it is not an
 application registry. Typed stages use distinct `stage.Stage[Input, Output]`
 interfaces.
+
+`internal/compositionfixture` is the executable architecture proof. Its
+committed `internal/spicegen/compositionproof` target constructs exact aliased
+model, tool, and generic stage interfaces through direct calls. The graph
+demonstrates fallback suppression, typed primary selection, alias-qualified
+injection, ordered slices, canonical named maps, reverse cleanup, rollback, and
+typed application-owned test overrides. Negative `testdata` graphs prove
+deterministic ambiguity and fail-closed concrete-to-interface injection.
 
 ## Dependency direction
 

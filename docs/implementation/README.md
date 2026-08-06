@@ -37,9 +37,14 @@ SQLite recovery remains the isolated Phase 7 stress proof.
 
 Canonical `@Stage`, `@Tool`, and `@ModelProvider` descriptors and their
 authorized v1alpha2 process are implemented using only generic Spice provider
-and bean-metadata contributions. This does not complete Phase 1: the generated
-consumer graph, fallback/replacement/ambiguity matrix, test overrides, and
-annotation doctor/bean-explanation evidence remain pending.
+and bean-metadata contributions. The in-module `CompositionProof` application
+now commits and executes the real generated graph, selection matrix, ordered
+collections, canonical tool map, cleanup/rollback, typed override, ownership,
+diagnostic, module, and source-mapping proof. Exact reproducible commands and
+asserted output are recorded in
+[`evidence/phase1-composition.md`](evidence/phase1-composition.md). Phase 1
+remains in progress until auto-configuration contracts and cross-repository
+compiled continuation evidence are complete.
 
 ## Current Phase 3 boundary
 
@@ -54,10 +59,17 @@ were supplied. Offline scripted acceptance remains the mandatory default.
 A Windows clean-clone audit of all five repositories passed Go 1.26.5,
 `make fast`, offline vendor tests with `GOWORK=off GOPROXY=off
 GOFLAGS=-mod=vendor`, and `govulncheck`. This is not Linux or macOS evidence and
-does not close Phase 0. GitHub Actions jobs remain queued without starting;
-diagnosing organization billing/policy requires unavailable `admin:org`
-authority. Core/tools Dependabot gRPC alerts remain open and must not be
-dismissed, although their tools modules already pin v1.82.1 and local
+does not close Phase 0. A separate WSL2 Linux 6.18.33.1 audit with Go 1.26.5
+linux/amd64 used fresh public clones: all five repositories passed `make fast`
+and explicit `GOWORK=off GOPROXY=off GOFLAGS=-mod=vendor go test ./...`.
+Fresh-clone full verification still needs a source-preserving dependency
+bootstrap. After cache preparation, `spice-agent` passed in 32.2s and
+`spice-agent-coding` passed in 6.7s; the other repositories exposed bootstrap
+or `go.sum` preservation gaps being corrected separately. This is not macOS
+evidence and does not close Phase 0. GitHub Actions jobs remain queued without
+starting; diagnosing organization billing/policy requires unavailable
+`admin:org` authority. Core/tools Dependabot gRPC alerts remain open and must
+not be dismissed, although their tools modules already pin v1.82.1 and local
 `govulncheck` is clean.
 
 ## Completed evidence

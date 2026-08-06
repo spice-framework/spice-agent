@@ -15,7 +15,8 @@ import (
 // call, and injects ordered candidates using name, aliases, qualifiers,
 // fallback, primary, and order metadata. Because the factory already returns
 // its interface exactly, no InterfaceContribution or assignability guess is
-// involved.
+// involved. The compiler supplies canonical go/types result facts; the handler
+// requires a named interface origin and fails closed when facts are unavailable.
 //
 // The authorized native tool is selected through the consuming application's
 // go.mod and runs with that user's privileges. It contributes metadata only;
@@ -50,8 +51,9 @@ func Stage() sdk.Definition {
 	}
 }
 
-// StageHandler contributes only generic provider and bean-selection metadata.
-// The typed Go compiler remains authoritative for the stage output contract.
+// StageHandler validates compiler-owned result facts and contributes only
+// generic provider and bean-selection metadata. The typed Go compiler remains
+// authoritative for the stage output contract.
 func StageHandler(ctx context.Context, invocation sdk.Invocation) (sdk.Result, error) {
-	return providerMetadata(ctx, invocation, "Stage", factoryContract{requireName: true})
+	return providerMetadata(ctx, invocation, "Stage", factoryContract{requireName: true, result: resultStage})
 }
