@@ -3,18 +3,21 @@ package stage
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
 	"slices"
+	"sync"
 
 	"github.com/spice-framework/spice-agent/tool"
 )
 
-// ToolDispatcher is the sole executable route for tool calls.
+// ToolDispatcher is the sole executable route for tool calls. Definition gives
+// decorators an immutable capability snapshot before they delegate execution.
 type ToolDispatcher interface {
-	Dispatch(context.Context, tool.Call, tool.Reporter) tool.Result
+	Definitions() []tool.Definition
+	Definition(name string) (tool.Definition, bool)
+	Dispatch(context.Context, tool.Call, tool.Reporter) (tool.Result, error)
 }
 
 // ToolDispatchDecorator wraps the canonical dispatcher. Spice supplies these
@@ -23,17 +26,19 @@ type ToolDispatchDecorator interface {
 	Wrap(ToolDispatcher) ToolDispatcher
 }
 
-// Dispatcher is an immutable named tool map constructed by Spice.
-type Dispatcher struct {
-	tools map[string]toolEntry
-}
-
 type toolEntry struct {
 	definition     tool.Definition
 	implementation tool.Tool
 }
 
-// NewDispatcher validates canonical bean names and model-visible definitions.
+// Dispatcher is an immutable named tool snapshot constructed by Spice.
+type Dispatcher struct {
+	tools map[string]toolEntry
+}
+
+// NewDispatcher validates canonical bean names in sorted order and snapshots
+// definitions and capabilities. Tool implementations remain trusted concurrent
+// singleton beans.
 func NewDispatcher(tools map[string]tool.Tool) (*Dispatcher, error) {
 	result := make(map[string]toolEntry, len(tools))
 	for _, name := range slices.Sorted(maps.Keys(tools)) {
@@ -53,7 +58,7 @@ func NewDispatcher(tools map[string]tool.Tool) (*Dispatcher, error) {
 	return &Dispatcher{tools: result}, nil
 }
 
-// Definitions returns definitions ordered by canonical bean name.
+// Definitions returns snapshotted definitions ordered by canonical bean name.
 func (dispatcher *Dispatcher) Definitions() []tool.Definition {
 	if dispatcher == nil {
 		return []tool.Definition{}
@@ -66,22 +71,92 @@ func (dispatcher *Dispatcher) Definitions() []tool.Definition {
 	return result
 }
 
-// Dispatch validates and invokes one named tool without reflection.
-func (dispatcher *Dispatcher) Dispatch(ctx context.Context, call tool.Call, reporter tool.Reporter) tool.Result {
+// Definition returns one immutable capability snapshot.
+func (dispatcher *Dispatcher) Definition(name string) (tool.Definition, bool) {
 	if dispatcher == nil {
-		return errorResult(call.ID, errors.New("tool dispatcher is nil"))
+		return tool.Definition{}, false
 	}
-	if err := call.Validate(); err != nil {
-		return errorResult(call.ID, err)
-	}
-	entry, found := dispatcher.tools[call.Name]
-	if !found {
-		return errorResult(call.ID, fmt.Errorf("tool %q is not available", call.Name))
-	}
-	return entry.implementation.Execute(ctx, call, reporter)
+	entry, found := dispatcher.tools[name]
+	return entry.definition.Clone(), found
 }
 
-func errorResult(callID tool.CallID, err error) tool.Result {
-	content, _ := json.Marshal(map[string]string{"error": err.Error()})
-	return tool.Result{CallID: callID, Content: content, Error: err.Error()}
+// Dispatch validates correlation and cancellation around one trusted in-process
+// call. Cancellation is cooperative: a Tool that ignores ctx can still block its
+// own goroutine and therefore must be treated as trusted code.
+func (dispatcher *Dispatcher) Dispatch(ctx context.Context, call tool.Call, reporter tool.Reporter) (tool.Result, error) {
+	if ctx == nil {
+		return tool.Result{}, errors.New("tool dispatch context must not be nil")
+	}
+	if dispatcher == nil {
+		return tool.Result{}, errors.New("tool dispatcher is nil")
+	}
+	if err := call.Validate(); err != nil {
+		return tool.Result{}, err
+	}
+	if err := ctx.Err(); err != nil {
+		return tool.Result{}, err
+	}
+	entry, found := dispatcher.tools[call.Name()]
+	if !found {
+		return tool.Result{}, fmt.Errorf("tool %q is not available", call.Name())
+	}
+	scoped := &scopedReporter{callID: call.ID(), delegate: reporter}
+	result := entry.implementation.Execute(ctx, call.Clone(), scoped)
+	if err := scoped.Err(); err != nil {
+		return tool.Result{}, err
+	}
+	if err := ctx.Err(); err != nil {
+		return tool.Result{}, err
+	}
+	if err := result.Validate(); err != nil {
+		return tool.Result{}, fmt.Errorf("validate tool %q result: %w", call.Name(), err)
+	}
+	if result.CallID() != call.ID() {
+		return tool.Result{}, fmt.Errorf("tool %q returned call ID %q for active call %q", call.Name(), result.CallID(), call.ID())
+	}
+	return result.Clone(), nil
+}
+
+type scopedReporter struct {
+	mu       sync.Mutex
+	callID   tool.CallID
+	delegate tool.Reporter
+	err      error
+}
+
+func (reporter *scopedReporter) Report(ctx context.Context, progress tool.Progress) error {
+	err := reporter.report(ctx, progress)
+	if err != nil {
+		reporter.mu.Lock()
+		if reporter.err == nil {
+			reporter.err = err
+		}
+		reporter.mu.Unlock()
+	}
+	return err
+}
+
+func (reporter *scopedReporter) report(ctx context.Context, progress tool.Progress) error {
+	if ctx == nil {
+		return errors.New("tool progress context must not be nil")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := progress.Validate(); err != nil {
+		return err
+	}
+	if progress.CallID() != reporter.callID {
+		return fmt.Errorf("tool progress call ID %q does not match active call %q", progress.CallID(), reporter.callID)
+	}
+	if reporter.delegate == nil {
+		return nil
+	}
+	return reporter.delegate.Report(ctx, progress)
+}
+
+func (reporter *scopedReporter) Err() error {
+	reporter.mu.Lock()
+	defer reporter.mu.Unlock()
+	return reporter.err
 }

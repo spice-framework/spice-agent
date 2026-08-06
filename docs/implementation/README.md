@@ -19,13 +19,14 @@ Exact commits and command output are recorded only after the corresponding gate
 has run. A phase is not complete because code exists; every exit criterion in its
 document must be green on Windows and Linux where required.
 
-## Current API-hardening blockers
+## Current Phase 2 boundary
 
-Phase 2 remains incomplete. Before daemon or provider integration is accepted,
-the next slice must make model/tool wire values deeply immutable, snapshot tool
-definitions in the dispatcher, enforce call/progress correlation and cancellation,
-preserve typed provider failures, and replace the current single-consumer run
-event delivery with a count-and-byte-bounded authoritative log plus independent
-`Subscribe(afterSequence)` replay. It must also make terminal persistence and
-engine shutdown explicit. Interaction completion and snapshots are contracts,
-not completed runtime implementations.
+The immutable model/tool contracts, typed provider failures, dispatcher
+capability snapshot, call/progress correlation, bounded independent event
+replay, terminal durability, and engine shutdown lifecycle are implemented.
+They remain pre-1.0 contracts and will be exercised by the independent OpenAI
+provider and coding-tool repositories before stabilization.
+
+Phase 2 is still incomplete: interaction completion and snapshot import/export
+remain documented seams rather than runtime implementations. Daemon protocol
+work must not imply those contracts are complete.

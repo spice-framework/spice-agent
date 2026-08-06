@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,7 +22,56 @@ import (
 	"github.com/spice-framework/spice-agent/tool"
 )
 
-const maxQueuedRunEvents = 65536
+const defaultFinalizationTimeout = 2 * time.Second
+
+// EngineOptions configures authoritative replay and bounded terminal durability.
+type EngineOptions struct {
+	LogLimits           event.LogLimits
+	FinalizationTimeout time.Duration
+	// MetadataNamespaces explicitly permits safe provider metadata in events.
+	MetadataNamespaces []string
+}
+
+// DefaultEngineOptions returns conservative architecture-proof bounds.
+func DefaultEngineOptions() EngineOptions {
+	return EngineOptions{LogLimits: event.DefaultLogLimits(), FinalizationTimeout: defaultFinalizationTimeout}
+}
+
+// DurabilityError reports that a lifecycle event could not be fully persisted
+// or acknowledged before its bounded finalization deadline.
+type DurabilityError struct {
+	Kind  event.Kind
+	Cause error
+}
+
+func (failure *DurabilityError) Error() string {
+	return fmt.Sprintf("durably persist %s: %v", failure.Kind, failure.Cause)
+}
+
+func (failure *DurabilityError) Unwrap() error { return failure.Cause }
+
+// EmissionError reports a post-commit observer acknowledgement failure. The
+// sequence is already authoritative and must never be reused.
+type EmissionError struct {
+	Kind      event.Kind
+	Sequence  uint64
+	Committed bool
+	Cause     error
+}
+
+func (failure *EmissionError) Error() string {
+	return fmt.Sprintf("publish committed %s sequence %d: %v", failure.Kind, failure.Sequence, failure.Cause)
+}
+
+func (failure *EmissionError) Unwrap() error { return failure.Cause }
+
+func committed(err error) bool {
+	if err == nil {
+		return true
+	}
+	var emission *EmissionError
+	return errors.As(err, &emission) && emission.Committed
+}
 
 // IDSource supplies stable operation identities. Applications may replace the
 // default through ordinary typed Spice injection.
@@ -29,9 +80,7 @@ type IDSource interface {
 }
 
 // AtomicIDSource is a deterministic process-local ID source for embedding and tests.
-type AtomicIDSource struct {
-	next atomic.Uint64
-}
+type AtomicIDSource struct{ next atomic.Uint64 }
 
 // Next returns prefix-N, starting at one.
 func (source *AtomicIDSource) Next(prefix string) (string, error) {
@@ -65,40 +114,58 @@ func NewDefinition(name, modelName string, maxTurns uint32) (Definition, error) 
 	return Definition{name: name, model: modelName, maxTurns: maxTurns}, nil
 }
 
-// Name returns the logical agent definition name.
-func (definition Definition) Name() string { return definition.name }
-
-// Model returns the selected provider model name.
-func (definition Definition) Model() string { return definition.model }
-
-// MaxTurns returns the deterministic loop bound.
+func (definition Definition) Name() string     { return definition.name }
+func (definition Definition) Model() string    { return definition.model }
 func (definition Definition) MaxTurns() uint32 { return definition.maxTurns }
 
 // Input is immutable initial run input.
-type Input struct {
-	message message.Message
-}
+type Input struct{ message message.Message }
 
 // NewInput validates an initial user message.
 func NewInput(initial message.Message) (Input, error) {
+	if err := initial.Validate(); err != nil {
+		return Input{}, fmt.Errorf("agent input message: %w", err)
+	}
 	if initial.Role() != message.RoleUser {
 		return Input{}, errors.New("agent input initial message must have user role")
 	}
-	return Input{message: initial}, nil
+	return Input{message: initial.Clone()}, nil
 }
 
 // Engine executes an already-constructed Spice graph. It is not a container.
+// Close drains cooperative runs; Shutdown cancels them. Neither method can
+// forcibly stop a trusted in-process provider or tool that ignores context.
 type Engine struct {
-	provider   model.Provider
-	dispatcher *stage.Dispatcher
-	ids        IDSource
-	clock      func() time.Time
-	observers  []event.Observer
-	bestEffort []*event.BestEffortObserver
+	provider            model.Provider
+	dispatcher          stage.ToolDispatcher
+	ids                 IDSource
+	clock               func() time.Time
+	observers           []event.Observer
+	bestEffort          []*event.BestEffortObserver
+	logLimits           event.LogLimits
+	finalizationTimeout time.Duration
+	metadataNamespaces  map[string]struct{}
+
+	mu      sync.Mutex
+	closed  bool
+	active  map[string]*Run
+	drained chan struct{}
 }
 
-// NewEngine constructs the kernel from exact typed dependencies.
-func NewEngine(provider model.Provider, dispatcher *stage.Dispatcher, ids IDSource, clock func() time.Time, observers []event.Observer, bestEffort []*event.BestEffortObserver) (*Engine, error) {
+// NewEngine constructs the kernel with default bounded replay limits.
+func NewEngine(provider model.Provider, dispatcher stage.ToolDispatcher, ids IDSource, clock func() time.Time, observers []event.Observer, bestEffort []*event.BestEffortObserver) (*Engine, error) {
+	return NewEngineWithOptions(provider, dispatcher, ids, clock, observers, bestEffort, DefaultEngineOptions())
+}
+
+// NewEngineWithLimits constructs the kernel with explicit replay bounds.
+func NewEngineWithLimits(provider model.Provider, dispatcher stage.ToolDispatcher, ids IDSource, clock func() time.Time, observers []event.Observer, bestEffort []*event.BestEffortObserver, limits event.LogLimits) (*Engine, error) {
+	options := DefaultEngineOptions()
+	options.LogLimits = limits
+	return NewEngineWithOptions(provider, dispatcher, ids, clock, observers, bestEffort, options)
+}
+
+// NewEngineWithOptions constructs the kernel with explicit bounded options.
+func NewEngineWithOptions(provider model.Provider, dispatcher stage.ToolDispatcher, ids IDSource, clock func() time.Time, observers []event.Observer, bestEffort []*event.BestEffortObserver, options EngineOptions) (*Engine, error) {
 	if provider == nil {
 		return nil, errors.New("agent engine requires a model provider")
 	}
@@ -121,34 +188,72 @@ func NewEngine(provider model.Provider, dispatcher *stage.Dispatcher, ids IDSour
 			return nil, fmt.Errorf("agent best-effort observer %d is nil", index)
 		}
 	}
-	return &Engine{provider: provider, dispatcher: dispatcher, ids: ids, clock: clock, observers: append([]event.Observer(nil), observers...), bestEffort: append([]*event.BestEffortObserver(nil), bestEffort...)}, nil
+	if options.FinalizationTimeout <= 0 || options.FinalizationTimeout > 30*time.Second {
+		return nil, errors.New("agent finalization timeout must be between zero and 30 seconds")
+	}
+	metadataNamespaces := make(map[string]struct{}, len(options.MetadataNamespaces))
+	for index, namespace := range options.MetadataNamespaces {
+		if namespace == "" || namespace != strings.TrimSpace(namespace) || len(namespace) > 128 {
+			return nil, fmt.Errorf("agent metadata namespace %d is invalid", index)
+		}
+		if _, duplicate := metadataNamespaces[namespace]; duplicate {
+			return nil, fmt.Errorf("agent metadata namespace %q is duplicated", namespace)
+		}
+		metadataNamespaces[namespace] = struct{}{}
+	}
+	probe, err := event.NewLog("validation", options.LogLimits)
+	if err != nil {
+		return nil, fmt.Errorf("agent replay limits: %w", err)
+	}
+	probe.Close()
+	drained := make(chan struct{})
+	close(drained)
+	return &Engine{
+		provider: provider, dispatcher: dispatcher, ids: ids, clock: clock,
+		observers: append([]event.Observer(nil), observers...), bestEffort: append([]*event.BestEffortObserver(nil), bestEffort...),
+		logLimits: options.LogLimits, finalizationTimeout: options.FinalizationTimeout,
+		metadataNamespaces: metadataNamespaces,
+		active:             make(map[string]*Run), drained: drained,
+	}, nil
 }
 
-// Run is one asynchronous execution and its required event subscription.
+// Run is one asynchronous execution backed by an authoritative replay log.
 type Run struct {
-	id          string
-	events      chan event.Envelope
-	done        chan struct{}
-	cancel      context.CancelFunc
-	mu          sync.Mutex
-	err         error
-	queueMu     sync.Mutex
-	queueCond   *sync.Cond
-	queue       []event.Envelope
-	eventsFinal bool
+	id       string
+	log      *event.Log
+	done     chan struct{}
+	cancel   context.CancelFunc
+	engine   *Engine
+	finalize sync.Once
+	mu       sync.Mutex
+	err      error
 }
 
-// ID returns the stable run identity.
 func (run *Run) ID() string { return run.id }
 
-// Events returns every event in sequence and closes after the terminal event.
-func (run *Run) Events() <-chan event.Envelope { return run.events }
+// Subscribe creates an independent gap-free replay/tail cursor.
+func (run *Run) Subscribe(ctx context.Context, afterSequence uint64) (*event.Subscription, error) {
+	if run == nil {
+		return nil, errors.New("agent run is nil")
+	}
+	return run.log.Subscribe(ctx, afterSequence)
+}
 
 // Cancel requests cooperative run cancellation.
-func (run *Run) Cancel() { run.cancel() }
+func (run *Run) Cancel() {
+	if run != nil {
+		run.cancel()
+	}
+}
 
-// Wait blocks for terminal finalization and returns the normalized run error.
+// Wait blocks for terminal persistence and returns the normalized run error.
 func (run *Run) Wait(ctx context.Context) error {
+	if ctx == nil {
+		return errors.New("agent wait context must not be nil")
+	}
+	if run == nil {
+		return errors.New("agent run is nil")
+	}
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -161,8 +266,14 @@ func (run *Run) Wait(ctx context.Context) error {
 
 // Start begins one run. Caller context ownership propagates to providers and tools.
 func (engine *Engine) Start(ctx context.Context, definition Definition, input Input) (*Run, error) {
+	if ctx == nil {
+		return nil, errors.New("agent start context must not be nil")
+	}
 	if engine == nil {
 		return nil, errors.New("agent engine is nil")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	if _, err := NewDefinition(definition.name, definition.model, definition.maxTurns); err != nil {
 		return nil, err
@@ -174,93 +285,156 @@ func (engine *Engine) Start(ctx context.Context, definition Definition, input In
 	if err != nil {
 		return nil, fmt.Errorf("allocate run ID: %w", err)
 	}
+	log, err := event.NewLog(runID, engine.logLimits)
+	if err != nil {
+		return nil, err
+	}
 	runContext, cancel := context.WithCancel(ctx)
-	run := &Run{id: runID, events: make(chan event.Envelope), done: make(chan struct{}), cancel: cancel}
-	run.queueCond = sync.NewCond(&run.queueMu)
-	go run.deliverEvents()
+	run := &Run{id: runID, log: log, done: make(chan struct{}), cancel: cancel, engine: engine}
+	engine.mu.Lock()
+	if engine.closed {
+		engine.mu.Unlock()
+		cancel()
+		log.Close()
+		return nil, errors.New("agent engine is closed")
+	}
+	if _, duplicate := engine.active[runID]; duplicate {
+		engine.mu.Unlock()
+		cancel()
+		log.Close()
+		return nil, fmt.Errorf("agent ID source returned active duplicate run ID %q", runID)
+	}
+	if len(engine.active) == 0 {
+		engine.drained = make(chan struct{})
+	}
+	engine.active[runID] = run
+	engine.mu.Unlock()
 	go engine.execute(runContext, run, definition, input)
 	return run, nil
 }
 
-func (engine *Engine) execute(ctx context.Context, run *Run, definition Definition, input Input) {
-	sequencer, sequenceErr := event.NewSequencer(run.id, engine.clock)
-	if sequenceErr != nil {
-		engine.completeRun(run, sequenceErr)
-		return
+// Close rejects new runs and waits for cooperative active runs to drain.
+func (engine *Engine) Close(ctx context.Context) error {
+	return engine.stop(ctx, false)
+}
+
+// Shutdown rejects new runs, requests cancellation, and waits up to ctx.
+func (engine *Engine) Shutdown(ctx context.Context) error {
+	return engine.stop(ctx, true)
+}
+
+func (engine *Engine) stop(ctx context.Context, cancelActive bool) error {
+	if ctx == nil {
+		return errors.New("agent engine stop context must not be nil")
 	}
-	emitter := runEmitter{engine: engine, run: run, sequencer: sequencer}
-	var terminal bool
+	if engine == nil {
+		return errors.New("agent engine is nil")
+	}
+	engine.mu.Lock()
+	engine.closed = true
+	drained := engine.drained
+	runs := make([]*Run, 0, len(engine.active))
+	for _, run := range engine.active {
+		runs = append(runs, run)
+	}
+	engine.mu.Unlock()
+	if cancelActive {
+		for _, run := range runs {
+			run.Cancel()
+		}
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-drained:
+		return nil
+	}
+}
+
+func (engine *Engine) execute(ctx context.Context, run *Run, definition Definition, input Input) {
+	emitter := runEmitter{engine: engine, run: run, next: 1}
+	var runErr error
+	terminalKind := event.RunCompleted
+	runStarted := false
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			panicErr := fmt.Errorf("agent execution panic: %v", recovered)
-			if !terminal {
-				emitter.terminal(ctx, event.RunFailed, panicErr)
-			}
-			engine.completeRun(run, panicErr)
+			runErr = errors.Join(runErr, fmt.Errorf("agent execution panic: %v", recovered))
+			terminalKind = event.RunFailed
 		}
+		var terminalErr error
+		if runStarted {
+			terminalErr = emitter.terminal(ctx, terminalKind, runErr)
+		}
+		run.complete(errors.Join(runErr, terminalErr))
 	}()
 	if err := emitter.emit(ctx, event.RunStarted, map[string]string{"definition": definition.name}); err != nil {
-		terminal = true
-		emitter.terminal(ctx, event.RunFailed, err)
-		engine.completeRun(run, err)
+		runStarted = committed(err)
+		runErr = err
+		terminalKind = event.RunFailed
 		return
 	}
+	runStarted = true
 	history := []message.Message{input.message}
 	for turn := uint32(1); turn <= definition.maxTurns; turn++ {
 		completed, err := engine.executeTurn(ctx, &emitter, definition, turn, &history)
 		if err != nil {
-			terminal = true
-			kind := event.RunFailed
+			runErr = err
+			terminalKind = event.RunFailed
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				kind = event.RunCancelled
+				terminalKind = event.RunCancelled
 			}
-			emitter.terminal(ctx, kind, err)
-			engine.completeRun(run, err)
 			return
 		}
 		if completed {
-			terminal = true
-			emitter.terminal(ctx, event.RunCompleted, nil)
-			engine.completeRun(run, nil)
 			return
 		}
 	}
-	err := fmt.Errorf("agent run exceeded maximum turns %d", definition.maxTurns)
-	terminal = true
-	emitter.terminal(ctx, event.RunFailed, err)
-	engine.completeRun(run, err)
+	runErr = fmt.Errorf("agent run exceeded maximum turns %d", definition.maxTurns)
+	terminalKind = event.RunFailed
 }
 
 func (engine *Engine) executeTurn(ctx context.Context, emitter *runEmitter, definition Definition, turn uint32, history *[]message.Message) (bool, error) {
 	if err := emitter.emit(ctx, event.TurnStarted, map[string]uint32{"turn": turn}); err != nil {
-		emitter.emitFailure(ctx, event.TurnFailed, err)
+		if committed(err) {
+			return false, errors.Join(err, emitter.failure(ctx, event.TurnFailed, err))
+		}
 		return false, err
 	}
-	request, err := model.NewRequest(definition.model, *history, engine.dispatcher.Definitions())
+	operationID, err := engine.ids.Next("model")
 	if err != nil {
-		emitter.emitFailure(ctx, event.TurnFailed, err)
-		return false, err
+		return false, errors.Join(err, emitter.failure(ctx, event.TurnFailed, err))
 	}
-	if err = emitter.emit(ctx, event.ModelStarted, map[string]uint32{"turn": turn}); err != nil {
-		emitter.emitFailure(ctx, event.ModelFailed, err)
-		emitter.emitFailure(ctx, event.TurnFailed, err)
-		return false, err
+	request, err := model.NewRequest(model.OperationID(operationID), definition.model, *history, engine.definitions())
+	if err != nil {
+		return false, errors.Join(err, emitter.failure(ctx, event.TurnFailed, err))
+	}
+	if err = emitter.emit(ctx, event.ModelStarted, map[string]any{"turn": turn, "operation_id": operationID}); err != nil {
+		if committed(err) {
+			return false, errors.Join(err,
+				emitter.modelFailure(ctx, err),
+				emitter.failure(ctx, event.TurnFailed, err))
+		}
+		return false, errors.Join(err, emitter.failure(ctx, event.TurnFailed, err))
 	}
 	stream, err := safeStream(ctx, engine.provider, request)
 	if err != nil {
-		emitter.emitFailure(ctx, event.ModelFailed, err)
-		emitter.emitFailure(ctx, event.TurnFailed, err)
-		return false, err
+		normalized := normalizeStartError(err)
+		return false, errors.Join(normalized,
+			emitter.modelFailure(ctx, normalized),
+			emitter.failure(ctx, event.TurnFailed, normalized))
 	}
-	text, calls, err := consumeStream(ctx, emitter, stream)
+	text, calls, usage, metadata, err := consumeStream(ctx, emitter, stream)
 	if err != nil {
-		emitter.emitFailure(ctx, event.ModelFailed, err)
-		emitter.emitFailure(ctx, event.TurnFailed, err)
-		return false, err
+		return false, errors.Join(err,
+			emitter.modelFailure(ctx, err),
+			emitter.failure(ctx, event.TurnFailed, err))
 	}
-	if err = emitter.emit(ctx, event.ModelCompleted, map[string]uint32{"turn": turn}); err != nil {
-		emitter.emitFailure(ctx, event.TurnFailed, err)
-		return false, err
+	completedPayload := modelCompletedPayload{
+		InputTokens: usage.InputTokens(), OutputTokens: usage.OutputTokens(),
+		Metadata: engine.filterMetadata(metadata),
+	}
+	if err = emitter.emit(ctx, event.ModelCompleted, completedPayload); err != nil {
+		return false, errors.Join(err, emitter.failure(ctx, event.TurnFailed, err))
 	}
 	if len(calls) == 0 {
 		if err = emitter.emit(ctx, event.TurnCompleted, map[string]uint32{"turn": turn}); err != nil {
@@ -269,8 +443,7 @@ func (engine *Engine) executeTurn(ctx context.Context, emitter *runEmitter, defi
 		return true, nil
 	}
 	if err = engine.appendToolRound(ctx, emitter, text, calls, history); err != nil {
-		emitter.emitFailure(ctx, event.TurnFailed, err)
-		return false, err
+		return false, errors.Join(err, emitter.failure(ctx, event.TurnFailed, err))
 	}
 	if err = emitter.emit(ctx, event.TurnCompleted, map[string]uint32{"turn": turn}); err != nil {
 		return false, err
@@ -278,47 +451,119 @@ func (engine *Engine) executeTurn(ctx context.Context, emitter *runEmitter, defi
 	return false, nil
 }
 
-func consumeStream(ctx context.Context, emitter *runEmitter, stream model.Stream) (string, []tool.Call, error) {
+func (engine *Engine) definitions() []tool.Definition {
+	return engine.dispatcher.Definitions()
+}
+
+func consumeStream(ctx context.Context, emitter *runEmitter, stream model.Stream) (textResult string, callsResult []tool.Call, usageResult model.Usage, metadataResult []model.Metadata, returnErr error) {
+	if stream == nil {
+		return "", nil, model.Usage{}, nil, errors.New("model provider returned a nil stream")
+	}
+	defer func() { returnErr = errors.Join(returnErr, safeClose(stream)) }()
 	var text strings.Builder
 	var calls []tool.Call
-	completed := false
+	observed := false
 	for {
 		streamEvent, err := safeRecv(ctx, stream)
 		if err != nil {
-			err = model.RequireCompletion(streamEvent, err, completed)
-			if errors.Is(err, io.EOF) && completed {
-				break
-			}
-			_ = safeClose(stream)
-			return "", nil, err
+			return "", nil, model.Usage{}, nil, normalizeRecvError(err, observed)
 		}
 		if err = streamEvent.Validate(); err != nil {
-			_ = safeClose(stream)
-			return "", nil, fmt.Errorf("validate model stream: %w", err)
+			return "", nil, model.Usage{}, nil, fmt.Errorf("validate model stream: %w", err)
 		}
-		switch streamEvent.Kind {
+		observed = true
+		switch streamEvent.Kind() {
 		case model.EventTextDelta:
-			text.WriteString(streamEvent.Text)
-			if err = emitter.emit(ctx, event.ModelDelta, map[string]string{"text": streamEvent.Text}); err != nil {
-				_ = safeClose(stream)
-				return "", nil, err
+			value, _ := streamEvent.Text()
+			if text.Len()+len(value) > model.MaximumOperationTextBytes {
+				return "", nil, model.Usage{}, nil, fmt.Errorf("model stream text exceeds %d bytes", model.MaximumOperationTextBytes)
+			}
+			text.WriteString(value)
+			if err = emitter.emit(ctx, event.ModelDelta, map[string]string{"text": value}); err != nil {
+				return "", nil, model.Usage{}, nil, err
 			}
 		case model.EventToolCall:
-			calls = append(calls, streamEvent.Call)
+			call, _ := streamEvent.Call()
+			if len(calls) >= model.MaximumOperationToolCalls {
+				return "", nil, model.Usage{}, nil, fmt.Errorf("model stream tool calls exceed %d", model.MaximumOperationToolCalls)
+			}
+			calls = append(calls, call)
 		case model.EventCompleted:
-			completed = true
+			usage, _ := streamEvent.Usage()
+			metadata, _ := streamEvent.Metadata()
+			return text.String(), calls, usage, metadata, nil
 		case model.EventFailed:
-			_ = safeClose(stream)
-			return "", nil, fmt.Errorf("model %s: %s", streamEvent.Problem.Code, streamEvent.Problem.Message)
-		}
-		if completed {
-			break
+			problem, _ := streamEvent.Problem()
+			operationErr, constructionErr := model.NewOperationError(problem, true, nil)
+			return "", nil, model.Usage{}, nil, errors.Join(operationErr, constructionErr)
 		}
 	}
-	if err := safeClose(stream); err != nil {
-		return "", nil, fmt.Errorf("close model stream: %w", err)
+}
+
+func normalizeRecvError(err error, observed bool) error {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
 	}
-	return text.String(), calls, nil
+	if streamError, ok := errors.AsType[*model.StreamError](err); ok {
+		operationError, constructionErr := model.NewOperationError(streamError.Problem(), observed, err)
+		return errors.Join(operationError, constructionErr)
+	}
+	if errors.Is(err, io.EOF) {
+		err = model.RequireCompletion(err, false)
+	}
+	problem, constructionErr := model.NewProblem("provider_stream", "model provider stream failed", false)
+	if constructionErr != nil {
+		return errors.Join(err, constructionErr)
+	}
+	operationError, operationConstructionErr := model.NewOperationError(problem, observed, err)
+	return errors.Join(operationError, operationConstructionErr)
+}
+
+type modelMetadataPayload struct {
+	Namespace string          `json:"namespace"`
+	Value     json.RawMessage `json:"value"`
+}
+
+type modelCompletedPayload struct {
+	InputTokens  uint64                 `json:"input_tokens"`
+	OutputTokens uint64                 `json:"output_tokens"`
+	Metadata     []modelMetadataPayload `json:"metadata,omitempty"`
+}
+
+type modelFailedPayload struct {
+	Code         string                 `json:"code"`
+	Message      string                 `json:"message"`
+	Retryable    bool                   `json:"retryable"`
+	BeforeStream bool                   `json:"before_stream"`
+	Metadata     []modelMetadataPayload `json:"metadata,omitempty"`
+}
+
+func (engine *Engine) filterMetadata(metadata []model.Metadata) []modelMetadataPayload {
+	byNamespace := make(map[string]modelMetadataPayload, len(metadata))
+	for _, value := range metadata {
+		if _, allowed := engine.metadataNamespaces[value.Namespace()]; !allowed {
+			continue
+		}
+		byNamespace[value.Namespace()] = modelMetadataPayload{Namespace: value.Namespace(), Value: value.Value()}
+	}
+	result := make([]modelMetadataPayload, 0, len(byNamespace))
+	for _, namespace := range slices.Sorted(maps.Keys(byNamespace)) {
+		result = append(result, byNamespace[namespace])
+	}
+	return result
+}
+
+func normalizeStartError(err error) error {
+	if providerError, ok := errors.AsType[*model.ProviderError](err); ok {
+		operationErr, constructionErr := model.NewOperationError(providerError.Problem(), false, err)
+		return errors.Join(operationErr, constructionErr)
+	}
+	problem, problemErr := model.NewProblem("provider_start", "model provider could not start the operation", false)
+	if problemErr != nil {
+		return errors.Join(err, problemErr)
+	}
+	operationErr, constructionErr := model.NewOperationError(problem, false, err)
+	return errors.Join(operationErr, constructionErr)
 }
 
 func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, textValue string, calls []tool.Call, history *[]message.Message) error {
@@ -331,7 +576,7 @@ func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, 
 		parts = append(parts, part)
 	}
 	for _, call := range calls {
-		part, err := message.ToolCall(string(call.ID), call.Name, call.Arguments)
+		part, err := message.ToolCall(string(call.ID()), call.Name(), call.Arguments())
 		if err != nil {
 			return err
 		}
@@ -343,27 +588,25 @@ func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, 
 	}
 	*history = append(*history, assistantMessage)
 	for _, call := range calls {
-		if err = emitter.emit(ctx, event.ToolStarted, map[string]string{"call_id": string(call.ID), "name": call.Name}); err != nil {
-			emitter.emitFailure(ctx, event.ToolFailed, err)
+		if err = emitter.emit(ctx, event.ToolStarted, map[string]string{"call_id": string(call.ID()), "name": call.Name()}); err != nil {
+			if committed(err) {
+				return errors.Join(err, emitter.failure(ctx, event.ToolFailed, err))
+			}
 			return err
 		}
-		result, panicErr := safeDispatch(ctx, engine.dispatcher, call, emitter)
-		if panicErr != nil {
-			emitter.emitFailure(ctx, event.ToolFailed, panicErr)
-			return panicErr
-		}
-		if err = result.Validate(); err != nil {
-			emitter.emitFailure(ctx, event.ToolFailed, err)
-			return fmt.Errorf("validate tool %q result: %w", call.Name, err)
+		result, dispatchErr := safeDispatch(ctx, engine.dispatcher, call, emitter)
+		if dispatchErr != nil {
+			return errors.Join(dispatchErr, emitter.failure(ctx, event.ToolFailed, dispatchErr))
 		}
 		terminalKind := event.ToolCompleted
-		if result.Error != "" {
+		problem, failed := result.Problem()
+		if failed {
 			terminalKind = event.ToolFailed
 		}
-		if err = emitter.emit(ctx, terminalKind, map[string]string{"call_id": string(call.ID), "name": call.Name, "error": result.Error}); err != nil {
+		if err = emitter.emit(ctx, terminalKind, map[string]string{"call_id": string(call.ID()), "name": call.Name(), "error": problem}); err != nil {
 			return err
 		}
-		part, partErr := message.ToolResult(string(call.ID), call.Name, result.Content)
+		part, partErr := message.ToolResult(string(call.ID()), call.Name(), result.Content())
 		if partErr != nil {
 			return partErr
 		}
@@ -418,73 +661,118 @@ func safeClose(stream model.Stream) (err error) {
 func safeDispatch(ctx context.Context, dispatcher stage.ToolDispatcher, call tool.Call, reporter tool.Reporter) (result tool.Result, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			err = fmt.Errorf("tool %q panic: %v", call.Name, recovered)
+			err = fmt.Errorf("tool %q panic: %v", call.Name(), recovered)
 		}
 	}()
-	return dispatcher.Dispatch(ctx, call, reporter), nil
+	return dispatcher.Dispatch(ctx, call, reporter)
 }
 
-func (engine *Engine) completeRun(run *Run, err error) {
-	run.mu.Lock()
-	run.err = err
-	run.mu.Unlock()
-	close(run.done)
-	run.cancel()
-	run.queueMu.Lock()
-	run.eventsFinal = true
-	run.queueCond.Broadcast()
-	run.queueMu.Unlock()
+func (run *Run) complete(err error) {
+	run.finalize.Do(func() {
+		run.mu.Lock()
+		run.err = err
+		run.mu.Unlock()
+		run.log.Close()
+		close(run.done)
+		run.cancel()
+		run.engine.release(run.id)
+	})
 }
 
-func (run *Run) enqueue(envelope event.Envelope, terminal bool) error {
-	run.queueMu.Lock()
-	defer run.queueMu.Unlock()
-	if !terminal && len(run.queue) >= maxQueuedRunEvents-1 {
-		return fmt.Errorf("run event replay exceeds %d queued events", maxQueuedRunEvents)
+func (engine *Engine) release(runID string) {
+	engine.mu.Lock()
+	delete(engine.active, runID)
+	if len(engine.active) == 0 {
+		close(engine.drained)
 	}
-	run.queue = append(run.queue, envelope)
-	run.queueCond.Signal()
-	return nil
-}
-
-func (run *Run) deliverEvents() {
-	defer close(run.events)
-	for {
-		run.queueMu.Lock()
-		for len(run.queue) == 0 && !run.eventsFinal {
-			run.queueCond.Wait()
-		}
-		if len(run.queue) == 0 && run.eventsFinal {
-			run.queueMu.Unlock()
-			return
-		}
-		envelope := run.queue[0]
-		run.queue = run.queue[1:]
-		run.queueMu.Unlock()
-		run.events <- envelope
-	}
+	engine.mu.Unlock()
 }
 
 type runEmitter struct {
-	engine    *Engine
-	run       *Run
-	sequencer *event.Sequencer
+	engine *Engine
+	run    *Run
+	mu     sync.Mutex
+	next   uint64
 }
 
 func (emitter *runEmitter) emit(ctx context.Context, kind event.Kind, payload any) error {
-	envelope, err := emitter.sequencer.Next(kind, payload)
+	if ctx == nil {
+		return errors.New("event emission context must not be nil")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return emitter.persist(ctx, kind, payload)
+}
+
+func (emitter *runEmitter) terminal(ctx context.Context, kind event.Kind, runErr error) error {
+	var payload any
+	if runErr != nil {
+		payload = map[string]string{"error": runErr.Error()}
+	}
+	finalizationContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), emitter.engine.finalizationTimeout)
+	defer cancel()
+	if err := emitter.persist(finalizationContext, kind, payload); err != nil {
+		return &DurabilityError{Kind: kind, Cause: err}
+	}
+	return nil
+}
+
+func (emitter *runEmitter) failure(ctx context.Context, kind event.Kind, err error) error {
+	finalizationContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), emitter.engine.finalizationTimeout)
+	defer cancel()
+	if persistErr := emitter.persist(finalizationContext, kind, map[string]string{"error": err.Error()}); persistErr != nil {
+		return &DurabilityError{Kind: kind, Cause: persistErr}
+	}
+	return nil
+}
+
+func (emitter *runEmitter) modelFailure(ctx context.Context, err error) error {
+	payload := modelFailedPayload{Code: "model_operation", Message: "model operation failed"}
+	if operationError, ok := errors.AsType[*model.OperationError](err); ok {
+		problem := operationError.Problem()
+		payload.Code = problem.Code()
+		payload.Message = problem.Message()
+		payload.Retryable = operationError.Retryable()
+		payload.BeforeStream = operationError.BeforeStream()
+		payload.Metadata = emitter.engine.filterMetadata(problem.Metadata())
+	} else if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		payload.Code = "cancelled"
+		payload.Message = "model operation was cancelled"
+	}
+	finalizationContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), emitter.engine.finalizationTimeout)
+	defer cancel()
+	if persistErr := emitter.persist(finalizationContext, event.ModelFailed, payload); persistErr != nil {
+		return &DurabilityError{Kind: event.ModelFailed, Cause: persistErr}
+	}
+	return nil
+}
+
+func (emitter *runEmitter) persist(ctx context.Context, kind event.Kind, payload any) error {
+	emitter.mu.Lock()
+	defer emitter.mu.Unlock()
+	var data json.RawMessage
+	if payload != nil {
+		encoded, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		data = encoded
+	}
+	envelope, err := event.Reconstruct(emitter.run.id, emitter.next, emitter.engine.clock(), kind, data)
 	if err != nil {
 		return err
 	}
-	if err = emitter.run.enqueue(envelope, false); err != nil {
-		return err
+	if appendErr := emitter.run.log.Append(envelope); appendErr != nil {
+		return fmt.Errorf("persist event %s: %w", kind, appendErr)
 	}
-	if err = ctx.Err(); err != nil {
-		return err
-	}
+	emitter.next++
 	for index, observer := range emitter.engine.observers {
-		if err = observer.Publish(ctx, envelope); err != nil {
-			return fmt.Errorf("publish event to required observer %d: %w", index, err)
+		if publishErr := observer.Publish(ctx, envelope); publishErr != nil {
+			return &EmissionError{
+				Kind: kind, Sequence: envelope.Sequence(), Committed: true,
+				Cause: fmt.Errorf("required observer %d: %w", index, publishErr),
+			}
 		}
 	}
 	for _, observer := range emitter.engine.bestEffort {
@@ -493,46 +781,10 @@ func (emitter *runEmitter) emit(ctx context.Context, kind event.Kind, payload an
 	return nil
 }
 
-func (emitter *runEmitter) emitFailure(ctx context.Context, kind event.Kind, err error) {
-	_ = emitter.emitWithoutCancellation(ctx, kind, map[string]string{"error": err.Error()})
-}
-
-func (emitter *runEmitter) terminal(ctx context.Context, kind event.Kind, err error) {
-	var payload any
-	if err != nil {
-		payload = map[string]string{"error": err.Error()}
-	}
-	_ = emitter.emitWithoutCancellation(ctx, kind, payload)
-}
-
-func (emitter *runEmitter) emitWithoutCancellation(ctx context.Context, kind event.Kind, payload any) error {
-	envelope, err := emitter.sequencer.Next(kind, payload)
-	if err != nil {
-		return err
-	}
-	if err = emitter.run.enqueue(envelope, true); err != nil {
-		return err
-	}
-	for _, observer := range emitter.engine.observers {
-		_ = observer.Publish(context.WithoutCancel(ctx), envelope)
-	}
-	for _, observer := range emitter.engine.bestEffort {
-		observer.TryPublish(envelope)
-	}
-	return nil
-}
-
-// Report emits bounded tool progress through the canonical event stream.
+// Report validates bounded progress and persists it before live publication.
 func (emitter *runEmitter) Report(ctx context.Context, progress tool.Progress) error {
-	if progress.CallID == "" || strings.TrimSpace(progress.Message) == "" {
-		return errors.New("tool progress requires call ID and message")
-	}
-	if len(progress.Message) > 4096 {
-		return errors.New("tool progress message exceeds 4096 bytes")
-	}
-	encoded, err := json.Marshal(progress)
-	if err != nil {
+	if err := progress.Validate(); err != nil {
 		return err
 	}
-	return emitter.emit(ctx, event.ToolProgress, json.RawMessage(encoded))
+	return emitter.emit(ctx, event.ToolProgress, map[string]string{"call_id": string(progress.CallID()), "message": progress.Message()})
 }

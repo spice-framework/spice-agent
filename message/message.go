@@ -12,6 +12,8 @@ const (
 	maxIDLength        = 128
 	maxNamespaceLength = 256
 	maxPartBytes       = 1 << 20
+	maxMessageBytes    = 4 << 20
+	maxMessageParts    = 128
 )
 
 // ID identifies one message within a run.
@@ -135,15 +137,20 @@ func New(id ID, role Role, parts ...Part) (Message, error) {
 	if !validRole(role) {
 		return Message{}, fmt.Errorf("message role %q is unsupported", role)
 	}
-	if len(parts) == 0 {
-		return Message{}, errors.New("message requires at least one part")
+	if len(parts) == 0 || len(parts) > maxMessageParts {
+		return Message{}, fmt.Errorf("message part count must be between 1 and %d", maxMessageParts)
 	}
 	result := Message{id: id, role: role, parts: make([]Part, len(parts))}
+	total := len(id) + len(role)
 	for index, part := range parts {
 		if !validPart(part) {
 			return Message{}, fmt.Errorf("message part %d is invalid", index)
 		}
 		result.parts[index] = clonePart(part)
+		total += part.encodedSize()
+		if total > maxMessageBytes {
+			return Message{}, fmt.Errorf("message exceeds %d bytes", maxMessageBytes)
+		}
 	}
 	return result, nil
 }
@@ -163,9 +170,38 @@ func (value Message) Parts() []Part {
 	return result
 }
 
+// Validate rejects a zero or corrupted message value.
+func (value Message) Validate() error {
+	_, err := New(value.id, value.role, value.parts...)
+	return err
+}
+
+// Clone returns a deep immutable copy.
+func (value Message) Clone() Message {
+	result := Message{id: value.id, role: value.role, parts: make([]Part, len(value.parts))}
+	for index, part := range value.parts {
+		result.parts[index] = clonePart(part)
+	}
+	return result
+}
+
+// SizeBytes returns the deterministic in-memory payload accounting used by
+// request and replay bounds.
+func (value Message) SizeBytes() int {
+	total := len(value.id) + len(value.role)
+	for _, part := range value.parts {
+		total += part.encodedSize()
+	}
+	return total
+}
+
 func clonePart(part Part) Part {
 	part.data = append([]byte(nil), part.data...)
 	return part
+}
+
+func (part Part) encodedSize() int {
+	return len(part.kind) + len(part.text) + len(part.name) + len(part.callID) + len(part.namespace) + len(part.data)
 }
 
 func validRole(role Role) bool {
@@ -178,9 +214,9 @@ func validPart(part Part) bool {
 		return part.text != "" && len(part.text) <= maxPartBytes
 	case PartToolCall, PartToolResult:
 		return validateToken("tool call ID", part.callID, maxIDLength) == nil &&
-			validateToken("tool name", part.name, maxIDLength) == nil && json.Valid(part.data)
+			validateToken("tool name", part.name, maxIDLength) == nil && len(part.data) <= maxPartBytes && json.Valid(part.data)
 	case PartExtension:
-		return validateToken("extension namespace", part.namespace, maxNamespaceLength) == nil && json.Valid(part.data)
+		return validateToken("extension namespace", part.namespace, maxNamespaceLength) == nil && len(part.data) <= maxPartBytes && json.Valid(part.data)
 	default:
 		return false
 	}

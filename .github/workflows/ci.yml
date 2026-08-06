@@ -27,4 +27,3 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: test "${{ needs.verify.result }}" = success && test "${{ needs.quality.result }}" = success
-

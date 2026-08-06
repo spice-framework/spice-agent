@@ -31,7 +31,7 @@ func main() {
 }
 
 func execute() int {
-	mode := flag.String("mode", "verify", "verification mode: fast, check, or verify")
+	mode := flag.String("mode", "verify", "verification mode: fast, check, coverage, or verify")
 	flag.Parse()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
@@ -56,11 +56,16 @@ func run(ctx context.Context, root, mode string) error {
 		return fmt.Errorf("go version is %s; require exactly %s", runtime.Version(), requiredGoVersion)
 	}
 	identity := step{"repository identity", func() error { return checkIdentity(root) }}
+	diffHygiene := step{"diff hygiene", func() error { return command(ctx, root, nil, "git", "diff", "--check", "HEAD", "--") }}
 	tests := step{"tests", func() error { return command(ctx, root, nil, "go", "test", "-shuffle=on", "-count=1", "./...") }}
-	steps := []step{identity, tests}
+	steps := []step{identity, diffHygiene, tests}
+	if mode == "coverage" {
+		steps = []step{identity, diffHygiene, {"coverage", func() error { return coverage(ctx, root) }}}
+	}
 	if mode == "check" || mode == "verify" {
 		steps = []step{
 			identity,
+			diffHygiene,
 			{"formatting", func() error { return checkFormatting(ctx, root) }},
 			{"module and vendor", func() error { return checkModule(ctx, root) }},
 			{"architecture", func() error { return checkArchitecture(root) }},
@@ -81,7 +86,7 @@ func run(ctx context.Context, root, mode string) error {
 			step{"offline vendor", func() error { return offline(ctx, root) }},
 		)
 	}
-	if mode != "fast" && mode != "check" && mode != "verify" {
+	if mode != "fast" && mode != "check" && mode != "coverage" && mode != "verify" {
 		return fmt.Errorf("unknown mode %q", mode)
 	}
 	for _, current := range steps {

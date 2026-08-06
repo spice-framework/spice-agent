@@ -36,6 +36,19 @@ func TestMessageValuesAreValidatedAndDefensive(t *testing.T) {
 	if value.ID() != id || value.Role() != message.RoleUser || parts[1].Namespace() != "acme.view" {
 		t.Fatal("message accessors lost metadata")
 	}
+	if err := value.Validate(); err != nil || value.SizeBytes() == 0 {
+		t.Fatalf("message validation/size = %d, %v", value.SizeBytes(), err)
+	}
+	clone := value.Clone()
+	cloneParts := clone.Parts()
+	cloneData := cloneParts[1].Data()
+	cloneData[2] = 'Z'
+	if string(value.Parts()[1].Data()) != `{"value":1}` {
+		t.Fatal("message clone shared data")
+	}
+	if err := (message.Message{}).Validate(); err == nil {
+		t.Fatal("zero message validated")
+	}
 }
 
 func TestMessageRejectsInvalidValues(t *testing.T) {
