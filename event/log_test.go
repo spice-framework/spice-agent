@@ -4,12 +4,41 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/spice-framework/spice-agent/event"
 )
+
+func TestImportedTailRejectsMissingHistoryAndContinuesAtCursor(t *testing.T) {
+	log, err := event.NewLogAfter("run", 7, event.DefaultLogLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if earliest, latest := log.Bounds(); earliest != 8 || latest != 7 {
+		t.Fatalf("empty imported bounds = [%d,%d]", earliest, latest)
+	}
+	_, err = log.Subscribe(t.Context(), 0)
+	var behind *event.OutOfRangeError
+	if !errors.As(err, &behind) || behind.Earliest != 8 || behind.Latest != 7 || behind.RecoveryAfter != 7 {
+		t.Fatalf("imported gap diagnostic = %#v, %v", behind, err)
+	}
+	subscription, err := log.Subscribe(t.Context(), 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendEnvelope(t, log, 8, event.TurnStarted)
+	log.Close()
+	events := collectSubscription(t, subscription)
+	if len(events) != 1 || events[0].Sequence() != 8 {
+		t.Fatalf("imported tail events = %#v", events)
+	}
+	if _, err = event.NewLogAfter("run", math.MaxUint64, event.DefaultLogLimits()); err == nil {
+		t.Fatal("maximum cursor succeeded")
+	}
+}
 
 func TestLogSubscriptionHasGapFreeReplayAndTail(t *testing.T) {
 	log := newLog(t, event.DefaultLogLimits())
@@ -115,6 +144,7 @@ func TestLogReservesCapacityForEveryLifecycleTerminal(t *testing.T) {
 		event.TurnCompleted, event.TurnFailed,
 		event.ModelCompleted, event.ModelFailed,
 		event.ToolCompleted, event.ToolFailed,
+		event.InteractionCompleted, event.InteractionFailed, event.InteractionCancelled,
 	}
 	for _, kind := range terminalKinds {
 		t.Run(string(kind), func(t *testing.T) {

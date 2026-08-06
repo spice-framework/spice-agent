@@ -1,10 +1,82 @@
-# Phase 5: Runtime Plugins
+# Phase 5: Runtime Plugins and Developer Loop
 
-**Objective:** support genuinely dynamic tools without mutating compiled DI. One
-process and connection serve each digest-pinned plugin. A random launch secret,
-bounded gRPC protocol, candidate validation, atomic activation, and generation
-leases protect existing runs.
+## Objective and prerequisites
 
-Failed candidates never affect the active generation. Go and Python fixtures use
-the same conformance suite. **Exit:** mismatch, crash, cancellation, timeout,
-activation, drain, and shutdown proof. **Status:** planned.
+Support genuinely dynamic runtime tools without mutating compiled Spice DI.
+This phase depends on stable run plan snapshots, daemon negotiation, canonical
+tool dispatch, and cancellation semantics.
+
+## Runtime-plugin contracts
+
+- One host process and one local gRPC connection exist per plugin generation.
+- Configuration names an absolute executable path and pinned SHA-256 digest.
+  Relative paths, PATH lookup, digest drift, and ambient plugin discovery fail.
+- Every launch receives a cryptographically random handshake secret. Candidate
+  manifest, protocol, digest, identity, capabilities, and bounds are verified
+  before it may serve a future run.
+- Activation is atomic for future runs. Existing runs retain a lease on their
+  original immutable generation until terminal finalization.
+- Failed candidates never alter the active generation. Old generations drain
+  within a bound and are forcibly terminated only with explicit uncertainty
+  reporting.
+- Startup, message, stderr, call, cancellation, restart, drain, and shutdown
+  are count/time/byte bounded. Crash replay is never automatic for a mutating
+  tool whose outcome is uncertain.
+- Initial `plugin/v1` exposes tools only. Providers and portable views require
+  additive protocol revisions; compiled stages and executable UI code are
+  permanently excluded.
+
+## Cross-language conformance
+
+Independent Go and Python 3.12+ fixtures implement the same public protocol. The
+Python fixture uses locked `grpcio` and Protobuf dependencies, starts from a
+clean environment, and passes the host-owned conformance suite without importing
+private Go implementation details.
+
+## Developer-loop contracts
+
+`spice dev` watches daemon and terminal targets, debounces deterministic
+generation/builds, restarts them independently, and preserves the last-known-good
+process when a new generation fails. Diagnostics identify source locations and
+the active/failed generation; no partial generated tree is activated.
+
+## Implementation slices
+
+1. Freeze `plugin/v1` with Buf lint/breaking checks.
+2. Implement manifest/digest verification and the fallback direct launcher.
+3. Add generation manager, candidate handshake, atomic activation, leases,
+   bounded stderr, restart policy, drain, and cleanup.
+4. Provide optional Spice auto-configuration that decorates/injects the dynamic
+   tool source through normal static DI.
+5. Ship Go and Python echo/filesystem-neutral fixture tools and conformance CLI.
+6. Integrate last-known-good `spice dev` for generated daemon/TUI targets.
+
+## Exclusions
+
+Plugins are trusted native processes, not sandboxes. Capability declarations
+are input to later policy; they do not enforce security. Plugins cannot alter
+static DI, register compiled stages, contribute native widgets, listen remotely,
+or trigger hidden downloads/installations.
+
+## Verification
+
+- Tests cover wrong digest, path swap, handshake secret, old/new protocol,
+  malformed/oversized messages, stdout contamination, bounded stderr, timeout,
+  cancellation, and process-tree cleanup.
+- Crash scenarios include handshake, call, activation, drain, and shutdown.
+  Candidate failures preserve the active generation; leased runs keep the old
+  generation; uncertain mutating calls are never replayed.
+- Conformance executes identical cases against Go and Python on Windows and
+  Linux, including cancellation and unknown fields.
+- Developer-loop tests change valid/invalid sources rapidly, prove debounce,
+  byte-identical generation, independent restart, diagnostic stability, and
+  last-known-good continuity.
+
+## Performance and completion evidence
+
+Plugin handshake and activation budgets are baselined separately from tool work.
+Local call overhead targets the daemon event-latency budget and must not add an
+unbounded queue. Evidence includes digests, generation/lease timelines, process
+logs, conformance versions, and failure-injection results.
+
+Status is **planned**.

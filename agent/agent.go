@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/spice-framework/spice-agent/event"
+	"github.com/spice-framework/spice-agent/interaction"
 	"github.com/spice-framework/spice-agent/message"
 	"github.com/spice-framework/spice-agent/model"
 	"github.com/spice-framework/spice-agent/stage"
@@ -30,11 +31,21 @@ type EngineOptions struct {
 	FinalizationTimeout time.Duration
 	// MetadataNamespaces explicitly permits safe provider metadata in events.
 	MetadataNamespaces []string
+	// DynamicGeneration identifies the immutable runtime-plugin generation used by a run.
+	DynamicGeneration string
+	// StaticPlanIdentities names generated provider/stage/observer/broker beans.
+	// Generated callers should include module version and source identity in each
+	// value so resume rejects a semantically different compiled plan.
+	StaticPlanIdentities []string
 }
 
 // DefaultEngineOptions returns conservative architecture-proof bounds.
 func DefaultEngineOptions() EngineOptions {
-	return EngineOptions{LogLimits: event.DefaultLogLimits(), FinalizationTimeout: defaultFinalizationTimeout}
+	return EngineOptions{
+		LogLimits: event.DefaultLogLimits(), FinalizationTimeout: defaultFinalizationTimeout,
+		DynamicGeneration:    "none",
+		StaticPlanIdentities: []string{"broker:injected", "provider:injected", "stage:kernel"},
+	}
 }
 
 // DurabilityError reports that a lifecycle event could not be fully persisted
@@ -136,19 +147,23 @@ func NewInput(initial message.Message) (Input, error) {
 // Close drains cooperative runs; Shutdown cancels them. Neither method can
 // forcibly stop a trusted in-process provider or tool that ignores context.
 type Engine struct {
-	provider            model.Provider
-	dispatcher          stage.ToolDispatcher
-	ids                 IDSource
-	clock               func() time.Time
-	observers           []event.Observer
-	bestEffort          []*event.BestEffortObserver
-	logLimits           event.LogLimits
-	finalizationTimeout time.Duration
-	metadataNamespaces  map[string]struct{}
+	provider             model.Provider
+	dispatcher           stage.ToolDispatcher
+	ids                  IDSource
+	clock                func() time.Time
+	observers            []event.Observer
+	bestEffort           []*event.BestEffortObserver
+	logLimits            event.LogLimits
+	finalizationTimeout  time.Duration
+	metadataNamespaces   map[string]struct{}
+	dynamicGeneration    string
+	broker               interaction.Broker
+	staticPlanIdentities []string
 
 	mu      sync.Mutex
 	closed  bool
 	active  map[string]*Run
+	seen    map[string]struct{}
 	drained chan struct{}
 }
 
@@ -166,11 +181,19 @@ func NewEngineWithLimits(provider model.Provider, dispatcher stage.ToolDispatche
 
 // NewEngineWithOptions constructs the kernel with explicit bounded options.
 func NewEngineWithOptions(provider model.Provider, dispatcher stage.ToolDispatcher, ids IDSource, clock func() time.Time, observers []event.Observer, bestEffort []*event.BestEffortObserver, options EngineOptions) (*Engine, error) {
+	return NewEngineWithInteractionBroker(provider, dispatcher, interaction.UnavailableBroker{}, ids, clock, observers, bestEffort, options)
+}
+
+// NewEngineWithInteractionBroker constructs an engine with a UI-neutral broker.
+func NewEngineWithInteractionBroker(provider model.Provider, dispatcher stage.ToolDispatcher, broker interaction.Broker, ids IDSource, clock func() time.Time, observers []event.Observer, bestEffort []*event.BestEffortObserver, options EngineOptions) (*Engine, error) {
 	if provider == nil {
 		return nil, errors.New("agent engine requires a model provider")
 	}
 	if dispatcher == nil {
 		return nil, errors.New("agent engine requires a tool dispatcher")
+	}
+	if broker == nil {
+		return nil, errors.New("agent engine requires an interaction broker")
 	}
 	if ids == nil {
 		return nil, errors.New("agent engine requires an ID source")
@@ -201,6 +224,13 @@ func NewEngineWithOptions(provider model.Provider, dispatcher stage.ToolDispatch
 		}
 		metadataNamespaces[namespace] = struct{}{}
 	}
+	if err := snapshotToken("dynamic generation", options.DynamicGeneration, 256); err != nil {
+		return nil, err
+	}
+	staticPlan, err := buildStaticPlan(options.StaticPlanIdentities, dispatcher.Definitions())
+	if err != nil {
+		return nil, err
+	}
 	probe, err := event.NewLog("validation", options.LogLimits)
 	if err != nil {
 		return nil, fmt.Errorf("agent replay limits: %w", err)
@@ -212,21 +242,45 @@ func NewEngineWithOptions(provider model.Provider, dispatcher stage.ToolDispatch
 		provider: provider, dispatcher: dispatcher, ids: ids, clock: clock,
 		observers: append([]event.Observer(nil), observers...), bestEffort: append([]*event.BestEffortObserver(nil), bestEffort...),
 		logLimits: options.LogLimits, finalizationTimeout: options.FinalizationTimeout,
-		metadataNamespaces: metadataNamespaces,
-		active:             make(map[string]*Run), drained: drained,
+		metadataNamespaces:   metadataNamespaces,
+		dynamicGeneration:    options.DynamicGeneration,
+		broker:               broker,
+		staticPlanIdentities: staticPlan,
+		active:               make(map[string]*Run), seen: make(map[string]struct{}), drained: drained,
 	}, nil
 }
 
 // Run is one asynchronous execution backed by an authoritative replay log.
 type Run struct {
-	id       string
-	log      *event.Log
-	done     chan struct{}
-	cancel   context.CancelFunc
-	engine   *Engine
+	id     string
+	log    *event.Log
+	done   chan struct{}
+	cancel context.CancelFunc
+	engine *Engine
+	// The run owns this derived context and cancels it during finalization.
+	//nolint:containedctx // required to link concurrent interaction lifecycles to run cancellation
+	ctx      context.Context
+	emitter  *runEmitter
 	finalize sync.Once
 	mu       sync.Mutex
 	err      error
+
+	stateMu            sync.Mutex
+	definition         Definition
+	history            []message.Message
+	completedTurns     uint32
+	status             LifecycleStatus
+	started            bool
+	lastSequence       uint64
+	staticPlan         []string
+	dynamicGeneration  string
+	suspendRequested   bool
+	suspendWaiter      chan error
+	resumeSignal       chan struct{}
+	activeInteractions map[interaction.ID]struct{}
+	seenInteractions   map[interaction.ID]struct{}
+	interactionWG      sync.WaitGroup
+	messageIDs         map[message.ID]struct{}
 }
 
 func (run *Run) ID() string { return run.id }
@@ -264,6 +318,180 @@ func (run *Run) Wait(ctx context.Context) error {
 	}
 }
 
+const (
+	runStatusRunning    LifecycleStatus = "running"
+	runStatusSuspending LifecycleStatus = "suspending"
+	runStatusFinishing  LifecycleStatus = "finishing"
+)
+
+// UnsafeSnapshotError reports state that cannot be exported or resumed safely.
+type UnsafeSnapshotError struct {
+	Status             LifecycleStatus
+	ActiveInteractions int
+}
+
+func (failure *UnsafeSnapshotError) Error() string {
+	return fmt.Sprintf("agent snapshot boundary is unsafe: status=%s active_interactions=%d", failure.Status, failure.ActiveInteractions)
+}
+
+// Suspend requests a pause after the current fully finalized turn. Active or
+// uncertain tool/interaction operations are never captured.
+func (run *Run) Suspend(ctx context.Context) error {
+	if ctx == nil {
+		return errors.New("agent suspend context must not be nil")
+	}
+	if run == nil {
+		return errors.New("agent run is nil")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	run.stateMu.Lock()
+	if run.status != runStatusRunning || !run.started || run.suspendRequested {
+		failure := &UnsafeSnapshotError{Status: run.status, ActiveInteractions: len(run.activeInteractions)}
+		run.stateMu.Unlock()
+		return failure
+	}
+	waiter := make(chan error, 1)
+	run.suspendRequested = true
+	run.suspendWaiter = waiter
+	run.status = runStatusSuspending
+	run.stateMu.Unlock()
+	select {
+	case <-ctx.Done():
+		run.stateMu.Lock()
+		if run.suspendRequested && run.suspendWaiter == waiter {
+			run.suspendRequested = false
+			run.suspendWaiter = nil
+			run.status = runStatusRunning
+		} else if run.status == LifecycleSuspended && run.resumeSignal != nil {
+			close(run.resumeSignal)
+			run.resumeSignal = nil
+		}
+		run.stateMu.Unlock()
+		return ctx.Err()
+	case err := <-waiter:
+		return err
+	}
+}
+
+// Resume continues a locally suspended run using its immutable plan snapshot.
+func (run *Run) Resume() error {
+	if run == nil {
+		return errors.New("agent run is nil")
+	}
+	run.stateMu.Lock()
+	defer run.stateMu.Unlock()
+	if run.status != LifecycleSuspended || run.resumeSignal == nil {
+		return &UnsafeSnapshotError{Status: run.status, ActiveInteractions: len(run.activeInteractions)}
+	}
+	close(run.resumeSignal)
+	run.resumeSignal = nil
+	return nil
+}
+
+// ExportSnapshot returns state only at a suspended or terminal safe boundary.
+func (run *Run) ExportSnapshot() (Snapshot, error) {
+	if run == nil {
+		return Snapshot{}, errors.New("agent run is nil")
+	}
+	run.stateMu.Lock()
+	defer run.stateMu.Unlock()
+	if run.status != LifecycleSuspended && run.status != LifecycleCompleted && run.status != LifecycleFailed && run.status != LifecycleCancelled {
+		return Snapshot{}, &UnsafeSnapshotError{Status: run.status, ActiveInteractions: len(run.activeInteractions)}
+	}
+	if len(run.activeInteractions) != 0 {
+		return Snapshot{}, &UnsafeSnapshotError{Status: run.status, ActiveInteractions: len(run.activeInteractions)}
+	}
+	return newSnapshot(
+		run.id, run.definition, run.completedTurns, run.history, run.staticPlan,
+		run.dynamicGeneration, slices.Sorted(maps.Keys(run.seenInteractions)),
+		run.lastSequence, run.status,
+	)
+}
+
+// Interact executes one UI-neutral interaction through the injected broker.
+func (run *Run) Interact(ctx context.Context, request interaction.Request) (interaction.Response, error) {
+	if ctx == nil {
+		return interaction.Response{}, errors.New("agent interaction context must not be nil")
+	}
+	if run == nil {
+		return interaction.Response{}, errors.New("agent run is nil")
+	}
+	if err := request.Validate(); err != nil {
+		return interaction.Response{}, err
+	}
+	if err := ctx.Err(); err != nil {
+		return interaction.Response{}, err
+	}
+	if err := run.reserveInteraction(request.ID()); err != nil {
+		return interaction.Response{}, err
+	}
+	defer run.releaseInteraction(request.ID())
+	if err := run.emitter.emit(ctx, event.InteractionStarted, map[string]string{"id": string(request.ID()), "kind": request.Kind()}); err != nil {
+		if committed(err) {
+			return interaction.Response{}, errors.Join(err, run.emitter.interactionFailure(ctx, event.InteractionFailed, request.ID()))
+		}
+		return interaction.Response{}, err
+	}
+	brokerContext, cancel := context.WithCancel(ctx)
+	stop := context.AfterFunc(run.ctx, cancel)
+	response, err := safeInteraction(brokerContext, run.engine.broker, request.Clone())
+	stop()
+	cancel()
+	if err != nil {
+		kind := run.interactionFailureKind(ctx, err)
+		return interaction.Response{}, errors.Join(err, run.emitter.interactionFailure(ctx, kind, request.ID()))
+	}
+	if err = response.Validate(); err != nil {
+		return interaction.Response{}, errors.Join(err, run.emitter.interactionFailure(ctx, event.InteractionFailed, request.ID()))
+	}
+	if response.ID() != request.ID() {
+		err = fmt.Errorf("interaction response ID %q does not match request %q", response.ID(), request.ID())
+		return interaction.Response{}, errors.Join(err, run.emitter.interactionFailure(ctx, event.InteractionFailed, request.ID()))
+	}
+	if err = run.emitter.emit(ctx, event.InteractionCompleted, map[string]string{"id": string(response.ID())}); err != nil {
+		if !committed(err) {
+			kind := run.interactionFailureKind(ctx, err)
+			return interaction.Response{}, errors.Join(err, run.emitter.interactionFailure(ctx, kind, request.ID()))
+		}
+		return interaction.Response{}, err
+	}
+	return response.Clone(), nil
+}
+
+func (run *Run) interactionFailureKind(ctx context.Context, err error) event.Kind {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || run.ctx.Err() != nil || ctx.Err() != nil {
+		return event.InteractionCancelled
+	}
+	return event.InteractionFailed
+}
+
+func (run *Run) reserveInteraction(id interaction.ID) error {
+	run.stateMu.Lock()
+	defer run.stateMu.Unlock()
+	if run.status != runStatusRunning || !run.started {
+		return &UnsafeSnapshotError{Status: run.status, ActiveInteractions: len(run.activeInteractions)}
+	}
+	if _, duplicate := run.activeInteractions[id]; duplicate {
+		return fmt.Errorf("interaction ID %q is already active", id)
+	}
+	if _, duplicate := run.seenInteractions[id]; duplicate {
+		return fmt.Errorf("interaction ID %q was already used by this run", id)
+	}
+	run.seenInteractions[id] = struct{}{}
+	run.activeInteractions[id] = struct{}{}
+	run.interactionWG.Add(1)
+	return nil
+}
+
+func (run *Run) releaseInteraction(id interaction.ID) {
+	run.stateMu.Lock()
+	delete(run.activeInteractions, id)
+	run.stateMu.Unlock()
+	run.interactionWG.Done()
+}
+
 // Start begins one run. Caller context ownership propagates to providers and tools.
 func (engine *Engine) Start(ctx context.Context, definition Definition, input Input) (*Run, error) {
 	if ctx == nil {
@@ -285,12 +513,22 @@ func (engine *Engine) Start(ctx context.Context, definition Definition, input In
 	if err != nil {
 		return nil, fmt.Errorf("allocate run ID: %w", err)
 	}
+	if err = snapshotToken("run ID", runID, 96); err != nil {
+		return nil, err
+	}
 	log, err := event.NewLog(runID, engine.logLimits)
 	if err != nil {
 		return nil, err
 	}
 	runContext, cancel := context.WithCancel(ctx)
-	run := &Run{id: runID, log: log, done: make(chan struct{}), cancel: cancel, engine: engine}
+	run := &Run{
+		id: runID, log: log, done: make(chan struct{}), cancel: cancel, engine: engine, ctx: runContext,
+		definition: definition, history: []message.Message{input.message.Clone()}, staticPlan: engine.staticPlan(),
+		dynamicGeneration: engine.dynamicGeneration, activeInteractions: make(map[interaction.ID]struct{}),
+		seenInteractions: make(map[interaction.ID]struct{}),
+		messageIDs:       map[message.ID]struct{}{input.message.ID(): {}},
+	}
+	run.emitter = &runEmitter{engine: engine, run: run, next: 1}
 	engine.mu.Lock()
 	if engine.closed {
 		engine.mu.Unlock()
@@ -298,18 +536,114 @@ func (engine *Engine) Start(ctx context.Context, definition Definition, input In
 		log.Close()
 		return nil, errors.New("agent engine is closed")
 	}
-	if _, duplicate := engine.active[runID]; duplicate {
+	if _, duplicate := engine.seen[runID]; duplicate {
 		engine.mu.Unlock()
 		cancel()
 		log.Close()
-		return nil, fmt.Errorf("agent ID source returned active duplicate run ID %q", runID)
+		return nil, fmt.Errorf("agent ID source returned duplicate run ID %q", runID)
 	}
 	if len(engine.active) == 0 {
 		engine.drained = make(chan struct{})
 	}
 	engine.active[runID] = run
+	engine.seen[runID] = struct{}{}
 	engine.mu.Unlock()
 	go engine.execute(runContext, run, definition, input)
+	return run, nil
+}
+
+func (engine *Engine) staticPlan() []string {
+	return append([]string(nil), engine.staticPlanIdentities...)
+}
+
+func buildStaticPlan(configured []string, tools []tool.Definition) ([]string, error) {
+	result := append([]string(nil), configured...)
+	for _, definition := range tools {
+		result = append(result, "tool:"+definition.Name()+"@"+definition.Fingerprint())
+	}
+	slices.Sort(result)
+	if len(result) == 0 {
+		return nil, errors.New("agent static plan must contain generated bean identities")
+	}
+	for index, identity := range result {
+		if err := snapshotToken("static plan identity", identity, 256); err != nil {
+			return nil, err
+		}
+		category, name, found := strings.Cut(identity, ":")
+		if !found || name == "" {
+			return nil, fmt.Errorf("agent static plan identity %q must use category:name", identity)
+		}
+		switch category {
+		case "provider", "stage", "observer", "broker", "tool":
+		default:
+			return nil, fmt.Errorf("agent static plan identity %q has unsupported category", identity)
+		}
+		if index > 0 && result[index-1] == identity {
+			return nil, fmt.Errorf("agent static plan identity %q is duplicated", identity)
+		}
+	}
+	return result, nil
+}
+
+// ResumeSnapshot imports an exclusively owned suspended snapshot. Callers must
+// ensure the original process/run authority is no longer executing.
+func (engine *Engine) ResumeSnapshot(ctx context.Context, snapshot Snapshot) (*Run, error) {
+	if ctx == nil {
+		return nil, errors.New("agent resume context must not be nil")
+	}
+	if engine == nil {
+		return nil, errors.New("agent engine is nil")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if err := snapshot.Validate(); err != nil {
+		return nil, err
+	}
+	if snapshot.status != LifecycleSuspended {
+		return nil, &UnsafeSnapshotError{Status: snapshot.status}
+	}
+	if !slices.Equal(snapshot.staticPlan, engine.staticPlan()) {
+		return nil, errors.New("agent snapshot static plan does not match the constructed engine")
+	}
+	if snapshot.dynamicGeneration != engine.dynamicGeneration {
+		return nil, errors.New("agent snapshot dynamic generation does not match the constructed engine")
+	}
+	log, err := event.NewLogAfter(snapshot.runID, snapshot.lastSequence, engine.logLimits)
+	if err != nil {
+		return nil, err
+	}
+	runContext, cancel := context.WithCancel(ctx)
+	run := &Run{
+		id: snapshot.runID, log: log, done: make(chan struct{}), cancel: cancel, engine: engine, ctx: runContext,
+		definition: snapshot.definition, history: cloneHistory(snapshot.history), completedTurns: snapshot.completedTurns,
+		status: runStatusRunning, started: true, lastSequence: snapshot.lastSequence,
+		staticPlan: append([]string(nil), snapshot.staticPlan...), dynamicGeneration: snapshot.dynamicGeneration,
+		activeInteractions: make(map[interaction.ID]struct{}),
+		seenInteractions:   interactionIDSet(snapshot.interactionIDs),
+		messageIDs:         snapshotMessageIDs(snapshot.history),
+	}
+	run.emitter = &runEmitter{engine: engine, run: run, next: snapshot.lastSequence + 1}
+	engine.mu.Lock()
+	if engine.closed {
+		engine.mu.Unlock()
+		cancel()
+		log.Close()
+		return nil, errors.New("agent engine is closed")
+	}
+	if _, duplicate := engine.seen[run.id]; duplicate {
+		engine.mu.Unlock()
+		cancel()
+		log.Close()
+		return nil, fmt.Errorf("agent snapshot run ID %q was already imported", run.id)
+	}
+	if len(engine.active) == 0 {
+		engine.drained = make(chan struct{})
+	}
+	engine.active[run.id] = run
+	engine.seen[run.id] = struct{}{}
+	engine.mu.Unlock()
+	go engine.executeState(runContext, run, snapshot.definition, cloneHistory(snapshot.history), snapshot.completedTurns+1, false)
 	return run, nil
 }
 
@@ -352,31 +686,44 @@ func (engine *Engine) stop(ctx context.Context, cancelActive bool) error {
 }
 
 func (engine *Engine) execute(ctx context.Context, run *Run, definition Definition, input Input) {
-	emitter := runEmitter{engine: engine, run: run, next: 1}
+	engine.executeState(ctx, run, definition, []message.Message{input.message.Clone()}, 1, true)
+}
+
+func (engine *Engine) executeState(ctx context.Context, run *Run, definition Definition, history []message.Message, firstTurn uint32, emitRunStart bool) {
+	emitter := run.emitter
 	var runErr error
 	terminalKind := event.RunCompleted
-	runStarted := false
+	runStarted := !emitRunStart
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			runErr = errors.Join(runErr, fmt.Errorf("agent execution panic: %v", recovered))
 			terminalKind = event.RunFailed
 		}
+		run.beginFinalization()
 		var terminalErr error
+		terminalCommitted := false
 		if runStarted {
 			terminalErr = emitter.terminal(ctx, terminalKind, runErr)
+			terminalCommitted = terminalErr == nil || committed(terminalErr)
+		}
+		if terminalCommitted {
+			run.recordTerminal(terminalKind, history)
 		}
 		run.complete(errors.Join(runErr, terminalErr))
 	}()
-	if err := emitter.emit(ctx, event.RunStarted, map[string]string{"definition": definition.name}); err != nil {
-		runStarted = committed(err)
-		runErr = err
-		terminalKind = event.RunFailed
-		return
+	if emitRunStart {
+		if err := emitter.emit(ctx, event.RunStarted, map[string]string{"definition": definition.name}); err != nil {
+			runStarted = committed(err)
+			run.markStarted(runStarted)
+			runErr = err
+			terminalKind = event.RunFailed
+			return
+		}
+		runStarted = true
+		run.markStarted(true)
 	}
-	runStarted = true
-	history := []message.Message{input.message}
-	for turn := uint32(1); turn <= definition.maxTurns; turn++ {
-		completed, err := engine.executeTurn(ctx, &emitter, definition, turn, &history)
+	for turn := firstTurn; turn <= definition.maxTurns; turn++ {
+		completed, err := engine.executeTurn(ctx, emitter, definition, turn, &history)
 		if err != nil {
 			runErr = err
 			terminalKind = event.RunFailed
@@ -385,7 +732,16 @@ func (engine *Engine) execute(ctx context.Context, run *Run, definition Definiti
 			}
 			return
 		}
+		run.recordBoundary(turn, history)
 		if completed {
+			return
+		}
+		if err = run.suspendAtBoundary(ctx); err != nil {
+			runErr = err
+			terminalKind = event.RunFailed
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				terminalKind = event.RunCancelled
+			}
 			return
 		}
 	}
@@ -400,10 +756,7 @@ func (engine *Engine) executeTurn(ctx context.Context, emitter *runEmitter, defi
 		}
 		return false, err
 	}
-	operationID, err := engine.ids.Next("model")
-	if err != nil {
-		return false, errors.Join(err, emitter.failure(ctx, event.TurnFailed, err))
-	}
+	operationID := emitter.run.id + "/model/" + strconv.FormatUint(uint64(turn), 10)
 	request, err := model.NewRequest(model.OperationID(operationID), definition.model, *history, engine.definitions())
 	if err != nil {
 		return false, errors.Join(err, emitter.failure(ctx, event.TurnFailed, err))
@@ -567,6 +920,9 @@ func normalizeStartError(err error) error {
 }
 
 func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, textValue string, calls []tool.Call, history *[]message.Message) error {
+	if err := validateNewToolCalls(*history, calls); err != nil {
+		return err
+	}
 	parts := make([]message.Part, 0, len(calls)+1)
 	if textValue != "" {
 		part, err := message.Text(textValue)
@@ -582,7 +938,7 @@ func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, 
 		}
 		parts = append(parts, part)
 	}
-	assistantMessage, err := engine.newMessage(message.RoleAssistant, parts...)
+	assistantMessage, err := engine.newMessage(emitter.run, message.RoleAssistant, parts...)
 	if err != nil {
 		return err
 	}
@@ -610,7 +966,7 @@ func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, 
 		if partErr != nil {
 			return partErr
 		}
-		resultMessage, messageErr := engine.newMessage(message.RoleTool, part)
+		resultMessage, messageErr := engine.newMessage(emitter.run, message.RoleTool, part)
 		if messageErr != nil {
 			return messageErr
 		}
@@ -619,16 +975,41 @@ func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, 
 	return nil
 }
 
-func (engine *Engine) newMessage(role message.Role, parts ...message.Part) (message.Message, error) {
-	id, err := engine.ids.Next("message")
-	if err != nil {
-		return message.Message{}, fmt.Errorf("allocate message ID: %w", err)
+func validateNewToolCalls(history []message.Message, calls []tool.Call) error {
+	seen := make(map[tool.CallID]struct{})
+	for _, value := range history {
+		for _, part := range value.Parts() {
+			if part.Kind() == message.PartToolCall {
+				seen[tool.CallID(part.CallID())] = struct{}{}
+			}
+		}
 	}
+	for _, call := range calls {
+		if _, duplicate := seen[call.ID()]; duplicate {
+			return fmt.Errorf("model tool call ID %q is duplicated in run history", call.ID())
+		}
+		seen[call.ID()] = struct{}{}
+	}
+	return nil
+}
+
+func (engine *Engine) newMessage(run *Run, role message.Role, parts ...message.Part) (message.Message, error) {
+	id := run.id + "/message/" + strconv.FormatUint(run.emitter.NextSequence(), 10)
 	messageID, err := message.NewID(id)
 	if err != nil {
 		return message.Message{}, err
 	}
-	return message.New(messageID, role, parts...)
+	result, err := message.New(messageID, role, parts...)
+	if err != nil {
+		return message.Message{}, err
+	}
+	run.stateMu.Lock()
+	defer run.stateMu.Unlock()
+	if _, duplicate := run.messageIDs[messageID]; duplicate {
+		return message.Message{}, fmt.Errorf("generated message ID %q collides with existing history", messageID)
+	}
+	run.messageIDs[messageID] = struct{}{}
+	return result, nil
 }
 
 func safeStream(ctx context.Context, provider model.Provider, request model.Request) (stream model.Stream, err error) {
@@ -665,6 +1046,98 @@ func safeDispatch(ctx context.Context, dispatcher stage.ToolDispatcher, call too
 		}
 	}()
 	return dispatcher.Dispatch(ctx, call, reporter)
+}
+
+func safeInteraction(ctx context.Context, broker interaction.Broker, request interaction.Request) (response interaction.Response, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("interaction broker panic: %v", recovered)
+		}
+	}()
+	return broker.Request(ctx, request)
+}
+
+func (run *Run) markStarted(started bool) {
+	run.stateMu.Lock()
+	run.started = started
+	if started {
+		run.status = runStatusRunning
+	}
+	run.stateMu.Unlock()
+}
+
+func (run *Run) recordSequence(sequence uint64) {
+	run.stateMu.Lock()
+	run.lastSequence = sequence
+	run.stateMu.Unlock()
+}
+
+func (run *Run) recordBoundary(turn uint32, history []message.Message) {
+	run.stateMu.Lock()
+	run.completedTurns = turn
+	run.history = cloneHistory(history)
+	run.stateMu.Unlock()
+}
+
+func (run *Run) suspendAtBoundary(ctx context.Context) error {
+	run.stateMu.Lock()
+	if !run.suspendRequested {
+		run.stateMu.Unlock()
+		return nil
+	}
+	waiter := run.suspendWaiter
+	run.suspendRequested = false
+	run.suspendWaiter = nil
+	if len(run.activeInteractions) != 0 {
+		failure := &UnsafeSnapshotError{Status: runStatusSuspending, ActiveInteractions: len(run.activeInteractions)}
+		run.status = runStatusRunning
+		run.stateMu.Unlock()
+		waiter <- failure
+		return nil
+	}
+	run.status = LifecycleSuspended
+	run.resumeSignal = make(chan struct{})
+	resumeSignal := run.resumeSignal
+	run.stateMu.Unlock()
+	waiter <- nil
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-resumeSignal:
+		run.stateMu.Lock()
+		if run.status == LifecycleSuspended {
+			run.status = runStatusRunning
+		}
+		run.stateMu.Unlock()
+		return nil
+	}
+}
+
+func (run *Run) beginFinalization() {
+	run.stateMu.Lock()
+	run.status = runStatusFinishing
+	if run.suspendRequested && run.suspendWaiter != nil {
+		run.suspendWaiter <- &UnsafeSnapshotError{Status: runStatusFinishing, ActiveInteractions: len(run.activeInteractions)}
+		run.suspendRequested = false
+		run.suspendWaiter = nil
+	}
+	run.stateMu.Unlock()
+	run.cancel()
+	run.interactionWG.Wait()
+}
+
+func (run *Run) recordTerminal(kind event.Kind, history []message.Message) {
+	status := LifecycleFailed
+	switch kind {
+	case event.RunCompleted:
+		status = LifecycleCompleted
+	case event.RunCancelled:
+		status = LifecycleCancelled
+	}
+	run.stateMu.Lock()
+	run.status = status
+	run.history = cloneHistory(history)
+	run.stateMu.Unlock()
 }
 
 func (run *Run) complete(err error) {
@@ -767,6 +1240,7 @@ func (emitter *runEmitter) persist(ctx context.Context, kind event.Kind, payload
 		return fmt.Errorf("persist event %s: %w", kind, appendErr)
 	}
 	emitter.next++
+	emitter.run.recordSequence(envelope.Sequence())
 	for index, observer := range emitter.engine.observers {
 		if publishErr := observer.Publish(ctx, envelope); publishErr != nil {
 			return &EmissionError{
@@ -777,6 +1251,22 @@ func (emitter *runEmitter) persist(ctx context.Context, kind event.Kind, payload
 	}
 	for _, observer := range emitter.engine.bestEffort {
 		observer.TryPublish(envelope)
+	}
+	return nil
+}
+
+// NextSequence returns the next uncommitted run sequence for deterministic IDs.
+func (emitter *runEmitter) NextSequence() uint64 {
+	emitter.mu.Lock()
+	defer emitter.mu.Unlock()
+	return emitter.next
+}
+
+func (emitter *runEmitter) interactionFailure(ctx context.Context, kind event.Kind, id interaction.ID) error {
+	finalizationContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), emitter.engine.finalizationTimeout)
+	defer cancel()
+	if err := emitter.persist(finalizationContext, kind, map[string]string{"id": string(id), "error": "interaction did not complete"}); err != nil {
+		return &DurabilityError{Kind: kind, Cause: err}
 	}
 	return nil
 }

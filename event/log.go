@@ -86,6 +86,11 @@ type Log struct {
 
 // NewLog validates limits without starting background work.
 func NewLog(runID string, limits LogLimits) (*Log, error) {
+	return NewLogAfter(runID, 0, limits)
+}
+
+// NewLogAfter constructs an empty tail log continuing after a persisted cursor.
+func NewLogAfter(runID string, lastSequence uint64, limits LogLimits) (*Log, error) {
 	if runID == "" || runID != strings.TrimSpace(runID) {
 		return nil, errors.New("event log requires a run ID without surrounding whitespace")
 	}
@@ -95,7 +100,10 @@ func NewLog(runID string, limits LogLimits) (*Log, error) {
 		limits.SubscriberMaxEvents < 1 || limits.SubscriberMaxBytes < 1 {
 		return nil, errors.New("event log limits are invalid")
 	}
-	return &Log{runID: runID, limits: limits, subscribers: make(map[uint64]*Subscription)}, nil
+	if lastSequence == math.MaxUint64 {
+		return nil, errors.New("event log cursor has no representable next sequence")
+	}
+	return &Log{runID: runID, limits: limits, lastSequence: lastSequence, subscribers: make(map[uint64]*Subscription)}, nil
 }
 
 // Append persists one next-sequence event and then offers it to live subscribers.
@@ -164,7 +172,10 @@ func (log *Log) Bounds() (uint64, uint64) {
 
 func (log *Log) boundsLocked() (uint64, uint64) {
 	if len(log.entries) == 0 {
-		return 1, log.lastSequence
+		if log.lastSequence == math.MaxUint64 {
+			return math.MaxUint64, math.MaxUint64
+		}
+		return log.lastSequence + 1, log.lastSequence
 	}
 	return log.entries[0].envelope.Sequence(), log.lastSequence
 }

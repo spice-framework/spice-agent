@@ -18,21 +18,25 @@ const MaximumPayloadBytes = 1 << 20
 type Kind string
 
 const (
-	RunStarted     Kind = "run.started"
-	RunCompleted   Kind = "run.completed"
-	RunFailed      Kind = "run.failed"
-	RunCancelled   Kind = "run.cancelled"
-	TurnStarted    Kind = "turn.started"
-	TurnCompleted  Kind = "turn.completed"
-	TurnFailed     Kind = "turn.failed"
-	ModelStarted   Kind = "model.started"
-	ModelDelta     Kind = "model.delta"
-	ModelCompleted Kind = "model.completed"
-	ModelFailed    Kind = "model.failed"
-	ToolStarted    Kind = "tool.started"
-	ToolProgress   Kind = "tool.progress"
-	ToolCompleted  Kind = "tool.completed"
-	ToolFailed     Kind = "tool.failed"
+	RunStarted           Kind = "run.started"
+	RunCompleted         Kind = "run.completed"
+	RunFailed            Kind = "run.failed"
+	RunCancelled         Kind = "run.cancelled"
+	TurnStarted          Kind = "turn.started"
+	TurnCompleted        Kind = "turn.completed"
+	TurnFailed           Kind = "turn.failed"
+	ModelStarted         Kind = "model.started"
+	ModelDelta           Kind = "model.delta"
+	ModelCompleted       Kind = "model.completed"
+	ModelFailed          Kind = "model.failed"
+	ToolStarted          Kind = "tool.started"
+	ToolProgress         Kind = "tool.progress"
+	ToolCompleted        Kind = "tool.completed"
+	ToolFailed           Kind = "tool.failed"
+	InteractionStarted   Kind = "interaction.started"
+	InteractionCompleted Kind = "interaction.completed"
+	InteractionFailed    Kind = "interaction.failed"
+	InteractionCancelled Kind = "interaction.cancelled"
 )
 
 // Envelope is one immutable event in a run sequence.
@@ -107,7 +111,8 @@ func (envelope Envelope) Terminal() bool {
 	case RunCompleted, RunFailed, RunCancelled,
 		TurnCompleted, TurnFailed,
 		ModelCompleted, ModelFailed,
-		ToolCompleted, ToolFailed:
+		ToolCompleted, ToolFailed,
+		InteractionCompleted, InteractionFailed, InteractionCancelled:
 		return true
 	default:
 		return false
@@ -250,7 +255,8 @@ func validKind(kind Kind) bool {
 	case RunStarted, RunCompleted, RunFailed, RunCancelled,
 		TurnStarted, TurnCompleted, TurnFailed,
 		ModelStarted, ModelDelta, ModelCompleted, ModelFailed,
-		ToolStarted, ToolProgress, ToolCompleted, ToolFailed:
+		ToolStarted, ToolProgress, ToolCompleted, ToolFailed,
+		InteractionStarted, InteractionCompleted, InteractionFailed, InteractionCancelled:
 		return true
 	default:
 		return false

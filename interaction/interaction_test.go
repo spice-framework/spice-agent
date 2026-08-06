@@ -8,37 +8,74 @@ import (
 	"github.com/spice-framework/spice-agent/interaction"
 )
 
-func TestRequestAndResponseValidation(t *testing.T) {
-	request := interaction.Request{ID: "i1", Kind: "confirm", Prompt: "Continue?", Schema: json.RawMessage(`{"type":"boolean"}`)}
-	response := interaction.Response{ID: request.ID, Value: json.RawMessage(`true`)}
-	if err := request.Validate(); err != nil {
+func TestRequestAndResponseAreImmutable(t *testing.T) {
+	schema := json.RawMessage(`{"type":"boolean"}`)
+	request, err := interaction.NewRequest("i1", "confirm", "Continue?", schema)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := response.Validate(); err != nil {
+	schema[2] = 'X'
+	copySchema := request.Schema()
+	copySchema[2] = 'X'
+	if request.ID() != "i1" || request.Kind() != "confirm" || request.Prompt() != "Continue?" || !json.Valid(request.Schema()) || request.Clone().Validate() != nil {
+		t.Fatal("request contract mismatch")
+	}
+	value := json.RawMessage(`true`)
+	response, err := interaction.NewResponse(request.ID(), value)
+	if err != nil {
 		t.Fatal(err)
 	}
-	for _, invalid := range []interaction.Request{{}, {ID: "i", Kind: "k", Prompt: "p", Schema: json.RawMessage(`{`)}} {
-		if err := invalid.Validate(); err == nil {
-			t.Fatalf("invalid request %+v succeeded", invalid)
+	value[0] = 'X'
+	copyValue := response.Value()
+	copyValue[0] = 'X'
+	if response.ID() != request.ID() || !json.Valid(response.Value()) || response.Clone().Validate() != nil {
+		t.Fatal("response contract mismatch")
+	}
+}
+
+func TestRequestAndResponseRejectInvalidValues(t *testing.T) {
+	invalidRequests := []func() error{
+		func() error {
+			_, err := interaction.NewRequest("", "confirm", "Continue?", json.RawMessage(`{}`))
+			return err
+		},
+		func() error {
+			_, err := interaction.NewRequest("i", "", "Continue?", json.RawMessage(`{}`))
+			return err
+		},
+		func() error { _, err := interaction.NewRequest("i", "confirm", " ", json.RawMessage(`{}`)); return err },
+		func() error {
+			_, err := interaction.NewRequest("i", "confirm", "Continue?", json.RawMessage(`{`))
+			return err
+		},
+		func() error {
+			_, err := interaction.NewRequest("i", "confirm", strings.Repeat("x", interaction.MaximumPayloadBytes+1), json.RawMessage(`{}`))
+			return err
+		},
+	}
+	for index, check := range invalidRequests {
+		if err := check(); err == nil {
+			t.Fatalf("invalid request %d succeeded", index)
 		}
 	}
-	for _, invalid := range []interaction.Request{
-		{ID: "i", Kind: "", Prompt: "p", Schema: json.RawMessage(`{}`)},
-		{ID: "i", Kind: "k", Prompt: " ", Schema: json.RawMessage(`{}`)},
-		{ID: "i", Kind: "k", Prompt: "p", Schema: json.RawMessage(`"` + strings.Repeat("x", 1<<20) + `"`)},
-	} {
-		if err := invalid.Validate(); err == nil {
-			t.Fatalf("invalid request %+v succeeded", invalid)
-		}
-	}
-	if err := (interaction.Response{ID: "i", Value: json.RawMessage(`{`)}).Validate(); err == nil {
-		t.Fatal("invalid response succeeded")
-	}
-	if err := (interaction.Response{ID: " bad", Value: json.RawMessage(`true`)}).Validate(); err == nil {
+	if _, err := interaction.NewResponse("bad ", json.RawMessage(`true`)); err == nil {
 		t.Fatal("invalid response ID succeeded")
 	}
-	large := json.RawMessage(`"` + strings.Repeat("x", 1<<20) + `"`)
-	if err := (interaction.Response{ID: "i", Value: large}).Validate(); err == nil {
+	if _, err := interaction.NewResponse("i", json.RawMessage(`{`)); err == nil {
+		t.Fatal("invalid response JSON succeeded")
+	}
+	large := json.RawMessage(`"` + strings.Repeat("x", interaction.MaximumPayloadBytes) + `"`)
+	if _, err := interaction.NewResponse("i", large); err == nil {
 		t.Fatal("oversized response succeeded")
+	}
+	if (interaction.Request{}).Validate() == nil || (interaction.Response{}).Validate() == nil {
+		t.Fatal("zero interaction value succeeded")
+	}
+}
+
+func TestUnavailableBrokerFailsClosed(t *testing.T) {
+	request, _ := interaction.NewRequest("i", "confirm", "Continue?", json.RawMessage(`{}`))
+	if _, err := (interaction.UnavailableBroker{}).Request(t.Context(), request); err == nil {
+		t.Fatal("unavailable broker succeeded")
 	}
 }

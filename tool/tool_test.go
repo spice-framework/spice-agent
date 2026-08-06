@@ -61,6 +61,33 @@ func TestImmutableValuesAndCapabilities(t *testing.T) {
 	}
 }
 
+func TestDefinitionFingerprintCoversContractAndNormalizesCapabilities(t *testing.T) {
+	base, _ := tool.NewDefinition("shell", "Run a command.", json.RawMessage(`{"type":"object"}`), tool.CapabilityProcessExecute, tool.CapabilityEnvironmentRead)
+	reordered, _ := tool.NewDefinition("shell", "Run a command.", json.RawMessage(`{"type":"object"}`), tool.CapabilityEnvironmentRead, tool.CapabilityProcessExecute)
+	if base.Fingerprint() == "" || base.Fingerprint() != reordered.Fingerprint() {
+		t.Fatal("fingerprint is empty or capability-order dependent")
+	}
+	for _, changed := range []tool.Definition{
+		mustDefinition(t, "other", "Run a command.", `{"type":"object"}`, tool.CapabilityProcessExecute, tool.CapabilityEnvironmentRead),
+		mustDefinition(t, "shell", "Run something else.", `{"type":"object"}`, tool.CapabilityProcessExecute, tool.CapabilityEnvironmentRead),
+		mustDefinition(t, "shell", "Run a command.", `{"type":"string"}`, tool.CapabilityProcessExecute, tool.CapabilityEnvironmentRead),
+		mustDefinition(t, "shell", "Run a command.", `{"type":"object"}`, tool.CapabilityProcessExecute),
+	} {
+		if changed.Fingerprint() == base.Fingerprint() {
+			t.Fatal("changed contract retained its fingerprint")
+		}
+	}
+}
+
+func mustDefinition(t *testing.T, name, description, schema string, capabilities ...tool.Capability) tool.Definition {
+	t.Helper()
+	definition, err := tool.NewDefinition(name, description, json.RawMessage(schema), capabilities...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return definition
+}
+
 func TestValuesRejectInvalidAndOversizedInput(t *testing.T) {
 	for _, capabilities := range [][]tool.Capability{{"unknown"}, {tool.CapabilityNetworkAccess, tool.CapabilityNetworkAccess}} {
 		if _, err := tool.NewDefinition("http", "HTTP", json.RawMessage(`{}`), capabilities...); err == nil {

@@ -219,7 +219,11 @@ func security(ctx context.Context, root string) error {
 }
 
 func fuzz(ctx context.Context, root string) error {
-	for _, target := range []struct{ pkg, name string }{{"./message", "FuzzNewID"}, {"./tool", "FuzzToolCall"}} {
+	for _, target := range []struct{ pkg, name string }{
+		{"./message", "FuzzNewID"},
+		{"./tool", "FuzzToolCall"},
+		{"./agent", "FuzzParseSnapshot"},
+	} {
 		if err := command(ctx, root, nil, "go", "test", "-run=^$", "-fuzz=^"+target.name+"$", "-fuzztime=1s", target.pkg); err != nil {
 			return err
 		}

@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -92,6 +93,19 @@ func (testTool) Definition() tool.Definition {
 	return definition
 }
 
+type countingTool struct{ calls atomic.Int32 }
+
+func (implementation *countingTool) Definition() tool.Definition {
+	definition, _ := tool.NewDefinition("read", "Read a fixture.", json.RawMessage(`{}`))
+	return definition
+}
+
+func (implementation *countingTool) Execute(_ context.Context, call tool.Call, _ tool.Reporter) tool.Result {
+	implementation.calls.Add(1)
+	result, _ := tool.NewResult(call.ID(), json.RawMessage(`"ok"`))
+	return result
+}
+
 func (implementation testTool) Execute(ctx context.Context, call tool.Call, reporter tool.Reporter) tool.Result {
 	if implementation.panicAt {
 		panic("tool boom")
@@ -139,6 +153,37 @@ func TestEngineExecutesToolThenContinues(t *testing.T) {
 	}
 	if got := provider.requests[0].Tools(); len(got) != 1 || got[0].Name() != "read" {
 		t.Fatalf("immutable dispatcher definitions = %v", got)
+	}
+}
+
+func TestEngineRejectsDuplicateToolCallsBeforeRedispatch(t *testing.T) {
+	call, _ := tool.NewCall("same-call", "read", json.RawMessage(`{}`))
+	for _, test := range []struct {
+		name    string
+		scripts [][]model.StreamEvent
+		want    int32
+	}{
+		{"same response", [][]model.StreamEvent{{toolEvent(t, call), toolEvent(t, call), completed(t)}}, 0},
+		{"prior history", [][]model.StreamEvent{
+			{toolEvent(t, call), completed(t)},
+			{toolEvent(t, call), completed(t)},
+		}, 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			implementation := &countingTool{}
+			engine := newEngine(t, &scriptedProvider{scripts: test.scripts}, map[string]tool.Tool{"read": implementation}, nil, nil)
+			run := startRun(t, engine, 3)
+			events := collect(t, run)
+			if err := run.Wait(t.Context()); err == nil || !strings.Contains(err.Error(), "duplicated") {
+				t.Fatalf("run error = %v", err)
+			}
+			if implementation.calls.Load() != test.want {
+				t.Fatalf("tool calls = %d, want %d", implementation.calls.Load(), test.want)
+			}
+			if countKinds(events)[event.ToolStarted] != int(test.want) {
+				t.Fatalf("tool start events = %v", countKinds(events))
+			}
+		})
 	}
 }
 
@@ -260,6 +305,10 @@ func TestTerminalDurabilityIsBoundedAndTyped(t *testing.T) {
 	err = run.Wait(waitContext)
 	if _, ok := errors.AsType[*agent.DurabilityError](err); !ok {
 		t.Fatalf("Wait error = %v", err)
+	}
+	snapshot, snapshotErr := run.ExportSnapshot()
+	if snapshotErr != nil || snapshot.Status() != agent.LifecycleCompleted {
+		t.Fatalf("postcommit observer snapshot = %s, %v", snapshot.Status(), snapshotErr)
 	}
 }
 
@@ -450,6 +499,18 @@ func TestEngineRejectsInvalidConstructionAndContexts(t *testing.T) {
 	options.MetadataNamespaces = []string{"duplicate", "duplicate"}
 	if _, err := agent.NewEngineWithOptions(provider, dispatcher, ids, time.Now, nil, nil, options); err == nil {
 		t.Fatal("duplicate metadata allowlist succeeded")
+	}
+	options = agent.DefaultEngineOptions()
+	options.StaticPlanIdentities = []string{"invalid"}
+	if _, err := agent.NewEngineWithOptions(provider, dispatcher, ids, time.Now, nil, nil, options); err == nil {
+		t.Fatal("invalid static plan identity succeeded")
+	}
+	limited, err := agent.NewEngineWithLimits(provider, dispatcher, ids, time.Now, nil, nil, event.DefaultLogLimits())
+	if err != nil {
+		t.Fatalf("construct engine with explicit limits: %v", err)
+	}
+	if err = limited.Close(t.Context()); err != nil {
+		t.Fatalf("close explicit-limit engine: %v", err)
 	}
 	if _, err := agent.NewDefinition("", "model", 1); err == nil {
 		t.Fatal("invalid definition name succeeded")

@@ -22,7 +22,8 @@ round-trip, and deterministic replay tests. **Status:** in progress.
   every dispatcher and decorator. Calls, results, and progress are immutable;
   the dispatcher enforces active call identity even when a tool ignores a
   reporter error. Tools are trusted concurrent singleton beans and may not
-  retain a reporter after `Execute` returns.
+  retain a reporter after `Execute` returns. Snapshot plan matching fingerprints
+  each complete tool contract, not only its bean name.
 - Each run owns a count-and-encoded-byte-bounded authoritative event log.
   `Subscribe(ctx, afterSequence)` creates an independent gap-free replay/tail
   cursor. Typed out-of-range and resource-exhaustion errors provide recovery
@@ -36,6 +37,15 @@ round-trip, and deterministic replay tests. **Status:** in progress.
   caller cancellation and surface typed durability errors. `Close` rejects new
   runs and drains; `Shutdown` additionally requests cooperative cancellation.
 
-Interaction completion and snapshot import/export remain intentionally
-incomplete. Phase 2 cannot close until those contracts and their round-trip
-tests are implemented.
+Interaction completion and snapshot import/export are implemented as preview
+contracts. UI-neutral broker lifecycles are exactly
+terminal under response validation, cancellation, panic, and observer failure.
+Versioned snapshots round-trip deterministically, reject active or uncertain
+mutations, and resume only with exact static/dynamic plan identity and monotonic
+sequence continuation. Used interaction IDs survive snapshot import so a client
+cannot ambiguously reuse a completed lifecycle identity. Durable SQLite recovery and uncertain-operation policy
+remain the isolated Phase 7 stress proof rather than hidden kernel behavior.
+
+**Kernel-local status:** complete for the preview contract. Cross-repository
+provider/tool conformance and the architecture-proof distribution remain in
+progress; this document does not claim those later phase exits.

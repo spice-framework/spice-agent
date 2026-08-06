@@ -1,7 +1,56 @@
-# RFC 0003: Stage Model
+# RFC 0003: Spice-Native Stage and Tool Model
 
-**Status:** accepted for preview. Stages are narrow Go interfaces. Replaceable
-defaults are Spice fallback beans; decorators are ordered typed collections;
-tools pass through exactly one dispatcher. Stage selection happens at generated
-construction time. No stage registry or string lookup exists at runtime.
+- **Status:** accepted for preview
+- **Depends on:** ADR 0001 and Spice typed DI contracts
 
+## Decision
+
+Stages and executable tools are narrow Go interfaces resolved at generated
+construction time. Replaceable defaults are fallback beans. Application or
+starter implementations are normal candidates; ambiguity requires an
+application-owned typed primary or qualifier. Decoration uses ordered typed
+collections and never mutates an existing bean registry.
+
+The default stage pipeline is a constructor-injected immutable slice. Ordering
+uses Spice `@Order`, then canonical bean name and source position for deterministic
+diagnostics. A stage receives only its typed input, output, and context; it cannot
+look up other stages or tools by arbitrary runtime string.
+
+Tools are exposed to models as immutable definitions but execute only through
+one `ToolDispatcher`. The dispatcher owns a canonical map built from
+`map[string]tool.Tool` injection, rejects name/definition mismatches, snapshots
+definitions for each model request, enforces call/progress correlation, contains
+panics, and preserves cancellation. Policy, telemetry, retry, and runtime-plugin
+support are ordered typed dispatcher decorators.
+
+## Annotation mapping
+
+`@Stage` and `@Tool` descriptors emit existing generic Spice contributions:
+stereotype, explicit interface binding, bean name, qualifier, fallback/primary,
+and order. They do not emit an agent registry entry. Descriptor handlers are
+typed Go functions in canonical files and the compiler consumes only generic
+contributions.
+
+## Dynamic tools
+
+The compiled graph may contain one runtime-plugin-backed tool source/dispatcher
+decorator. It leases an immutable plugin generation when a run begins and
+contributes its advertised tool definitions to that run's execution-plan
+snapshot. Dynamic tools do not add compiled stages or mutate static DI.
+
+## Rejected alternatives
+
+- String-keyed runtime stage registries hide type errors and source navigation.
+- Universal middleware functions erase lifecycle and capability contracts.
+- Allowing tools to publish events directly bypasses canonical sequencing and
+  future permission interception.
+- Automatic interface scanning makes dependency selection dependent on ambient
+  packages rather than source declarations.
+
+## Acceptance
+
+Generated fixtures prove fallback replacement, deterministic ambiguity, typed
+primary/qualifier resolution, ordered decorators, named tool maps, test overrides,
+capability snapshots, panic/cancellation, and absence of registry/reflection
+source. A future permission stress prototype must intercept every executable
+route without kernel changes.

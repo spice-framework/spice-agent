@@ -1,60 +1,105 @@
-// Package interaction defines UI-independent request and response values.
+// Package interaction defines UI-independent immutable interaction contracts.
 package interaction
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 )
 
+const MaximumPayloadBytes = 512 << 10
+
 // ID identifies one interaction lifecycle.
 type ID string
 
-// Request asks a client for typed user input.
+// Request asks an injected broker for typed user input.
 type Request struct {
-	ID     ID
-	Kind   string
-	Prompt string
-	Schema json.RawMessage
+	id     ID
+	kind   string
+	prompt string
+	schema json.RawMessage
 }
 
-// Validate rejects malformed or unbounded requests.
+// NewRequest validates and defensively copies one interaction request.
+func NewRequest(id ID, kind, prompt string, schema json.RawMessage) (Request, error) {
+	if err := token("interaction ID", string(id)); err != nil {
+		return Request{}, err
+	}
+	if err := token("interaction kind", kind); err != nil {
+		return Request{}, err
+	}
+	if prompt == "" || prompt != strings.TrimSpace(prompt) {
+		return Request{}, errors.New("interaction prompt must be non-empty without surrounding whitespace")
+	}
+	if len(prompt) > MaximumPayloadBytes {
+		return Request{}, fmt.Errorf("interaction prompt exceeds %d bytes", MaximumPayloadBytes)
+	}
+	if err := validateJSON("interaction schema", schema); err != nil {
+		return Request{}, err
+	}
+	return Request{id: id, kind: kind, prompt: prompt, schema: cloneJSON(schema)}, nil
+}
+
 func (request Request) Validate() error {
-	if err := token("interaction ID", string(request.ID)); err != nil {
-		return err
-	}
-	if err := token("interaction kind", request.Kind); err != nil {
-		return err
-	}
-	if strings.TrimSpace(request.Prompt) == "" {
-		return errors.New("interaction prompt must not be empty")
-	}
-	if len(request.Schema) == 0 || !json.Valid(request.Schema) {
-		return errors.New("interaction schema must be valid JSON")
-	}
-	if len(request.Schema) > 1<<20 {
-		return errors.New("interaction schema exceeds 1048576 bytes")
-	}
-	return nil
+	_, err := NewRequest(request.id, request.kind, request.prompt, request.schema)
+	return err
+}
+
+func (request Request) ID() ID                  { return request.id }
+func (request Request) Kind() string            { return request.kind }
+func (request Request) Prompt() string          { return request.prompt }
+func (request Request) Schema() json.RawMessage { return cloneJSON(request.schema) }
+func (request Request) Clone() Request {
+	return Request{id: request.id, kind: request.kind, prompt: request.prompt, schema: request.Schema()}
 }
 
 // Response completes one interaction with structured user input.
 type Response struct {
-	ID    ID
-	Value json.RawMessage
+	id    ID
+	value json.RawMessage
 }
 
-// Validate rejects a response with no valid JSON value.
+// NewResponse validates and defensively copies one response.
+func NewResponse(id ID, value json.RawMessage) (Response, error) {
+	if err := token("interaction ID", string(id)); err != nil {
+		return Response{}, err
+	}
+	if err := validateJSON("interaction response", value); err != nil {
+		return Response{}, err
+	}
+	return Response{id: id, value: cloneJSON(value)}, nil
+}
+
 func (response Response) Validate() error {
-	if err := token("interaction ID", string(response.ID)); err != nil {
-		return err
+	_, err := NewResponse(response.id, response.value)
+	return err
+}
+
+func (response Response) ID() ID                 { return response.id }
+func (response Response) Value() json.RawMessage { return cloneJSON(response.value) }
+func (response Response) Clone() Response        { return Response{id: response.id, value: response.Value()} }
+
+// Broker is the UI-neutral user-interaction port injected into the engine.
+// Implementations must be concurrent-safe and cooperatively honor context.
+type Broker interface {
+	Request(context.Context, Request) (Response, error)
+}
+
+// UnavailableBroker is the fail-closed fallback when no client owns prompts.
+type UnavailableBroker struct{}
+
+func (UnavailableBroker) Request(context.Context, Request) (Response, error) {
+	return Response{}, errors.New("interaction broker is unavailable")
+}
+
+func validateJSON(label string, value json.RawMessage) error {
+	if len(value) == 0 || !json.Valid(value) {
+		return fmt.Errorf("%s must contain valid JSON", label)
 	}
-	if len(response.Value) == 0 || !json.Valid(response.Value) {
-		return errors.New("interaction response must contain valid JSON")
-	}
-	if len(response.Value) > 1<<20 {
-		return errors.New("interaction response exceeds 1048576 bytes")
+	if len(value) > MaximumPayloadBytes {
+		return fmt.Errorf("%s exceeds %d bytes", label, MaximumPayloadBytes)
 	}
 	return nil
 }
@@ -67,4 +112,8 @@ func token(label, value string) error {
 		return fmt.Errorf("%s exceeds 128 bytes", label)
 	}
 	return nil
+}
+
+func cloneJSON(value json.RawMessage) json.RawMessage {
+	return append(json.RawMessage(nil), value...)
 }
