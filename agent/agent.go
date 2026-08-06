@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/spice-framework/spice-agent/event"
 	"github.com/spice-framework/spice-agent/interaction"
@@ -751,42 +752,42 @@ func (engine *Engine) executeState(ctx context.Context, run *Run, definition Def
 func (engine *Engine) executeTurn(ctx context.Context, emitter *runEmitter, definition Definition, turn uint32, history *[]message.Message) (bool, error) {
 	if err := emitter.emit(ctx, event.TurnStarted, map[string]uint32{"turn": turn}); err != nil {
 		if committed(err) {
-			return false, errors.Join(err, emitter.failure(ctx, event.TurnFailed, err))
+			return false, errors.Join(err, emitter.turnFailure(ctx, err))
 		}
 		return false, err
 	}
 	operationID := emitter.run.id + "/model/" + strconv.FormatUint(uint64(turn), 10)
 	request, err := model.NewRequest(model.OperationID(operationID), definition.model, *history, engine.definitions())
 	if err != nil {
-		return false, errors.Join(err, emitter.failure(ctx, event.TurnFailed, err))
+		return false, errors.Join(err, emitter.turnFailure(ctx, err))
 	}
 	if err = emitter.emit(ctx, event.ModelStarted, map[string]any{"turn": turn, "operation_id": operationID}); err != nil {
 		if committed(err) {
 			return false, errors.Join(err,
 				emitter.modelFailure(ctx, err),
-				emitter.failure(ctx, event.TurnFailed, err))
+				emitter.turnFailure(ctx, err))
 		}
-		return false, errors.Join(err, emitter.failure(ctx, event.TurnFailed, err))
+		return false, errors.Join(err, emitter.turnFailure(ctx, err))
 	}
 	stream, err := safeStream(ctx, engine.provider, request)
 	if err != nil {
 		normalized := normalizeStartError(err)
 		return false, errors.Join(normalized,
 			emitter.modelFailure(ctx, normalized),
-			emitter.failure(ctx, event.TurnFailed, normalized))
+			emitter.turnFailure(ctx, normalized))
 	}
 	text, calls, usage, metadata, err := consumeStream(ctx, emitter, stream)
 	if err != nil {
 		return false, errors.Join(err,
 			emitter.modelFailure(ctx, err),
-			emitter.failure(ctx, event.TurnFailed, err))
+			emitter.turnFailure(ctx, err))
 	}
 	completedPayload := modelCompletedPayload{
 		InputTokens: usage.InputTokens(), OutputTokens: usage.OutputTokens(),
 		Metadata: engine.filterMetadata(metadata),
 	}
 	if err = emitter.emit(ctx, event.ModelCompleted, completedPayload); err != nil {
-		return false, errors.Join(err, emitter.failure(ctx, event.TurnFailed, err))
+		return false, errors.Join(err, emitter.turnFailure(ctx, err))
 	}
 	if len(calls) == 0 {
 		if err = emitter.emit(ctx, event.TurnCompleted, map[string]uint32{"turn": turn}); err != nil {
@@ -795,7 +796,7 @@ func (engine *Engine) executeTurn(ctx context.Context, emitter *runEmitter, defi
 		return true, nil
 	}
 	if err = engine.appendToolRound(ctx, emitter, text, calls, history); err != nil {
-		return false, errors.Join(err, emitter.failure(ctx, event.TurnFailed, err))
+		return false, errors.Join(err, emitter.turnFailure(ctx, err))
 	}
 	if err = emitter.emit(ctx, event.TurnCompleted, map[string]uint32{"turn": turn}); err != nil {
 		return false, err
@@ -890,6 +891,14 @@ type modelFailedPayload struct {
 	Metadata     []modelMetadataPayload `json:"metadata,omitempty"`
 }
 
+type toolTerminalPayload struct {
+	CallID  string                `json:"call_id"`
+	Name    string                `json:"name"`
+	Error   string                `json:"error"`
+	Outcome tool.ExecutionState   `json:"outcome,omitempty"`
+	Retry   tool.RetryDisposition `json:"retry,omitempty"`
+}
+
 func (engine *Engine) filterMetadata(metadata []model.Metadata) []modelMetadataPayload {
 	byNamespace := make(map[string]modelMetadataPayload, len(metadata))
 	for _, value := range metadata {
@@ -945,20 +954,21 @@ func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, 
 	for _, call := range calls {
 		if err = emitter.emit(ctx, event.ToolStarted, map[string]string{"call_id": string(call.ID()), "name": call.Name()}); err != nil {
 			if committed(err) {
-				return errors.Join(err, emitter.failure(ctx, event.ToolFailed, err))
+				return errors.Join(err, emitter.toolFailure(ctx, call, err))
 			}
 			return err
 		}
 		result, dispatchErr := safeDispatch(ctx, engine.dispatcher, call, emitter)
 		if dispatchErr != nil {
-			return errors.Join(dispatchErr, emitter.failure(ctx, event.ToolFailed, dispatchErr))
+			return errors.Join(dispatchErr, emitter.toolFailure(ctx, call, dispatchErr))
 		}
 		terminalKind := event.ToolCompleted
 		problem, failed := result.Problem()
 		if failed {
 			terminalKind = event.ToolFailed
 		}
-		if err = emitter.emit(ctx, terminalKind, map[string]string{"call_id": string(call.ID()), "name": call.Name(), "error": problem}); err != nil {
+		payload := toolTerminalPayload{CallID: string(call.ID()), Name: call.Name(), Error: problem}
+		if err = emitter.emit(ctx, terminalKind, payload); err != nil {
 			return err
 		}
 		part, partErr := message.ToolResult(string(call.ID()), call.Name(), result.Content())
@@ -1190,13 +1200,52 @@ func (emitter *runEmitter) terminal(ctx context.Context, kind event.Kind, runErr
 	return nil
 }
 
-func (emitter *runEmitter) failure(ctx context.Context, kind event.Kind, err error) error {
+func (emitter *runEmitter) turnFailure(ctx context.Context, err error) error {
 	finalizationContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), emitter.engine.finalizationTimeout)
 	defer cancel()
-	if persistErr := emitter.persist(finalizationContext, kind, map[string]string{"error": err.Error()}); persistErr != nil {
-		return &DurabilityError{Kind: kind, Cause: persistErr}
+	if persistErr := emitter.persist(finalizationContext, event.TurnFailed, map[string]string{"error": err.Error()}); persistErr != nil {
+		return &DurabilityError{Kind: event.TurnFailed, Cause: persistErr}
 	}
 	return nil
+}
+
+func (emitter *runEmitter) toolFailure(ctx context.Context, call tool.Call, err error) error {
+	payload := toolTerminalPayload{
+		CallID: string(call.ID()),
+		Name:   call.Name(),
+		Error:  boundedToolFailureMessage(err),
+	}
+	//nolint:errorlint // Only a validated top-level failure may supply outcome metadata.
+	if failure, typed := err.(*tool.ExecutionError); typed && failure != nil &&
+		failure.Validate() == nil && failure.CallID() == call.ID() {
+		payload.Outcome = failure.State()
+		payload.Retry = failure.RetryDisposition()
+	}
+	finalizationContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), emitter.engine.finalizationTimeout)
+	defer cancel()
+	if persistErr := emitter.persist(finalizationContext, event.ToolFailed, payload); persistErr != nil {
+		return &DurabilityError{Kind: event.ToolFailed, Cause: persistErr}
+	}
+	return nil
+}
+
+func boundedToolFailureMessage(err error) string {
+	message := "tool execution failed"
+	if err != nil {
+		candidate := strings.TrimSpace(strings.ToValidUTF8(err.Error(), "\uFFFD"))
+		if candidate != "" {
+			message = candidate
+		}
+	}
+	if len(message) <= tool.MaximumExecutionErrorBytes {
+		return message
+	}
+	const suffix = "..."
+	cutoff := tool.MaximumExecutionErrorBytes - len(suffix)
+	for cutoff > 0 && !utf8.ValidString(message[:cutoff]) {
+		cutoff--
+	}
+	return message[:cutoff] + suffix
 }
 
 func (emitter *runEmitter) modelFailure(ctx context.Context, err error) error {

@@ -24,6 +24,14 @@ round-trip, and deterministic replay tests. **Status:** in progress.
   reporter error. Tools are trusted concurrent singleton beans and may not
   retain a reporter after `Execute` returns. Snapshot plan matching fingerprints
   each complete tool contract, not only its bean name.
+- Tool definitions require explicit effect and replay-safety metadata.
+  Capabilities are canonical unordered sets, and contradictory read-only
+  mutation capabilities fail closed. Model-visible problem results remain
+  distinct from bounded, call-correlated infrastructure failures. Typed
+  failures preserve cancellation, distinguish definitive from uncertain
+  mutation outcomes, and cannot carry unsafe retry advice. Execution errors
+  must be direct typed values rather than wrappers or joins. Tool-failure events
+  retain bounded call, name, outcome, and retry correlation.
 - Each run owns a count-and-encoded-byte-bounded authoritative event log.
   `Subscribe(ctx, afterSequence)` creates an independent gap-free replay/tail
   cursor. Typed out-of-range and resource-exhaustion errors provide recovery

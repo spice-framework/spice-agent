@@ -32,6 +32,11 @@ Run/Turn/Model/Tool/Interaction Started event receives exactly one matching
 Completed, Failed, or Cancelled terminal. Cancellation preserves history and no
 replay or import operation renumbers committed events.
 
+Tool infrastructure failures carry a tool-specific payload with the active
+call ID, canonical tool name, bounded error text, and—when supplied by a valid
+typed execution failure—its definitive/uncertain outcome and retry disposition.
+This correlation is retained even when execution terminates the turn and run.
+
 ## Authoritative replay
 
 Each run owns one count-and-encoded-byte-bounded authoritative in-memory log.

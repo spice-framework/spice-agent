@@ -26,6 +26,27 @@ definitions for each model request, enforces call/progress correlation, contains
 panics, and preserves cancellation. Policy, telemetry, retry, and runtime-plugin
 support are ordered typed dispatcher decorators.
 
+Each definition has mandatory `Effect` (`read_only` or `mutating`) and
+`ReplaySafety` (`safe`, `idempotent`, or `unsafe`) metadata. Capabilities are an
+unordered set normalized to lexical order before storage, cloning,
+fingerprinting, or exposure. Read-only tools must be replay-safe and cannot
+declare `filesystem.write`, `process.execute`, `network.access`, or
+`environment.write`; contradictory metadata fails dispatcher construction.
+Replay-safe is reserved for read-only tools; mutating tools must declare either
+idempotent or unsafe replay.
+
+`Execute(context.Context, tool.Call, tool.Reporter)` returns
+`(tool.Result, error)`. A problem result is a completed, model-visible tool
+outcome. A Go error is infrastructure failure and must itself be exactly one
+valid `*tool.ExecutionError` correlated to the active call. Error wrappers,
+joins, and sibling failures are rejected so unbounded or unrelated data cannot
+bypass validation. The dispatcher
+rejects a simultaneous result and error, untyped errors, mismatched call IDs,
+uncertain outcomes from read-only tools, and retry advice for replay-unsafe
+tools. Uncertain outcomes always prohibit retry. Accepted typed errors are
+returned without replacing their error chain, so cancellation remains
+discoverable through `errors.Is`.
+
 ## Annotation mapping
 
 `@Stage`, `@Tool`, and `@ModelProvider` descriptors emit only existing generic

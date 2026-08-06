@@ -12,8 +12,8 @@ type concreteTool struct{}
 
 func (*concreteTool) Definition() tool.Definition { return tool.Definition{} }
 
-func (*concreteTool) Execute(context.Context, tool.Call, tool.Reporter) tool.Result {
-	return tool.Result{}
+func (*concreteTool) Execute(context.Context, tool.Call, tool.Reporter) (tool.Result, error) {
+	return tool.Result{}, nil
 }
 
 // @Bean(name="concrete")

@@ -24,7 +24,7 @@ func TestRequestIsImmutableAndBounded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition, err := tool.NewDefinition("read", "Read", json.RawMessage(`{}`), tool.CapabilityFilesystemRead)
+	definition, err := tool.NewDefinition("read", "Read", json.RawMessage(`{}`), tool.EffectReadOnly, tool.ReplaySafe, tool.CapabilityFilesystemRead)
 	if err != nil {
 		t.Fatal(err)
 	}

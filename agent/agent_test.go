@@ -86,34 +86,45 @@ type fixedIDSource struct{ value string }
 
 func (source fixedIDSource) Next(string) (string, error) { return source.value, nil }
 
-type testTool struct{ panicAt bool }
+type testTool struct {
+	panicAt      bool
+	problem      string
+	executionErr error
+}
 
 func (testTool) Definition() tool.Definition {
-	definition, _ := tool.NewDefinition("read", "Read a fixture.", json.RawMessage(`{}`), tool.CapabilityFilesystemRead)
+	definition, _ := tool.NewDefinition("read", "Read a fixture.", json.RawMessage(`{}`), tool.EffectReadOnly, tool.ReplaySafe, tool.CapabilityFilesystemRead)
 	return definition
 }
 
 type countingTool struct{ calls atomic.Int32 }
 
 func (implementation *countingTool) Definition() tool.Definition {
-	definition, _ := tool.NewDefinition("read", "Read a fixture.", json.RawMessage(`{}`))
+	definition, _ := tool.NewDefinition("read", "Read a fixture.", json.RawMessage(`{}`), tool.EffectReadOnly, tool.ReplaySafe)
 	return definition
 }
 
-func (implementation *countingTool) Execute(_ context.Context, call tool.Call, _ tool.Reporter) tool.Result {
+func (implementation *countingTool) Execute(_ context.Context, call tool.Call, _ tool.Reporter) (tool.Result, error) {
 	implementation.calls.Add(1)
 	result, _ := tool.NewResult(call.ID(), json.RawMessage(`"ok"`))
-	return result
+	return result, nil
 }
 
-func (implementation testTool) Execute(ctx context.Context, call tool.Call, reporter tool.Reporter) tool.Result {
+func (implementation testTool) Execute(ctx context.Context, call tool.Call, reporter tool.Reporter) (tool.Result, error) {
 	if implementation.panicAt {
 		panic("tool boom")
 	}
+	if implementation.executionErr != nil {
+		return tool.Result{}, implementation.executionErr
+	}
 	progress, _ := tool.NewProgress(call.ID(), "reading")
 	_ = reporter.Report(ctx, progress)
+	if implementation.problem != "" {
+		result, _ := tool.NewErrorResult(call.ID(), json.RawMessage(`{"error":"denied"}`), implementation.problem)
+		return result, nil
+	}
 	result, _ := tool.NewResult(call.ID(), json.RawMessage(`{"content":"fixture"}`))
-	return result
+	return result, nil
 }
 
 func TestEngineCompletesTextRunDeterministically(t *testing.T) {
@@ -154,6 +165,77 @@ func TestEngineExecutesToolThenContinues(t *testing.T) {
 	if got := provider.requests[0].Tools(); len(got) != 1 || got[0].Name() != "read" {
 		t.Fatalf("immutable dispatcher definitions = %v", got)
 	}
+}
+
+func TestEngineDistinguishesModelVisibleToolProblemsFromExecutionFailures(t *testing.T) {
+	call, _ := tool.NewCall("call-1", "read", json.RawMessage(`{}`))
+	t.Run("model-visible problem continues", func(t *testing.T) {
+		provider := &scriptedProvider{scripts: [][]model.StreamEvent{
+			{toolEvent(t, call), completed(t)},
+			{delta(t, "handled"), completed(t)},
+		}}
+		engine := newEngine(t, provider, map[string]tool.Tool{"read": testTool{problem: "denied"}}, nil, nil)
+		run := startRun(t, engine, 3)
+		events := collect(t, run)
+		if err := run.Wait(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		counts := countKinds(events)
+		if counts[event.ToolFailed] != 1 || counts[event.RunCompleted] != 1 || counts[event.RunFailed] != 0 {
+			t.Fatalf("event counts = %v", counts)
+		}
+		if len(provider.requests) != 2 {
+			t.Fatalf("provider request count = %d", len(provider.requests))
+		}
+		messages := provider.requests[1].Messages()
+		parts := messages[len(messages)-1].Parts()
+		if len(parts) != 1 || parts[0].Kind() != message.PartToolResult || string(parts[0].Data()) != `{"error":"denied"}` {
+			t.Fatalf("model-visible tool result = %#v", parts)
+		}
+	})
+
+	t.Run("execution failure terminates", func(t *testing.T) {
+		failure, err := tool.NewExecutionError(
+			call.ID(),
+			tool.ExecutionDefinitive,
+			tool.RetryAllowed,
+			errors.New("tool host unavailable"),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		provider := &scriptedProvider{scripts: [][]model.StreamEvent{{toolEvent(t, call), completed(t)}}}
+		engine := newEngine(t, provider, map[string]tool.Tool{"read": testTool{executionErr: failure}}, nil, nil)
+		run := startRun(t, engine, 3)
+		events := collect(t, run)
+		waitErr := run.Wait(t.Context())
+		var typed *tool.ExecutionError
+		if !errors.As(waitErr, &typed) || typed != failure {
+			t.Fatalf("execution failure = %T, %v", waitErr, waitErr)
+		}
+		counts := countKinds(events)
+		if counts[event.ToolFailed] != 1 || counts[event.RunFailed] != 1 || counts[event.RunCompleted] != 0 {
+			t.Fatalf("event counts = %v", counts)
+		}
+		var payload struct {
+			CallID  string                `json:"call_id"`
+			Name    string                `json:"name"`
+			Error   string                `json:"error"`
+			Outcome tool.ExecutionState   `json:"outcome"`
+			Retry   tool.RetryDisposition `json:"retry"`
+		}
+		if err = json.Unmarshal([]byte(eventData(t, events, event.ToolFailed)), &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload.CallID != string(call.ID()) || payload.Name != call.Name() ||
+			payload.Error != "tool host unavailable" || payload.Outcome != tool.ExecutionDefinitive ||
+			payload.Retry != tool.RetryAllowed {
+			t.Fatalf("tool failure payload = %#v", payload)
+		}
+		if len(provider.requests) != 1 {
+			t.Fatalf("provider request count = %d", len(provider.requests))
+		}
+	})
 }
 
 func TestEngineRejectsDuplicateToolCallsBeforeRedispatch(t *testing.T) {

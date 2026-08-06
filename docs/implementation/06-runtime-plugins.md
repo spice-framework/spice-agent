@@ -6,6 +6,11 @@ Support genuinely dynamic runtime tools without mutating compiled Spice DI.
 This phase depends on stable run plan snapshots, daemon negotiation, canonical
 tool dispatch, and cancellation semantics.
 
+The Phase 5.0A prerequisite is complete in core: all tool definitions carry
+effect/replay metadata and all execution failures use the correlated typed
+outcome contract. The plugin host must translate protocol failures into that
+same contract; it may not introduce a parallel error or retry model.
+
 ## Runtime-plugin contracts
 
 - One host process and one local gRPC connection exist per plugin generation.
@@ -79,4 +84,6 @@ Local call overhead targets the daemon event-latency budget and must not add an
 unbounded queue. Evidence includes digests, generation/lease timelines, process
 logs, conformance versions, and failure-injection results.
 
-Status is **planned**.
+Status is **in progress**. The execution-outcome prerequisite is implemented;
+plugin protocol, host, generation leases, fixtures, and developer loop remain
+pending.

@@ -43,7 +43,20 @@ engine boundaries and normalized into terminal failure.
 
 All executable tools traverse one injected `ToolDispatcher`. The dispatcher
 publishes an immutable capability/definition snapshot and validates active call
-and progress correlation. No tool may retain a reporter after execution.
+and progress correlation. Definitions explicitly classify external-state
+effect and replay safety; capabilities form an unordered set returned in
+canonical lexical order. Read-only definitions reject mutation-capable
+filesystem, process, network, and environment capabilities. No tool may retain
+a reporter after execution.
+
+`tool.Tool.Execute` returns `(tool.Result, error)`. A valid `Result` whose
+problem is set is model-visible terminal tool data and may continue the model
+loop. An infrastructure failure returns a zero result and exactly one direct,
+bounded, call-correlated `*tool.ExecutionError`; wrappers and joined siblings
+are rejected. The error distinguishes a definitive
+failure from an uncertain mutation outcome and supplies validated retry advice.
+The dispatcher rejects untyped, uncorrelated, contradictory, or result-plus-error
+outcomes and preserves `errors.Is` cancellation/deadline semantics.
 
 Local event commit precedes required-observer acknowledgement. Once committed,
 a sequence is never reused even if an observer reports failure. Bounded terminal

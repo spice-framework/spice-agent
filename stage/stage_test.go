@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -27,21 +28,23 @@ func TestTypedStageKeepsInputAndOutputInGoTypeSystem(t *testing.T) {
 }
 
 type fakeTool struct {
-	name       string
-	resultID   tool.CallID
-	progressID tool.CallID
-	definition tool.Definition
+	name                   string
+	resultID               tool.CallID
+	progressID             tool.CallID
+	definition             tool.Definition
+	executionErr           error
+	resultWithExecutionErr bool
 }
 
 func (fake fakeTool) Definition() tool.Definition {
 	if fake.definition.Name() != "" {
 		return fake.definition
 	}
-	value, _ := tool.NewDefinition(fake.name, "test", json.RawMessage(`{}`))
+	value, _ := tool.NewDefinition(fake.name, "test", json.RawMessage(`{}`), tool.EffectReadOnly, tool.ReplaySafe)
 	return value
 }
 
-func (fake fakeTool) Execute(ctx context.Context, call tool.Call, reporter tool.Reporter) tool.Result {
+func (fake fakeTool) Execute(ctx context.Context, call tool.Call, reporter tool.Reporter) (tool.Result, error) {
 	if fake.progressID != "" {
 		progress, _ := tool.NewProgress(fake.progressID, "work")
 		_ = reporter.Report(ctx, progress)
@@ -51,7 +54,78 @@ func (fake fakeTool) Execute(ctx context.Context, call tool.Call, reporter tool.
 		id = call.ID()
 	}
 	result, _ := tool.NewResult(id, json.RawMessage(`"ok"`))
-	return result
+	if fake.executionErr != nil {
+		if fake.resultWithExecutionErr {
+			return result, fake.executionErr
+		}
+		return tool.Result{}, fake.executionErr
+	}
+	return result, nil
+}
+
+func TestDispatcherPreservesAndValidatesTypedExecutionFailures(t *testing.T) {
+	t.Parallel()
+	call, _ := tool.NewCall("c", "a", json.RawMessage(`{}`))
+	cancelled, _ := tool.NewExecutionError(call.ID(), tool.ExecutionDefinitive, tool.RetryAllowed, context.Canceled)
+	dispatcher, _ := stage.NewDispatcher(map[string]tool.Tool{"a": fakeTool{name: "a", executionErr: cancelled}})
+	if _, err := dispatcher.Dispatch(t.Context(), call, nil); !errors.Is(err, context.Canceled) {
+		t.Fatalf("typed cancellation = %v", err)
+	} else {
+		var typed *tool.ExecutionError
+		if !errors.As(err, &typed) || typed != cancelled {
+			t.Fatalf("execution error was not preserved: %T, %v", err, err)
+		}
+	}
+
+	uncertain, _ := tool.NewExecutionError(call.ID(), tool.ExecutionUncertain, tool.RetryNever, errors.New("commit acknowledgement lost"))
+	readOnly, _ := stage.NewDispatcher(map[string]tool.Tool{"a": fakeTool{name: "a", executionErr: uncertain}})
+	if _, err := readOnly.Dispatch(t.Context(), call, nil); err == nil || !strings.Contains(err.Error(), "read-only") {
+		t.Fatalf("read-only uncertain execution = %v", err)
+	}
+
+	mutatingDefinition, _ := tool.NewDefinition("a", "test", json.RawMessage(`{}`), tool.EffectMutating, tool.ReplayUnsafe)
+	mutating, _ := stage.NewDispatcher(map[string]tool.Tool{"a": fakeTool{name: "a", definition: mutatingDefinition, executionErr: uncertain}})
+	if _, err := mutating.Dispatch(t.Context(), call, nil); !errors.Is(err, uncertain) {
+		t.Fatalf("uncertain mutation was not preserved: %T, %v", err, err)
+	}
+
+	retryable, _ := tool.NewExecutionError(call.ID(), tool.ExecutionDefinitive, tool.RetryAllowed, errors.New("worker unavailable"))
+	replayUnsafe, _ := stage.NewDispatcher(map[string]tool.Tool{"a": fakeTool{name: "a", definition: mutatingDefinition, executionErr: retryable}})
+	if _, err := replayUnsafe.Dispatch(t.Context(), call, nil); err == nil || !strings.Contains(err.Error(), "replay-unsafe") {
+		t.Fatalf("unsafe retry = %v", err)
+	}
+	idempotentDefinition, _ := tool.NewDefinition("a", "test", json.RawMessage(`{}`), tool.EffectMutating, tool.ReplayIdempotent)
+	idempotent, _ := stage.NewDispatcher(map[string]tool.Tool{"a": fakeTool{name: "a", definition: idempotentDefinition, executionErr: retryable}})
+	if _, err := idempotent.Dispatch(t.Context(), call, nil); !errors.Is(err, retryable) {
+		t.Fatalf("idempotent retryable failure was not preserved: %T, %v", err, err)
+	}
+}
+
+func TestDispatcherRejectsUntypedMismatchedAndAmbiguousExecutionFailures(t *testing.T) {
+	t.Parallel()
+	call, _ := tool.NewCall("c", "a", json.RawMessage(`{}`))
+	wrong, _ := tool.NewExecutionError("other", tool.ExecutionDefinitive, tool.RetryNever, errors.New("failure"))
+	valid, _ := tool.NewExecutionError(call.ID(), tool.ExecutionDefinitive, tool.RetryNever, errors.New("failure"))
+	second, _ := tool.NewExecutionError(call.ID(), tool.ExecutionDefinitive, tool.RetryNever, errors.New("second failure"))
+	for name, implementation := range map[string]tool.Tool{
+		"untyped":                   fakeTool{name: "a", executionErr: errors.New("plain failure")},
+		"wrapped typed":             fakeTool{name: "a", executionErr: fmt.Errorf("wrapped: %w", valid)},
+		"joined sibling":            fakeTool{name: "a", executionErr: errors.Join(valid, errors.New("sibling failure"))},
+		"multiple typed":            fakeTool{name: "a", executionErr: errors.Join(valid, second)},
+		"wrong correlation":         fakeTool{name: "a", executionErr: wrong},
+		"result and error":          fakeTool{name: "a", executionErr: wrong, resultWithExecutionErr: true},
+		"oversized wrapped sibling": fakeTool{name: "a", executionErr: fmt.Errorf("%s: %w", strings.Repeat("SECRET", tool.MaximumExecutionErrorBytes), valid)},
+	} {
+		dispatcher, err := stage.NewDispatcher(map[string]tool.Tool{"a": implementation})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = dispatcher.Dispatch(t.Context(), call, nil); err == nil {
+			t.Errorf("%s execution failure succeeded", name)
+		} else if len(err.Error()) > 256 || strings.Contains(err.Error(), "SECRET") {
+			t.Errorf("%s leaked unbounded rejected error: %q", name, err)
+		}
+	}
 }
 
 type collectingReporter struct{ progress []tool.Progress }
@@ -70,18 +144,18 @@ type cancellingTool struct {
 }
 
 func (implementation cancellingTool) Definition() tool.Definition {
-	definition, _ := tool.NewDefinition("cancel", "cancel", json.RawMessage(`{}`))
+	definition, _ := tool.NewDefinition("cancel", "cancel", json.RawMessage(`{}`), tool.EffectReadOnly, tool.ReplaySafe)
 	return definition
 }
 
-func (implementation cancellingTool) Execute(_ context.Context, call tool.Call, _ tool.Reporter) tool.Result {
+func (implementation cancellingTool) Execute(_ context.Context, call tool.Call, _ tool.Reporter) (tool.Result, error) {
 	implementation.cancel()
 	result, _ := tool.NewResult(call.ID(), json.RawMessage(`null`))
-	return result
+	return result, nil
 }
 
 func TestDispatcherSnapshotsDefinitionsAndEnforcesCorrelation(t *testing.T) {
-	definition, _ := tool.NewDefinition("a", "test", json.RawMessage(`{}`), tool.CapabilityFilesystemRead)
+	definition, _ := tool.NewDefinition("a", "test", json.RawMessage(`{}`), tool.EffectReadOnly, tool.ReplaySafe, tool.CapabilityFilesystemRead)
 	dispatcher, err := stage.NewDispatcher(map[string]tool.Tool{"a": fakeTool{name: "a", definition: definition}})
 	if err != nil {
 		t.Fatal(err)

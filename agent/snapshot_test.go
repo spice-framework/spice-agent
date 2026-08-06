@@ -32,38 +32,38 @@ type contractChangedTool struct {
 }
 
 func (hugePanicTool) Definition() tool.Definition {
-	definition, _ := tool.NewDefinition("read", "Read a fixture.", json.RawMessage(`{}`))
+	definition, _ := tool.NewDefinition("read", "Read a fixture.", json.RawMessage(`{}`), tool.EffectReadOnly, tool.ReplaySafe)
 	return definition
 }
 
-func (hugePanicTool) Execute(context.Context, tool.Call, tool.Reporter) tool.Result {
+func (hugePanicTool) Execute(context.Context, tool.Call, tool.Reporter) (tool.Result, error) {
 	panic(strings.Repeat("x", event.MaximumPayloadBytes+1))
 }
 
 func (implementation contractChangedTool) Definition() tool.Definition {
-	definition, _ := tool.NewDefinition("read", "Read a fixture.", json.RawMessage(implementation.schema), implementation.capabilities...)
+	definition, _ := tool.NewDefinition("read", "Read a fixture.", json.RawMessage(implementation.schema), tool.EffectReadOnly, tool.ReplaySafe, implementation.capabilities...)
 	return definition
 }
 
-func (contractChangedTool) Execute(_ context.Context, call tool.Call, _ tool.Reporter) tool.Result {
+func (contractChangedTool) Execute(_ context.Context, call tool.Call, _ tool.Reporter) (tool.Result, error) {
 	result, _ := tool.NewResult(call.ID(), json.RawMessage(`null`))
-	return result
+	return result, nil
 }
 
 func (implementation *gatedTool) Definition() tool.Definition {
-	definition, _ := tool.NewDefinition("read", "Read a fixture.", json.RawMessage(`{}`), tool.CapabilityFilesystemRead)
+	definition, _ := tool.NewDefinition("read", "Read a fixture.", json.RawMessage(`{}`), tool.EffectReadOnly, tool.ReplaySafe, tool.CapabilityFilesystemRead)
 	return definition
 }
 
-func (implementation *gatedTool) Execute(ctx context.Context, call tool.Call, _ tool.Reporter) tool.Result {
+func (implementation *gatedTool) Execute(ctx context.Context, call tool.Call, _ tool.Reporter) (tool.Result, error) {
 	close(implementation.started)
 	select {
 	case <-ctx.Done():
-		result, _ := tool.NewErrorResult(call.ID(), json.RawMessage(`null`), "cancelled")
-		return result
+		failure, _ := tool.NewExecutionError(call.ID(), tool.ExecutionDefinitive, tool.RetryAllowed, ctx.Err())
+		return tool.Result{}, failure
 	case <-implementation.release:
 		result, _ := tool.NewResult(call.ID(), json.RawMessage(`"fixture"`))
-		return result
+		return result, nil
 	}
 }
 
@@ -130,7 +130,7 @@ func TestSnapshotRoundTripAndResumePreservePlansAndSequences(t *testing.T) {
 	}
 	for _, changed := range []contractChangedTool{
 		{schema: `{"type":"string"}`, capabilities: []tool.Capability{tool.CapabilityFilesystemRead}},
-		{schema: `{}`, capabilities: []tool.Capability{tool.CapabilityFilesystemRead, tool.CapabilityNetworkAccess}},
+		{schema: `{}`, capabilities: []tool.Capability{tool.CapabilityFilesystemRead, tool.CapabilityEnvironmentRead}},
 	} {
 		changedEngine := newEngine(t, blockingProvider{}, map[string]tool.Tool{"read": changed}, nil, nil)
 		if _, err = changedEngine.ResumeSnapshot(t.Context(), decoded); err == nil || !strings.Contains(err.Error(), "static plan") {
@@ -339,6 +339,18 @@ func TestSnapshotRejectsRunWhoseTerminalCouldNotCommit(t *testing.T) {
 	}
 	if countKinds(events)[event.RunFailed] != 0 {
 		t.Fatal("precommit run terminal appeared in log")
+	}
+	var payload struct {
+		CallID string `json:"call_id"`
+		Name   string `json:"name"`
+		Error  string `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(eventData(t, events, event.ToolFailed)), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.CallID != string(call.ID()) || payload.Name != call.Name() ||
+		len(payload.Error) != tool.MaximumExecutionErrorBytes {
+		t.Fatalf("bounded tool failure payload = %#v", payload)
 	}
 	if _, err := run.ExportSnapshot(); err == nil {
 		t.Fatal("uncommitted terminal exported as safe snapshot")

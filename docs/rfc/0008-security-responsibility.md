@@ -27,6 +27,13 @@ Capability data is immutable, bounded, deterministic, and covered by generated
 composition tests. It is useful for UI disclosure and policy input but provides
 no enforcement until an explicit policy bean is installed.
 
+Effect and replay metadata are also mandatory policy inputs, not inferred
+security guarantees. Definitions marked read-only fail closed if they request
+filesystem write, process execution, network access, or environment write.
+Capabilities are a set with canonical order, so source declaration order cannot
+change fingerprints, snapshots, or policy decisions. Replay-safe is reserved
+for read-only work; mutating tools must explicitly choose idempotent or unsafe.
+
 ## Secrets and sensitive data
 
 Credentials originate in secret-redacted typed configuration and are passed only
@@ -65,7 +72,11 @@ and covered by protected immutable tags and private vulnerability reporting.
 Cancellation does not prove a mutating operation had no effect. File replacement
 reports commit separately from durability. Lost process/plugin acknowledgement
 reports uncertain termination/outcome. Automatic replay is forbidden unless the
-operation contract proves it did not begin or is independently idempotent.
+operation contract proves it did not begin or is independently idempotent. A
+typed uncertain execution error can only describe a mutating tool and always
+declares retry forbidden. A definitive failure may declare retry eligible only
+when the tool's replay contract is not unsafe; no core dispatcher performs that
+retry by itself.
 
 ## Rejected claims
 

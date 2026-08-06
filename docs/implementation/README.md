@@ -10,7 +10,7 @@ Repository roadmaps link here and must not duplicate status.
 | 2 — deterministic kernel | Complete for preview | `841edd3`; deterministic lifecycle, interaction, snapshot, race/fuzz proof |
 | 3 — provider and coding tools | In progress | generated cross-repository continuation and opt-in live acceptance |
 | 4 — daemon and TUI | In progress | provisional local protocol baseline; host/reconnect proof pending |
-| 5 — runtime plugins | Planned | Go/Python conformance and generation leases |
+| 5 — runtime plugins | In progress | execution-outcome prerequisite complete; Go/Python conformance and generation leases pending |
 | 6 — architecture proof | Planned | signed `v0.1.0-preview.1` distribution |
 | 7 — stress prototypes | Planned | permission, SQLite, alternate UI, two-worker experiments |
 | 8 — stabilization | Planned | external authors and frozen compatibility policy |
@@ -85,6 +85,19 @@ The schema is not the final Phase 4 freeze: the host slice must reconcile
 interaction delivery and run identity, reconnect ownership, suspend/import
 semantics, atomic replay bounds, and RPC-context versus run-lifetime ownership
 before the baseline can be declared stable.
+
+## Phase 5.0A execution prerequisite
+
+The shared tool contract now requires effect and replay-safety metadata,
+canonicalizes capabilities as an unordered set, and fails closed on read-only
+definitions that request mutation-capable operations. `Tool.Execute` separates
+model-visible problem results from bounded correlated infrastructure errors.
+The dispatcher rejects ambiguous, untyped, mismatched, and replay-unsafe error
+combinations while preserving typed errors and normal cancellation checks.
+This is a prerequisite shared by compiled and runtime tools; it does not add a
+plugin protocol, dynamic plan source, generation lease, or retry engine. Exact
+acceptance commands are listed in
+[`evidence/phase5-tool-execution.md`](evidence/phase5-tool-execution.md).
 
 ## Current infrastructure blocker
 

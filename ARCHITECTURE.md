@@ -58,4 +58,12 @@ daemon, client lifecycle, registry, or translation into kernel internals. The
 quality gate rejects gRPC, Protobuf, and generated protocol imports from kernel
 packages.
 
+Every tool definition explicitly classifies external-state effect and replay
+safety and carries a canonically ordered capability set. Model-visible tool
+problems are normal correlated results and may continue the model loop;
+infrastructure failures are bounded correlated `tool.ExecutionError` values.
+An uncertain mutating outcome is distinct from a definitive failure and can
+never authorize automatic replay. These contracts are kernel-owned and apply
+equally to compiled and future runtime-plugin tools.
+
 See `docs/adr/0001-spice-native-composition.md` for the rejected parallel graph.

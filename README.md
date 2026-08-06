@@ -23,4 +23,9 @@ validation; they do not implement a daemon and are not imported by the kernel.
 Normal generation and verification are offline. See
 [verification](docs/verification.md) for the one explicit bootstrap exception.
 
+Tool contracts fail closed: each definition declares `read_only` or `mutating`
+effect, replay safety, and a canonical capability set. Tools return ordinary
+model-visible results separately from bounded, call-correlated infrastructure
+failures, including explicit uncertain mutation outcomes.
+
 Spice Agent is licensed under Apache-2.0.

@@ -13,8 +13,8 @@ type implementation struct{}
 
 func (*implementation) Definition() tool.Definition { return tool.Definition{} }
 
-func (*implementation) Execute(context.Context, tool.Call, tool.Reporter) tool.Result {
-	return tool.Result{}
+func (*implementation) Execute(context.Context, tool.Call, tool.Reporter) (tool.Result, error) {
+	return tool.Result{}, nil
 }
 
 // @Tool(name="first")
