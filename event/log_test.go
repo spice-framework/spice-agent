@@ -138,6 +138,35 @@ func TestLogTerminatesSlowAndCancelledSubscribers(t *testing.T) {
 	})
 }
 
+func TestSubscriptionCancellationAfterCommittedDeliveryDoesNotRaceDequeue(t *testing.T) {
+	t.Parallel()
+	for iteration := range 250 {
+		log := newLog(t, event.DefaultLogLimits())
+		ctx, cancel := context.WithCancel(t.Context())
+		subscription, err := log.Subscribe(ctx, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		appendEnvelope(t, log, 1, event.ModelDelta)
+		select {
+		case envelope := <-subscription.Events():
+			if envelope.Sequence() != 1 {
+				t.Fatalf("iteration %d sequence = %d", iteration, envelope.Sequence())
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("iteration %d did not deliver", iteration)
+		}
+		cancel()
+		if err = subscription.Wait(t.Context()); !errors.Is(err, context.Canceled) {
+			t.Fatalf("iteration %d cancellation = %v", iteration, err)
+		}
+		if subscription.LastDelivered() != 1 {
+			t.Fatalf("iteration %d last delivered = %d", iteration, subscription.LastDelivered())
+		}
+		log.Close()
+	}
+}
+
 func TestLogReservesCapacityForEveryLifecycleTerminal(t *testing.T) {
 	terminalKinds := []event.Kind{
 		event.RunCompleted, event.RunFailed, event.RunCancelled,

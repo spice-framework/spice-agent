@@ -92,7 +92,11 @@ func TestSnapshotRoundTripAndResumePreservePlansAndSequences(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.Version() != agent.SnapshotVersion || snapshot.Status() != agent.LifecycleSuspended || snapshot.CompletedTurns() != 1 || snapshot.LastSequence() == 0 || !containsPrefix(snapshot.StaticPlan(), "tool:read@") || snapshot.DynamicGeneration() != "none" {
+	planIdentity := snapshot.PlanIdentity()
+	if snapshot.Version() != agent.SnapshotVersion || snapshot.Status() != agent.LifecycleSuspended ||
+		snapshot.CompletedTurns() != 1 || snapshot.LastSequence() == 0 ||
+		snapshot.ToolPlanID() != run.ToolPlanID() || planIdentity.Fingerprint() == "" ||
+		planIdentity.Validate() != nil {
 		t.Fatalf("snapshot accessors mismatch: status=%s turns=%d sequence=%d", snapshot.Status(), snapshot.CompletedTurns(), snapshot.LastSequence())
 	}
 	if snapshot.Definition().Name() != "test" || len(snapshot.History()) == 0 {
@@ -133,7 +137,7 @@ func TestSnapshotRoundTripAndResumePreservePlansAndSequences(t *testing.T) {
 		{schema: `{}`, capabilities: []tool.Capability{tool.CapabilityFilesystemRead, tool.CapabilityEnvironmentRead}},
 	} {
 		changedEngine := newEngine(t, blockingProvider{}, map[string]tool.Tool{"read": changed}, nil, nil)
-		if _, err = changedEngine.ResumeSnapshot(t.Context(), decoded); err == nil || !strings.Contains(err.Error(), "static plan") {
+		if _, err = changedEngine.ResumeSnapshot(t.Context(), decoded); err == nil || !strings.Contains(err.Error(), "tool plan") {
 			t.Fatalf("changed tool contract resume = %v", err)
 		}
 	}
@@ -226,8 +230,13 @@ func TestSnapshotRejectsUnsafeCorruptedAndMismatchedState(t *testing.T) {
 	definition, _ := agent.NewDefinition("test", "model", 3)
 	history := []message.Message{inputMessage(t)}
 	readDefinition := testTool{}.Definition()
-	plan := []string{"broker:injected", "provider:injected", "stage:kernel", "tool:read@" + readDefinition.Fingerprint()}
-	valid, err := agent.NewSnapshot("run-1", definition, 1, history, plan, "generation-1", 7, agent.LifecycleSuspended)
+	plan := mustPlanIdentity(
+		t,
+		[]string{"broker:injected", "provider:injected", "stage:kernel"},
+		"generation-1",
+		[]tool.Definition{readDefinition},
+	)
+	valid, err := agent.NewSnapshot("run-1", definition, 1, history, plan, 7, agent.LifecycleSuspended)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +249,16 @@ func TestSnapshotRejectsUnsafeCorruptedAndMismatchedState(t *testing.T) {
 		{"active status", func(value map[string]any) { value["status"] = "running" }},
 		{"zero sequence", func(value map[string]any) { value["last_sequence"] = float64(0) }},
 		{"maximum sequence", func(value map[string]any) { value["last_sequence"] = float64(^uint64(0)) }},
-		{"unsorted plan", func(value map[string]any) { value["static_plan"] = []any{"z", "a"} }},
+		{"unsorted plan", func(value map[string]any) {
+			if identity, valid := value["plan_identity"].(map[string]any); valid {
+				identity["compiled_identities"] = []any{"stage:z", "broker:a"}
+			}
+		}},
+		{"invalid fingerprint", func(value map[string]any) {
+			if identity, valid := value["plan_identity"].(map[string]any); valid {
+				identity["fingerprint"] = "sha256:not-a-digest"
+			}
+		}},
 		{"duplicate interactions", func(value map[string]any) { value["seen_interaction_ids"] = []any{"same", "same"} }},
 		{"unsorted interactions", func(value map[string]any) { value["seen_interaction_ids"] = []any{"z", "a"} }},
 	} {
@@ -270,19 +288,19 @@ func TestSnapshotRejectsUnsafeCorruptedAndMismatchedState(t *testing.T) {
 	callPart, _ := message.ToolCall("call", "read", json.RawMessage(`{}`))
 	assistantID, _ := message.NewID("assistant")
 	uncertain, _ := message.New(assistantID, message.RoleAssistant, callPart)
-	if _, err = agent.NewSnapshot("run-1", definition, 1, append(history, uncertain), plan, "generation-1", 7, agent.LifecycleSuspended); err == nil {
+	if _, err = agent.NewSnapshot("run-1", definition, 1, append(history, uncertain), plan, 7, agent.LifecycleSuspended); err == nil {
 		t.Fatal("uncertain tool mutation snapshot succeeded")
 	}
 	dispatcher, _ := stage.NewDispatcher(nil)
 	options := agent.DefaultEngineOptions()
-	options.DynamicGeneration = "different"
+	options.SnapshotCompatibilityIdentity = testSnapshotCompatibility
 	engine, _ := agent.NewEngineWithOptions(&scriptedProvider{}, dispatcher, &agent.AtomicIDSource{}, time.Now, nil, nil, options)
-	if _, err = engine.ResumeSnapshot(t.Context(), valid); err == nil || !strings.Contains(err.Error(), "static plan") {
+	if _, err = engine.ResumeSnapshot(t.Context(), valid); err == nil || !strings.Contains(err.Error(), "tool plan") {
 		t.Fatalf("mismatched plan resume = %v", err)
 	}
 	dispatcher, _ = stage.NewDispatcher(map[string]tool.Tool{"read": testTool{}})
 	engine, _ = agent.NewEngineWithOptions(&scriptedProvider{}, dispatcher, &agent.AtomicIDSource{}, time.Now, nil, nil, options)
-	if _, err = engine.ResumeSnapshot(t.Context(), valid); err == nil || !strings.Contains(err.Error(), "dynamic generation") {
+	if _, err = engine.ResumeSnapshot(t.Context(), valid); err == nil || !strings.Contains(err.Error(), "tool plan") {
 		t.Fatalf("mismatched generation resume = %v", err)
 	}
 }
@@ -293,20 +311,15 @@ func newEngineWithBrokerAndTools(t *testing.T, provider model.Provider, broker i
 	if err != nil {
 		t.Fatal(err)
 	}
-	engine, err := agent.NewEngineWithInteractionBroker(provider, dispatcher, broker, &agent.AtomicIDSource{}, time.Now, nil, nil, agent.DefaultEngineOptions())
+	options := agent.DefaultEngineOptions()
+	options.SnapshotCompatibilityIdentity = testSnapshotCompatibility
+	engine, err := agent.NewEngineWithInteractionBroker(
+		provider, dispatcher, broker, &agent.AtomicIDSource{}, time.Now, nil, nil, options,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return engine
-}
-
-func containsPrefix(values []string, prefix string) bool {
-	for _, value := range values {
-		if strings.HasPrefix(value, prefix) {
-			return true
-		}
-	}
-	return false
 }
 
 func TestTerminalSnapshotCannotResumeAndActiveRunCannotExport(t *testing.T) {
@@ -385,7 +398,9 @@ func FuzzParseSnapshot(f *testing.F) {
 	part, _ := message.Text("hello")
 	id, _ := message.NewID("message")
 	value, _ := message.New(id, message.RoleUser, part)
-	snapshot, _ := agent.NewSnapshot("run", definition, 1, []message.Message{value}, []string{"provider:test"}, "none", 4, agent.LifecycleSuspended)
+	toolPlanID, _ := stage.NewPlanID("generation:test")
+	plan, _ := agent.NewPlanIdentity([]string{"provider:test"}, "fuzz:v1", toolPlanID, nil)
+	snapshot, _ := agent.NewSnapshot("run", definition, 1, []message.Message{value}, plan, 4, agent.LifecycleSuspended)
 	encoded, _ := snapshot.MarshalBinary()
 	f.Add(encoded)
 	f.Add([]byte(`{}`))
@@ -404,6 +419,24 @@ func mustSnapshotBytes(t *testing.T, snapshot agent.Snapshot) []byte {
 		t.Fatal(err)
 	}
 	return encoded
+}
+
+func mustPlanIdentity(
+	t *testing.T,
+	compiled []string,
+	toolPlanID string,
+	definitions []tool.Definition,
+) agent.PlanIdentity {
+	t.Helper()
+	id, err := stage.NewPlanID(toolPlanID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := agent.NewPlanIdentity(compiled, testSnapshotCompatibility, id, definitions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return identity
 }
 
 func collectAfter(t *testing.T, run *agent.Run, after uint64) []event.Envelope {

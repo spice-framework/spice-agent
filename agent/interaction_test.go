@@ -100,6 +100,7 @@ func TestInteractionFailuresPanicsAndObserverErrorsFinalizeOnce(t *testing.T) {
 		contains  string
 	}{
 		{"broker failure", &scriptedBroker{err: errors.New("declined")}, nil, "declined"},
+		{"broker cancellation sentinel without cancellation", &scriptedBroker{err: context.Canceled}, nil, "context canceled"},
 		{"broker panic", &scriptedBroker{panicAt: true}, nil, "broker panic"},
 		{"observer failure", &scriptedBroker{}, []event.Observer{failingObserver{event.InteractionStarted}}, "observer"},
 	} {

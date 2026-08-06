@@ -19,6 +19,8 @@ import (
 	"github.com/spice-framework/spice-agent/tool"
 )
 
+const testSnapshotCompatibility = "tests:v1"
+
 type scriptedProvider struct {
 	mu       sync.Mutex
 	scripts  [][]model.StreamEvent
@@ -90,6 +92,28 @@ type testTool struct {
 	panicAt      bool
 	problem      string
 	executionErr error
+}
+
+type reportThenFailTool struct {
+	failure *tool.ExecutionError
+}
+
+func (reportThenFailTool) Definition() tool.Definition {
+	definition, _ := tool.NewDefinition(
+		"write", "Write a fixture.", json.RawMessage(`{}`),
+		tool.EffectMutating, tool.ReplayUnsafe, tool.CapabilityFilesystemWrite,
+	)
+	return definition
+}
+
+func (implementation reportThenFailTool) Execute(
+	ctx context.Context,
+	call tool.Call,
+	reporter tool.Reporter,
+) (tool.Result, error) {
+	progress, _ := tool.NewProgress(call.ID(), "committing")
+	_ = reporter.Report(ctx, progress)
+	return tool.Result{}, implementation.failure
 }
 
 func (testTool) Definition() tool.Definition {
@@ -236,6 +260,72 @@ func TestEngineDistinguishesModelVisibleToolProblemsFromExecutionFailures(t *tes
 			t.Fatalf("provider request count = %d", len(provider.requests))
 		}
 	})
+
+	t.Run("execution cancellation sentinel without run cancellation fails", func(t *testing.T) {
+		failure, err := tool.NewExecutionError(
+			call.ID(),
+			tool.ExecutionDefinitive,
+			tool.RetryAllowed,
+			context.Canceled,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		provider := &scriptedProvider{scripts: [][]model.StreamEvent{{toolEvent(t, call), completed(t)}}}
+		engine := newEngine(t, provider, map[string]tool.Tool{"read": testTool{executionErr: failure}}, nil, nil)
+		run := startRun(t, engine, 3)
+		events := collect(t, run)
+		if waitErr := run.Wait(t.Context()); !errors.Is(waitErr, context.Canceled) {
+			t.Fatalf("typed tool cancellation cause = %v", waitErr)
+		}
+		counts := countKinds(events)
+		if counts[event.ToolFailed] != 1 || counts[event.RunFailed] != 1 || counts[event.RunCancelled] != 0 {
+			t.Fatalf("sentinel failure terminal events = %v", counts)
+		}
+	})
+}
+
+func TestToolExecutionAndReporterDurabilityFailuresRemainStructured(t *testing.T) {
+	call, _ := tool.NewCall("write-1", "write", json.RawMessage(`{}`))
+	failure, err := tool.NewExecutionError(
+		call.ID(), tool.ExecutionUncertain, tool.RetryNever, errors.New("commit acknowledgement lost"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := &scriptedProvider{scripts: [][]model.StreamEvent{{toolEvent(t, call), completed(t)}}}
+	engine := newEngine(
+		t, provider, map[string]tool.Tool{"write": reportThenFailTool{failure: failure}},
+		[]event.Observer{failingObserver{event.ToolProgress}}, nil,
+	)
+	run := startRun(t, engine, 2)
+	events := collect(t, run)
+	waitErr := run.Wait(t.Context())
+	var combined *stage.DispatchFailure
+	var execution *tool.ExecutionError
+	if !errors.As(waitErr, &combined) || !errors.As(waitErr, &execution) || execution != failure {
+		t.Fatalf("combined execution failure = %T, %v", waitErr, waitErr)
+	}
+	var durability *agent.EmissionError
+	if reporterErr := combined.ReporterFailure(); !errors.As(reporterErr, &durability) ||
+		durability.Kind != event.ToolProgress || !durability.Committed {
+		t.Fatalf("reporter durability failure = %T, %v", reporterErr, reporterErr)
+	}
+	counts := countKinds(events)
+	if counts[event.ToolProgress] != 1 || counts[event.ToolFailed] != 1 ||
+		counts[event.RunFailed] != 1 || counts[event.RunCancelled] != 0 {
+		t.Fatalf("combined failure terminals = %v", counts)
+	}
+	var payload struct {
+		Outcome tool.ExecutionState   `json:"outcome"`
+		Retry   tool.RetryDisposition `json:"retry"`
+	}
+	if err = json.Unmarshal([]byte(eventData(t, events, event.ToolFailed)), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Outcome != tool.ExecutionUncertain || payload.Retry != tool.RetryNever {
+		t.Fatalf("uncertain terminal metadata = %#v", payload)
+	}
 }
 
 func TestEngineRejectsDuplicateToolCallsBeforeRedispatch(t *testing.T) {
@@ -583,9 +673,14 @@ func TestEngineRejectsInvalidConstructionAndContexts(t *testing.T) {
 		t.Fatal("duplicate metadata allowlist succeeded")
 	}
 	options = agent.DefaultEngineOptions()
-	options.StaticPlanIdentities = []string{"invalid"}
+	options.CompiledPlanIdentities = []string{"invalid"}
 	if _, err := agent.NewEngineWithOptions(provider, dispatcher, ids, time.Now, nil, nil, options); err == nil {
 		t.Fatal("invalid static plan identity succeeded")
+	}
+	options = agent.DefaultEngineOptions()
+	options.SnapshotCompatibilityIdentity = " invalid "
+	if _, err := agent.NewEngineWithOptions(provider, dispatcher, ids, time.Now, nil, nil, options); err == nil {
+		t.Fatal("invalid snapshot compatibility identity succeeded")
 	}
 	limited, err := agent.NewEngineWithLimits(provider, dispatcher, ids, time.Now, nil, nil, event.DefaultLogLimits())
 	if err != nil {
@@ -659,7 +754,12 @@ func newEngine(t *testing.T, provider model.Provider, tools map[string]tool.Tool
 	if err != nil {
 		t.Fatal(err)
 	}
-	engine, err := agent.NewEngine(provider, dispatcher, &agent.AtomicIDSource{}, func() time.Time { return time.Unix(1, 0).UTC() }, observers, bestEffort)
+	options := agent.DefaultEngineOptions()
+	options.SnapshotCompatibilityIdentity = testSnapshotCompatibility
+	engine, err := agent.NewEngineWithOptions(
+		provider, dispatcher, &agent.AtomicIDSource{},
+		func() time.Time { return time.Unix(1, 0).UTC() }, observers, bestEffort, options,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

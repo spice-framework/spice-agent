@@ -41,6 +41,16 @@ cancellation is cooperative; the kernel cannot force a function that ignores
 context to return. Panics are contained at provider, stream, dispatcher, and
 engine boundaries and normalized into terminal failure.
 
+Each run acquires a `ToolPlanLease` after input validation and before ID
+allocation or event mutation. The host snapshots definitions; the trusted
+source guarantees stable executable behavior under a non-reusable `PlanID`.
+All model requests and calls for that run use the leased dispatcher. Generated
+compiled compatibility is checked before exact-plan resume and import mutation.
+Release callbacks are non-blocking reference decrements; source draining is
+asynchronous. The engine nevertheless bounds release, and timeout or failure
+forces the single authoritative `RunFailed` event, snapshot status, and `Wait`
+result.
+
 All executable tools traverse one injected `ToolDispatcher`. The dispatcher
 publishes an immutable capability/definition snapshot and validates active call
 and progress correlation. Definitions explicitly classify external-state
@@ -57,6 +67,17 @@ are rejected. The error distinguishes a definitive
 failure from an uncertain mutation outcome and supplies validated retry advice.
 The dispatcher rejects untyped, uncorrelated, contradictory, or result-plus-error
 outcomes and preserves `errors.Is` cancellation/deadline semantics.
+A successfully returned, valid correlated result remains authoritative when
+cancellation races after tool commit. Conversely, an extension returning a
+cancellation sentinel while the run context remains active is an ordinary run
+failure; lifecycle cancellation is derived only from authoritative context
+state.
+
+`Tool.Execute` itself must return exactly one direct `ExecutionError`. If a
+progress reporter also failed, the dispatcher returns a bounded structured
+`stage.DispatchFailure`: ordinary unwrapping reaches only the authoritative
+execution outcome, while `ReporterFailure` exposes required-observer durability
+for explicit two-step inspection without contaminating `errors.Is` cancellation.
 
 Local event commit precedes required-observer acknowledgement. Once committed,
 a sequence is never reused even if an observer reports failure. Bounded terminal

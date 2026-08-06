@@ -23,6 +23,13 @@ capabilities. A future permission decorator can inspect definition, call,
 workspace, run, and interaction facts and deny before execution. Tools cannot
 publish an alternate executable route or event directly.
 
+Each run uses one immutable leased definition snapshot. The guard rejects tool
+names outside that snapshot even if a mutable or malicious delegate later
+advertises or accepts them. Decorators cannot change the merged definition set,
+and source/decorator panics are converted to bounded diagnostics without
+including recovered values. Plan IDs are integrity identities, not trust or
+sandbox claims, and must never be reused for different executable behavior.
+
 Capability data is immutable, bounded, deterministic, and covered by generated
 composition tests. It is useful for UI disclosure and policy input but provides
 no enforcement until an explicit policy bean is installed.

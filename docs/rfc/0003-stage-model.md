@@ -25,6 +25,11 @@ one `ToolDispatcher`. The dispatcher owns a canonical map built from
 definitions for each model request, enforces call/progress correlation, contains
 panics, and preserves cancellation. Policy, telemetry, retry, and runtime-plugin
 support are ordered typed dispatcher decorators.
+`ApplyToolDispatchDecorators` applies the already Spice-ordered collection to
+the merged dispatcher: the first decorator is outermost. Nil, panicking,
+nil-returning, and definition-changing decorators fail construction. Every
+wrapper is guarded by the same immutable definition snapshot, so it cannot
+dispatch an undeclared tool.
 
 Each definition has mandatory `Effect` (`read_only` or `mutating`) and
 `ReplaySafety` (`safe`, `idempotent`, or `unsafe`) metadata. Capabilities are an
@@ -46,6 +51,10 @@ uncertain outcomes from read-only tools, and retry advice for replay-unsafe
 tools. Uncertain outcomes always prohibit retry. Accepted typed errors are
 returned without replacing their error chain, so cancellation remains
 discoverable through `errors.Is`.
+When progress reporting and execution both fail, the dispatcher returns one
+generic-text `DispatchFailure`. Its normal unwrap path contains only the
+validated execution failure; reporter durability is available explicitly via
+`ReporterFailure` and cannot inject a cancellation sentinel into `errors.Is`.
 
 ## Annotation mapping
 
@@ -62,10 +71,18 @@ contributions.
 
 ## Dynamic tools
 
-The compiled graph may contain one runtime-plugin-backed tool source/dispatcher
-decorator. It leases an immutable plugin generation when a run begins and
-contributes its advertised tool definitions to that run's execution-plan
-snapshot. Dynamic tools do not add compiled stages or mutate static DI.
+The compiled graph may contain one runtime-plugin-backed `ToolPlanSource`. A
+source leases either its current immutable plan for a new run or one exact
+`PlanID` for snapshot recovery. A lease owns a dispatcher, canonical defensive
+copies of its definitions, and an idempotent observable release. An ID must
+never be reused for changed definitions or behavior. The kernel validates
+source results, releases a lease returned alongside an error or wrong ID, and
+contains source/decorator/definition panics without exposing recovered text.
+`StaticToolPlanSource` adapts an ordinary compiled dispatcher for embedded
+applications. The source—not Go structural copying—guarantees behavior remains
+stable while leased. Release callbacks only decrement references and must not
+block; drain and process shutdown are source-owned asynchronous work. Dynamic
+tools do not add compiled stages or mutate static DI.
 
 ## Rejected alternatives
 

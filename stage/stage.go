@@ -32,6 +32,44 @@ type ToolDispatchDecorator interface {
 	Wrap(ToolDispatcher) ToolDispatcher
 }
 
+// DispatchFailure preserves both a valid tool execution outcome and a progress
+// reporter failure without joining their potentially sensitive text. It occurs
+// only when both failures happen in one dispatch.
+type DispatchFailure struct {
+	execution *tool.ExecutionError
+	reporter  error
+}
+
+func (failure *DispatchFailure) Error() string {
+	return "tool execution and progress reporting both failed"
+}
+
+// Unwrap preserves execution errors.Is/errors.As inspection. Reporter failures
+// are excluded from errors.Is so a reporter cancellation sentinel cannot
+// misclassify the execution lifecycle.
+func (failure *DispatchFailure) Unwrap() error {
+	if failure == nil {
+		return nil
+	}
+	return failure.execution
+}
+
+// ExecutionFailure returns the validated correlated execution failure.
+func (failure *DispatchFailure) ExecutionFailure() *tool.ExecutionError {
+	if failure == nil {
+		return nil
+	}
+	return failure.execution
+}
+
+// ReporterFailure returns the reporter rejection for structured inspection.
+func (failure *DispatchFailure) ReporterFailure() error {
+	if failure == nil {
+		return nil
+	}
+	return failure.reporter
+}
+
 type toolEntry struct {
 	definition     tool.Definition
 	implementation tool.Tool
@@ -112,15 +150,15 @@ func (dispatcher *Dispatcher) Dispatch(ctx context.Context, call tool.Call, repo
 	if executionErr != nil {
 		validated := validateExecutionError(call, entry.definition, result, executionErr)
 		if reporterErr != nil {
-			return tool.Result{}, errors.Join(validated, reporterErr)
+			//nolint:errorlint // The exact boundary type was enforced by validateExecutionError.
+			if failure, typed := validated.(*tool.ExecutionError); typed {
+				return tool.Result{}, &DispatchFailure{execution: failure, reporter: reporterErr}
+			}
 		}
 		return tool.Result{}, validated
 	}
 	if reporterErr != nil {
 		return tool.Result{}, reporterErr
-	}
-	if err := ctx.Err(); err != nil {
-		return tool.Result{}, err
 	}
 	if err := result.Validate(); err != nil {
 		return tool.Result{}, fmt.Errorf("validate tool %q result: %w", call.Name(), err)

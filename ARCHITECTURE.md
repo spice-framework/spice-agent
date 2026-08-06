@@ -15,6 +15,12 @@ MCP, Git, indexing, TUI code, subagents, or distributed scheduling.
 
 Runtime plugins are the sole dynamic graph. A run leases one immutable plugin
 generation; activation never changes existing runs and never alters compiled DI.
+The kernel expresses this boundary generically as `stage.ToolPlanSource` and
+`stage.ToolPlanLease`; it has no plugin process or protocol knowledge. Existing
+embedded constructors use `StaticToolPlanSource`, preserving direct-call Go.
+Ordered dispatcher decorators are applied once to a merged dispatcher and must
+preserve its snapshotted definition set. A leased dispatcher rejects any call
+not present in that snapshot.
 
 `annotation/agent` exposes `@Stage`, `@Tool`, and `@ModelProvider`. Their typed
 handlers return only Spice's generic provider and bean-metadata contributions.
@@ -65,5 +71,20 @@ infrastructure failures are bounded correlated `tool.ExecutionError` values.
 An uncertain mutating outcome is distinct from a definitive failure and can
 never authorize automatic replay. These contracts are kernel-owned and apply
 equally to compiled and future runtime-plugin tools.
+
+The engine acquires a tool plan only after public input validation and before
+ID allocation, event-log mutation, or execution. It releases the lease exactly
+once on every rollback and terminal path. Release precedes run-terminal
+persistence, making cleanup failure part of the single authoritative terminal
+state. Cancellation classification comes from the run/request context, not an
+arbitrary error cause returned by an extension.
+
+Generated engines provide one semantic `SnapshotCompatibilityIdentity` and
+compiled identities for every executable provider, stage, observer, broker,
+static tool, and dispatcher decorator bean. Convenience constructors leave the
+compatibility identity empty: runs, local suspend/resume, and snapshot
+inspection work, but cross-engine `ResumeSnapshot` fails closed. A plan source
+is trusted to keep leased behavior immutable and never reuse a `PlanID`; the
+kernel can freeze definitions and guard names, but cannot clone Go behavior.
 
 See `docs/adr/0001-spice-native-composition.md` for the rejected parallel graph.

@@ -31,20 +31,20 @@ type EngineOptions struct {
 	FinalizationTimeout time.Duration
 	// MetadataNamespaces explicitly permits safe provider metadata in events.
 	MetadataNamespaces []string
-	// DynamicGeneration identifies the immutable runtime-plugin generation used by a run.
-	DynamicGeneration string
-	// StaticPlanIdentities names generated provider/stage/observer/broker beans.
-	// Generated callers should include module version and source identity in each
-	// value so resume rejects a semantically different compiled plan.
-	StaticPlanIdentities []string
+	// CompiledPlanIdentities names every executable generated provider, stage,
+	// observer, broker, static tool, and dispatcher decorator bean. Generated
+	// callers include module version and source identity in each value.
+	CompiledPlanIdentities []string
+	// SnapshotCompatibilityIdentity is an explicit compiler-generated semantic
+	// identity for portable snapshot import. Empty disables Engine.ResumeSnapshot.
+	SnapshotCompatibilityIdentity string
 }
 
 // DefaultEngineOptions returns conservative architecture-proof bounds.
 func DefaultEngineOptions() EngineOptions {
 	return EngineOptions{
 		LogLimits: event.DefaultLogLimits(), FinalizationTimeout: defaultFinalizationTimeout,
-		DynamicGeneration:    "none",
-		StaticPlanIdentities: []string{"broker:injected", "provider:injected", "stage:kernel"},
+		CompiledPlanIdentities: []string{"broker:injected", "provider:injected", "stage:kernel"},
 	}
 }
 
@@ -147,18 +147,18 @@ func NewInput(initial message.Message) (Input, error) {
 // Close drains cooperative runs; Shutdown cancels them. Neither method can
 // forcibly stop a trusted in-process provider or tool that ignores context.
 type Engine struct {
-	provider             model.Provider
-	dispatcher           stage.ToolDispatcher
-	ids                  IDSource
-	clock                func() time.Time
-	observers            []event.Observer
-	bestEffort           []*event.BestEffortObserver
-	logLimits            event.LogLimits
-	finalizationTimeout  time.Duration
-	metadataNamespaces   map[string]struct{}
-	dynamicGeneration    string
-	broker               interaction.Broker
-	staticPlanIdentities []string
+	provider              model.Provider
+	toolPlans             stage.ToolPlanSource
+	ids                   IDSource
+	clock                 func() time.Time
+	observers             []event.Observer
+	bestEffort            []*event.BestEffortObserver
+	logLimits             event.LogLimits
+	finalizationTimeout   time.Duration
+	metadataNamespaces    map[string]struct{}
+	broker                interaction.Broker
+	compiledPlan          []string
+	snapshotCompatibility string
 
 	mu      sync.Mutex
 	closed  bool
@@ -184,13 +184,53 @@ func NewEngineWithOptions(provider model.Provider, dispatcher stage.ToolDispatch
 	return NewEngineWithInteractionBroker(provider, dispatcher, interaction.UnavailableBroker{}, ids, clock, observers, bestEffort, options)
 }
 
+// NewEngineWithToolPlanSource constructs an engine whose future runs lease the
+// source's current immutable tool generation.
+func NewEngineWithToolPlanSource(
+	provider model.Provider,
+	toolPlans stage.ToolPlanSource,
+	ids IDSource,
+	clock func() time.Time,
+	observers []event.Observer,
+	bestEffort []*event.BestEffortObserver,
+	options EngineOptions,
+) (*Engine, error) {
+	return NewEngineWithToolPlanSourceAndInteractionBroker(
+		provider, toolPlans, interaction.UnavailableBroker{}, ids, clock, observers, bestEffort, options,
+	)
+}
+
 // NewEngineWithInteractionBroker constructs an engine with a UI-neutral broker.
 func NewEngineWithInteractionBroker(provider model.Provider, dispatcher stage.ToolDispatcher, broker interaction.Broker, ids IDSource, clock func() time.Time, observers []event.Observer, bestEffort []*event.BestEffortObserver, options EngineOptions) (*Engine, error) {
+	if dispatcher == nil {
+		return nil, errors.New("agent engine requires a tool dispatcher")
+	}
+	toolPlans, err := stage.NewStaticToolPlanSource(dispatcher)
+	if err != nil {
+		return nil, fmt.Errorf("agent static tool plan: %w", err)
+	}
+	return NewEngineWithToolPlanSourceAndInteractionBroker(
+		provider, toolPlans, broker, ids, clock, observers, bestEffort, options,
+	)
+}
+
+// NewEngineWithToolPlanSourceAndInteractionBroker constructs the full kernel
+// boundary with a per-run tool plan source and UI-neutral broker.
+func NewEngineWithToolPlanSourceAndInteractionBroker(
+	provider model.Provider,
+	toolPlans stage.ToolPlanSource,
+	broker interaction.Broker,
+	ids IDSource,
+	clock func() time.Time,
+	observers []event.Observer,
+	bestEffort []*event.BestEffortObserver,
+	options EngineOptions,
+) (*Engine, error) {
 	if provider == nil {
 		return nil, errors.New("agent engine requires a model provider")
 	}
-	if dispatcher == nil {
-		return nil, errors.New("agent engine requires a tool dispatcher")
+	if toolPlans == nil {
+		return nil, errors.New("agent engine requires a tool plan source")
 	}
 	if broker == nil {
 		return nil, errors.New("agent engine requires an interaction broker")
@@ -224,11 +264,11 @@ func NewEngineWithInteractionBroker(provider model.Provider, dispatcher stage.To
 		}
 		metadataNamespaces[namespace] = struct{}{}
 	}
-	if err := snapshotToken("dynamic generation", options.DynamicGeneration, 256); err != nil {
+	compiledPlan, err := buildCompiledPlan(options.CompiledPlanIdentities)
+	if err != nil {
 		return nil, err
 	}
-	staticPlan, err := buildStaticPlan(options.StaticPlanIdentities, dispatcher.Definitions())
-	if err != nil {
+	if err = validateSnapshotCompatibilityIdentity(options.SnapshotCompatibilityIdentity); err != nil {
 		return nil, err
 	}
 	probe, err := event.NewLog("validation", options.LogLimits)
@@ -239,14 +279,14 @@ func NewEngineWithInteractionBroker(provider model.Provider, dispatcher stage.To
 	drained := make(chan struct{})
 	close(drained)
 	return &Engine{
-		provider: provider, dispatcher: dispatcher, ids: ids, clock: clock,
+		provider: provider, toolPlans: toolPlans, ids: ids, clock: clock,
 		observers: append([]event.Observer(nil), observers...), bestEffort: append([]*event.BestEffortObserver(nil), bestEffort...),
 		logLimits: options.LogLimits, finalizationTimeout: options.FinalizationTimeout,
-		metadataNamespaces:   metadataNamespaces,
-		dynamicGeneration:    options.DynamicGeneration,
-		broker:               broker,
-		staticPlanIdentities: staticPlan,
-		active:               make(map[string]*Run), seen: make(map[string]struct{}), drained: drained,
+		metadataNamespaces:    metadataNamespaces,
+		broker:                broker,
+		compiledPlan:          compiledPlan,
+		snapshotCompatibility: options.SnapshotCompatibilityIdentity,
+		active:                make(map[string]*Run), seen: make(map[string]struct{}), drained: drained,
 	}, nil
 }
 
@@ -267,13 +307,14 @@ type Run struct {
 
 	stateMu            sync.Mutex
 	definition         Definition
+	dispatcher         stage.ToolDispatcher
+	planLease          *stage.ToolPlanLease
+	planIdentity       PlanIdentity
 	history            []message.Message
 	completedTurns     uint32
 	status             LifecycleStatus
 	started            bool
 	lastSequence       uint64
-	staticPlan         []string
-	dynamicGeneration  string
 	suspendRequested   bool
 	suspendWaiter      chan error
 	resumeSignal       chan struct{}
@@ -284,6 +325,22 @@ type Run struct {
 }
 
 func (run *Run) ID() string { return run.id }
+
+// PlanIdentity returns the immutable compiled and leased execution identity.
+func (run *Run) PlanIdentity() PlanIdentity {
+	if run == nil {
+		return PlanIdentity{}
+	}
+	return run.planIdentity.clone()
+}
+
+// ToolPlanID returns the exact leased tool generation.
+func (run *Run) ToolPlanID() stage.PlanID {
+	if run == nil {
+		return ""
+	}
+	return run.planIdentity.ToolPlanID()
+}
 
 // Subscribe creates an independent gap-free replay/tail cursor.
 func (run *Run) Subscribe(ctx context.Context, afterSequence uint64) (*event.Subscription, error) {
@@ -404,8 +461,8 @@ func (run *Run) ExportSnapshot() (Snapshot, error) {
 		return Snapshot{}, &UnsafeSnapshotError{Status: run.status, ActiveInteractions: len(run.activeInteractions)}
 	}
 	return newSnapshot(
-		run.id, run.definition, run.completedTurns, run.history, run.staticPlan,
-		run.dynamicGeneration, slices.Sorted(maps.Keys(run.seenInteractions)),
+		run.id, run.definition, run.completedTurns, run.history, run.planIdentity,
+		slices.Sorted(maps.Keys(run.seenInteractions)),
 		run.lastSequence, run.status,
 	)
 }
@@ -440,7 +497,7 @@ func (run *Run) Interact(ctx context.Context, request interaction.Request) (inte
 	stop()
 	cancel()
 	if err != nil {
-		kind := run.interactionFailureKind(ctx, err)
+		kind := run.interactionFailureKind(ctx)
 		return interaction.Response{}, errors.Join(err, run.emitter.interactionFailure(ctx, kind, request.ID()))
 	}
 	if err = response.Validate(); err != nil {
@@ -452,7 +509,7 @@ func (run *Run) Interact(ctx context.Context, request interaction.Request) (inte
 	}
 	if err = run.emitter.emit(ctx, event.InteractionCompleted, map[string]string{"id": string(response.ID())}); err != nil {
 		if !committed(err) {
-			kind := run.interactionFailureKind(ctx, err)
+			kind := run.interactionFailureKind(ctx)
 			return interaction.Response{}, errors.Join(err, run.emitter.interactionFailure(ctx, kind, request.ID()))
 		}
 		return interaction.Response{}, err
@@ -460,8 +517,8 @@ func (run *Run) Interact(ctx context.Context, request interaction.Request) (inte
 	return response.Clone(), nil
 }
 
-func (run *Run) interactionFailureKind(ctx context.Context, err error) event.Kind {
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || run.ctx.Err() != nil || ctx.Err() != nil {
+func (run *Run) interactionFailureKind(ctx context.Context) event.Kind {
+	if run.ctx.Err() != nil || ctx.Err() != nil {
 		return event.InteractionCancelled
 	}
 	return event.InteractionFailed
@@ -509,22 +566,33 @@ func (engine *Engine) Start(ctx context.Context, definition Definition, input In
 	if _, err := NewInput(input.message); err != nil {
 		return nil, err
 	}
+	if engine.isClosed() {
+		return nil, errors.New("agent engine is closed")
+	}
+	lease, err := leaseCurrentToolPlan(ctx, engine.toolPlans, engine.finalizationTimeout)
+	if err != nil {
+		return nil, err
+	}
+	planIdentity, err := newPlanIdentity(engine.compiledPlan, engine.snapshotCompatibility, lease)
+	if err != nil {
+		return nil, releaseLeaseOnRollback(lease, err, engine.finalizationTimeout)
+	}
 	runID, err := engine.ids.Next("run")
 	if err != nil {
-		return nil, fmt.Errorf("allocate run ID: %w", err)
+		return nil, releaseLeaseOnRollback(lease, fmt.Errorf("allocate run ID: %w", err), engine.finalizationTimeout)
 	}
 	if err = snapshotToken("run ID", runID, 96); err != nil {
-		return nil, err
+		return nil, releaseLeaseOnRollback(lease, err, engine.finalizationTimeout)
 	}
 	log, err := event.NewLog(runID, engine.logLimits)
 	if err != nil {
-		return nil, err
+		return nil, releaseLeaseOnRollback(lease, err, engine.finalizationTimeout)
 	}
 	runContext, cancel := context.WithCancel(ctx)
 	run := &Run{
 		id: runID, log: log, done: make(chan struct{}), cancel: cancel, engine: engine, ctx: runContext,
-		definition: definition, history: []message.Message{input.message.Clone()}, staticPlan: engine.staticPlan(),
-		dynamicGeneration: engine.dynamicGeneration, activeInteractions: make(map[interaction.ID]struct{}),
+		definition: definition, dispatcher: lease.Dispatcher(), planLease: lease, planIdentity: planIdentity,
+		history: []message.Message{input.message.Clone()}, activeInteractions: make(map[interaction.ID]struct{}),
 		seenInteractions: make(map[interaction.ID]struct{}),
 		messageIDs:       map[message.ID]struct{}{input.message.ID(): {}},
 	}
@@ -534,13 +602,15 @@ func (engine *Engine) Start(ctx context.Context, definition Definition, input In
 		engine.mu.Unlock()
 		cancel()
 		log.Close()
-		return nil, errors.New("agent engine is closed")
+		return nil, releaseLeaseOnRollback(lease, errors.New("agent engine is closed"), engine.finalizationTimeout)
 	}
 	if _, duplicate := engine.seen[runID]; duplicate {
 		engine.mu.Unlock()
 		cancel()
 		log.Close()
-		return nil, fmt.Errorf("agent ID source returned duplicate run ID %q", runID)
+		return nil, releaseLeaseOnRollback(
+			lease, fmt.Errorf("agent ID source returned duplicate run ID %q", runID), engine.finalizationTimeout,
+		)
 	}
 	if len(engine.active) == 0 {
 		engine.drained = make(chan struct{})
@@ -552,37 +622,122 @@ func (engine *Engine) Start(ctx context.Context, definition Definition, input In
 	return run, nil
 }
 
-func (engine *Engine) staticPlan() []string {
-	return append([]string(nil), engine.staticPlanIdentities...)
+func (engine *Engine) isClosed() bool {
+	engine.mu.Lock()
+	defer engine.mu.Unlock()
+	return engine.closed
 }
 
-func buildStaticPlan(configured []string, tools []tool.Definition) ([]string, error) {
+func buildCompiledPlan(configured []string) ([]string, error) {
 	result := append([]string(nil), configured...)
-	for _, definition := range tools {
-		result = append(result, "tool:"+definition.Name()+"@"+definition.Fingerprint())
-	}
 	slices.Sort(result)
-	if len(result) == 0 {
-		return nil, errors.New("agent static plan must contain generated bean identities")
-	}
-	for index, identity := range result {
-		if err := snapshotToken("static plan identity", identity, 256); err != nil {
-			return nil, err
-		}
-		category, name, found := strings.Cut(identity, ":")
-		if !found || name == "" {
-			return nil, fmt.Errorf("agent static plan identity %q must use category:name", identity)
-		}
-		switch category {
-		case "provider", "stage", "observer", "broker", "tool":
-		default:
-			return nil, fmt.Errorf("agent static plan identity %q has unsupported category", identity)
-		}
-		if index > 0 && result[index-1] == identity {
-			return nil, fmt.Errorf("agent static plan identity %q is duplicated", identity)
-		}
+	if err := validateCompiledPlan(result); err != nil {
+		return nil, err
 	}
 	return result, nil
+}
+
+func leaseCurrentToolPlan(
+	ctx context.Context,
+	source stage.ToolPlanSource,
+	releaseTimeout time.Duration,
+) (*stage.ToolPlanLease, error) {
+	lease, err := safeLeaseCurrent(ctx, source)
+	lease, err = validateAcquiredLease(lease, err, "current", releaseTimeout)
+	if err != nil {
+		return nil, err
+	}
+	if err = ctx.Err(); err != nil {
+		return nil, releaseLeaseOnRollback(lease, err, releaseTimeout)
+	}
+	return lease, nil
+}
+
+func leaseToolPlanGeneration(
+	ctx context.Context,
+	source stage.ToolPlanSource,
+	id stage.PlanID,
+	releaseTimeout time.Duration,
+) (*stage.ToolPlanLease, error) {
+	lease, err := safeLeaseGeneration(ctx, source, id)
+	lease, err = validateAcquiredLease(lease, err, id.String(), releaseTimeout)
+	if err != nil {
+		return nil, err
+	}
+	if err = ctx.Err(); err != nil {
+		return nil, releaseLeaseOnRollback(lease, err, releaseTimeout)
+	}
+	if lease.ToolPlanID() != id {
+		return nil, releaseLeaseOnRollback(
+			lease,
+			fmt.Errorf("tool plan source returned generation %q for requested %q", lease.ToolPlanID(), id),
+			releaseTimeout,
+		)
+	}
+	return lease, nil
+}
+
+func safeLeaseCurrent(
+	ctx context.Context,
+	source stage.ToolPlanSource,
+) (lease *stage.ToolPlanLease, err error) {
+	defer func() {
+		if recover() != nil {
+			lease = nil
+			err = errors.New("tool plan source LeaseCurrent panicked")
+		}
+	}()
+	return source.LeaseCurrent(ctx)
+}
+
+func safeLeaseGeneration(
+	ctx context.Context,
+	source stage.ToolPlanSource,
+	id stage.PlanID,
+) (lease *stage.ToolPlanLease, err error) {
+	defer func() {
+		if recover() != nil {
+			lease = nil
+			err = errors.New("tool plan source LeaseGeneration panicked")
+		}
+	}()
+	return source.LeaseGeneration(ctx, id)
+}
+
+func validateAcquiredLease(
+	lease *stage.ToolPlanLease,
+	acquireErr error,
+	description string,
+	releaseTimeout time.Duration,
+) (*stage.ToolPlanLease, error) {
+	if acquireErr != nil {
+		if lease != nil {
+			return nil, releaseLeaseOnRollback(
+				lease,
+				fmt.Errorf("tool plan source returned generation and error for %s acquisition", description),
+				releaseTimeout,
+			)
+		}
+		return nil, fmt.Errorf("lease tool plan %s: %w", description, acquireErr)
+	}
+	if lease == nil {
+		return nil, fmt.Errorf("tool plan source returned nil for %s acquisition", description)
+	}
+	if err := lease.Validate(); err != nil {
+		return nil, releaseLeaseOnRollback(
+			lease, fmt.Errorf("validate tool plan %s: %w", description, err), releaseTimeout,
+		)
+	}
+	return lease, nil
+}
+
+func releaseLeaseOnRollback(lease *stage.ToolPlanLease, cause error, timeout time.Duration) error {
+	releaseContext, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	if releaseErr := lease.ReleaseContext(releaseContext); releaseErr != nil {
+		return errors.Join(cause, fmt.Errorf("release rolled-back tool plan: %w", releaseErr))
+	}
+	return cause
 }
 
 // ResumeSnapshot imports an exclusively owned suspended snapshot. Callers must
@@ -603,22 +758,43 @@ func (engine *Engine) ResumeSnapshot(ctx context.Context, snapshot Snapshot) (*R
 	if snapshot.status != LifecycleSuspended {
 		return nil, &UnsafeSnapshotError{Status: snapshot.status}
 	}
-	if !slices.Equal(snapshot.staticPlan, engine.staticPlan()) {
-		return nil, errors.New("agent snapshot static plan does not match the constructed engine")
+	if engine.isClosed() {
+		return nil, errors.New("agent engine is closed")
 	}
-	if snapshot.dynamicGeneration != engine.dynamicGeneration {
-		return nil, errors.New("agent snapshot dynamic generation does not match the constructed engine")
+	if engine.snapshotCompatibility == "" {
+		return nil, errors.New("agent engine snapshot import requires an explicit generated compatibility identity")
+	}
+	if snapshot.planIdentity.SnapshotCompatibilityIdentity() != engine.snapshotCompatibility ||
+		!slices.Equal(snapshot.planIdentity.CompiledIdentities(), engine.compiledPlan) {
+		return nil, errors.New("agent snapshot compiled compatibility does not match the constructed engine")
+	}
+	lease, err := leaseToolPlanGeneration(
+		ctx, engine.toolPlans, snapshot.planIdentity.ToolPlanID(), engine.finalizationTimeout,
+	)
+	if err != nil {
+		return nil, err
+	}
+	planIdentity, err := newPlanIdentity(engine.compiledPlan, engine.snapshotCompatibility, lease)
+	if err != nil {
+		return nil, releaseLeaseOnRollback(lease, err, engine.finalizationTimeout)
+	}
+	if !snapshot.planIdentity.equal(planIdentity) {
+		return nil, releaseLeaseOnRollback(
+			lease,
+			errors.New("agent snapshot plan identity does not match the leased engine plan"),
+			engine.finalizationTimeout,
+		)
 	}
 	log, err := event.NewLogAfter(snapshot.runID, snapshot.lastSequence, engine.logLimits)
 	if err != nil {
-		return nil, err
+		return nil, releaseLeaseOnRollback(lease, err, engine.finalizationTimeout)
 	}
 	runContext, cancel := context.WithCancel(ctx)
 	run := &Run{
 		id: snapshot.runID, log: log, done: make(chan struct{}), cancel: cancel, engine: engine, ctx: runContext,
 		definition: snapshot.definition, history: cloneHistory(snapshot.history), completedTurns: snapshot.completedTurns,
 		status: runStatusRunning, started: true, lastSequence: snapshot.lastSequence,
-		staticPlan: append([]string(nil), snapshot.staticPlan...), dynamicGeneration: snapshot.dynamicGeneration,
+		dispatcher: lease.Dispatcher(), planLease: lease, planIdentity: planIdentity,
 		activeInteractions: make(map[interaction.ID]struct{}),
 		seenInteractions:   interactionIDSet(snapshot.interactionIDs),
 		messageIDs:         snapshotMessageIDs(snapshot.history),
@@ -629,13 +805,15 @@ func (engine *Engine) ResumeSnapshot(ctx context.Context, snapshot Snapshot) (*R
 		engine.mu.Unlock()
 		cancel()
 		log.Close()
-		return nil, errors.New("agent engine is closed")
+		return nil, releaseLeaseOnRollback(lease, errors.New("agent engine is closed"), engine.finalizationTimeout)
 	}
 	if _, duplicate := engine.seen[run.id]; duplicate {
 		engine.mu.Unlock()
 		cancel()
 		log.Close()
-		return nil, fmt.Errorf("agent snapshot run ID %q was already imported", run.id)
+		return nil, releaseLeaseOnRollback(
+			lease, fmt.Errorf("agent snapshot run ID %q was already imported", run.id), engine.finalizationTimeout,
+		)
 	}
 	if len(engine.active) == 0 {
 		engine.drained = make(chan struct{})
@@ -700,6 +878,16 @@ func (engine *Engine) executeState(ctx context.Context, run *Run, definition Def
 			terminalKind = event.RunFailed
 		}
 		run.beginFinalization()
+		releaseContext, releaseCancel := context.WithTimeout(context.WithoutCancel(ctx), engine.finalizationTimeout)
+		releaseErr := run.planLease.ReleaseContext(releaseContext)
+		releaseCancel()
+		if releaseErr != nil {
+			runErr = errors.Join(
+				runErr,
+				fmt.Errorf("release tool plan %q: %w", run.ToolPlanID(), releaseErr),
+			)
+			terminalKind = event.RunFailed
+		}
 		var terminalErr error
 		terminalCommitted := false
 		if runStarted {
@@ -727,7 +915,7 @@ func (engine *Engine) executeState(ctx context.Context, run *Run, definition Def
 		if err != nil {
 			runErr = err
 			terminalKind = event.RunFailed
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			if ctx.Err() != nil {
 				terminalKind = event.RunCancelled
 			}
 			return
@@ -739,7 +927,7 @@ func (engine *Engine) executeState(ctx context.Context, run *Run, definition Def
 		if err = run.suspendAtBoundary(ctx); err != nil {
 			runErr = err
 			terminalKind = event.RunFailed
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			if ctx.Err() != nil {
 				terminalKind = event.RunCancelled
 			}
 			return
@@ -757,7 +945,7 @@ func (engine *Engine) executeTurn(ctx context.Context, emitter *runEmitter, defi
 		return false, err
 	}
 	operationID := emitter.run.id + "/model/" + strconv.FormatUint(uint64(turn), 10)
-	request, err := model.NewRequest(model.OperationID(operationID), definition.model, *history, engine.definitions())
+	request, err := model.NewRequest(model.OperationID(operationID), definition.model, *history, emitter.run.dispatcher.Definitions())
 	if err != nil {
 		return false, errors.Join(err, emitter.turnFailure(ctx, err))
 	}
@@ -802,10 +990,6 @@ func (engine *Engine) executeTurn(ctx context.Context, emitter *runEmitter, defi
 		return false, err
 	}
 	return false, nil
-}
-
-func (engine *Engine) definitions() []tool.Definition {
-	return engine.dispatcher.Definitions()
 }
 
 func consumeStream(ctx context.Context, emitter *runEmitter, stream model.Stream) (textResult string, callsResult []tool.Call, usageResult model.Usage, metadataResult []model.Metadata, returnErr error) {
@@ -958,7 +1142,7 @@ func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, 
 			}
 			return err
 		}
-		result, dispatchErr := safeDispatch(ctx, engine.dispatcher, call, emitter)
+		result, dispatchErr := safeDispatch(ctx, emitter.run.dispatcher, call, emitter)
 		if dispatchErr != nil {
 			return errors.Join(dispatchErr, emitter.toolFailure(ctx, call, dispatchErr))
 		}
@@ -968,7 +1152,7 @@ func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, 
 			terminalKind = event.ToolFailed
 		}
 		payload := toolTerminalPayload{CallID: string(call.ID()), Name: call.Name(), Error: problem}
-		if err = emitter.emit(ctx, terminalKind, payload); err != nil {
+		if err = emitter.toolTerminal(ctx, terminalKind, payload); err != nil {
 			return err
 		}
 		part, partErr := message.ToolResult(string(call.ID()), call.Name(), result.Content())
@@ -1215,8 +1399,7 @@ func (emitter *runEmitter) toolFailure(ctx context.Context, call tool.Call, err 
 		Name:   call.Name(),
 		Error:  boundedToolFailureMessage(err),
 	}
-	//nolint:errorlint // Only a validated top-level failure may supply outcome metadata.
-	if failure, typed := err.(*tool.ExecutionError); typed && failure != nil &&
+	if failure, typed := errors.AsType[*tool.ExecutionError](err); typed && failure != nil &&
 		failure.Validate() == nil && failure.CallID() == call.ID() {
 		payload.Outcome = failure.State()
 		payload.Retry = failure.RetryDisposition()
@@ -1225,6 +1408,19 @@ func (emitter *runEmitter) toolFailure(ctx context.Context, call tool.Call, err 
 	defer cancel()
 	if persistErr := emitter.persist(finalizationContext, event.ToolFailed, payload); persistErr != nil {
 		return &DurabilityError{Kind: event.ToolFailed, Cause: persistErr}
+	}
+	return nil
+}
+
+func (emitter *runEmitter) toolTerminal(
+	ctx context.Context,
+	kind event.Kind,
+	payload toolTerminalPayload,
+) error {
+	finalizationContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), emitter.engine.finalizationTimeout)
+	defer cancel()
+	if persistErr := emitter.persist(finalizationContext, kind, payload); persistErr != nil {
+		return &DurabilityError{Kind: kind, Cause: persistErr}
 	}
 	return nil
 }
@@ -1257,7 +1453,7 @@ func (emitter *runEmitter) modelFailure(ctx context.Context, err error) error {
 		payload.Retryable = operationError.Retryable()
 		payload.BeforeStream = operationError.BeforeStream()
 		payload.Metadata = emitter.engine.filterMetadata(problem.Metadata())
-	} else if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+	} else if ctx.Err() != nil {
 		payload.Code = "cancelled"
 		payload.Message = "model operation was cancelled"
 	}

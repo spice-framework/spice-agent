@@ -58,6 +58,16 @@ automatic approval policy, persistence recovery, MCP, Git automation, indexing,
 telemetry, planning, or production subagent orchestration. Release notes state
 these limitations prominently.
 
+## Preview migration note
+
+The kernel snapshot wire format makes a deliberate pre-release hard cut from
+`spice.agent.snapshot/v1alpha1` to `v1alpha2`. Old snapshots are rejected rather
+than guessed or silently upgraded. `v1alpha2` replaces separate static/dynamic
+fields with `PlanIdentity`, `ToolPlanID`, compiled executable-bean identities,
+and an explicit generated snapshot-compatibility identity. Applications that
+need cross-engine import must regenerate construction with that identity;
+convenience/default engines remain local-resume and inspection only.
+
 ## Verification and evidence
 
 All repository `make verify` gates run on exact release commits. The catalog

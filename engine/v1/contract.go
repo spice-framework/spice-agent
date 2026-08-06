@@ -15,7 +15,7 @@ import (
 
 const (
 	// SnapshotFormat is the only safe kernel snapshot format accepted by v1.
-	SnapshotFormat = "spice.agent.snapshot/v1alpha1"
+	SnapshotFormat = "spice.agent.snapshot/v1alpha2"
 	// MaximumSnapshotBytes matches the bounded kernel snapshot contract.
 	MaximumSnapshotBytes  = 16 << 20
 	maximumJSONBytes      = 1 << 20

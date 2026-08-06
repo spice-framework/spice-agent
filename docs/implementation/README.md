@@ -10,7 +10,7 @@ Repository roadmaps link here and must not duplicate status.
 | 2 — deterministic kernel | Complete for preview | `841edd3`; deterministic lifecycle, interaction, snapshot, race/fuzz proof |
 | 3 — provider and coding tools | In progress | generated cross-repository continuation and opt-in live acceptance |
 | 4 — daemon and TUI | In progress | provisional local protocol baseline; host/reconnect proof pending |
-| 5 — runtime plugins | In progress | execution-outcome prerequisite complete; Go/Python conformance and generation leases pending |
+| 5 — runtime plugins | In progress | execution-outcome and kernel plan-lease prerequisites complete; plugin host/conformance pending |
 | 6 — architecture proof | Planned | signed `v0.1.0-preview.1` distribution |
 | 7 — stress prototypes | Planned | permission, SQLite, alternate UI, two-worker experiments |
 | 8 — stabilization | Planned | external authors and frozen compatibility policy |
@@ -98,6 +98,18 @@ This is a prerequisite shared by compiled and runtime tools; it does not add a
 plugin protocol, dynamic plan source, generation lease, or retry engine. Exact
 acceptance commands are listed in
 [`evidence/phase5-tool-execution.md`](evidence/phase5-tool-execution.md).
+
+## Phase 5.0B immutable tool-plan prerequisite
+
+The kernel now leases one immutable dispatcher generation per run through the
+generic `stage.ToolPlanSource` boundary. Acquisition precedes mutation, snapshot
+resume leases the exact recorded `ToolPlanID`, `PlanIdentity` combines compiled
+bean identities with tool definitions, and release occurs exactly once before
+terminal selection. Static embedded applications retain their existing
+constructors through `StaticToolPlanSource`. Ordered decorators fail closed and
+cannot change or bypass the snapshotted definition set. This is a kernel seam,
+not a plugin protocol or host implementation. Exact acceptance commands are in
+[`evidence/phase5-tool-plan-leases.md`](evidence/phase5-tool-plan-leases.md).
 
 ## Current infrastructure blocker
 

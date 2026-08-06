@@ -213,7 +213,7 @@ func TestStaleInteractionResponseFailsBeforePayloadAcceptance(t *testing.T) {
 
 func TestSnapshotDigestLifecycleAndImportSafety(t *testing.T) {
 	t.Parallel()
-	payload := []byte(`{"version":"spice.agent.snapshot/v1alpha1"}`)
+	payload := []byte(`{"version":"spice.agent.snapshot/v1alpha2"}`)
 	snapshot, err := enginev1.NewSnapshotEnvelope(
 		"run-1",
 		42,
@@ -227,6 +227,14 @@ func TestSnapshotDigestLifecycleAndImportSafety(t *testing.T) {
 	returnedPayload := snapshot.GetPayload()
 	if len(returnedPayload) == 0 || returnedPayload[0] != '{' {
 		t.Fatal("snapshot retained caller-owned payload")
+	}
+	oldSnapshot, valid := proto.Clone(snapshot).(*enginev1.SnapshotEnvelope)
+	if !valid {
+		t.Fatal("snapshot clone had unexpected type")
+	}
+	oldSnapshot.Format = "spice.agent.snapshot/v1alpha1"
+	if err = enginev1.ValidateSnapshotEnvelope(oldSnapshot); err == nil {
+		t.Fatal("v1alpha1 snapshot format succeeded after hard cut")
 	}
 	request := &enginev1.ImportSnapshotRequest{
 		ClientId: "client-1", OwnershipEpoch: 1,

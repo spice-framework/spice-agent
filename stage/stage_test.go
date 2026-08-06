@@ -139,12 +139,78 @@ type errorReporter struct{}
 
 func (errorReporter) Report(context.Context, tool.Progress) error { return errors.New("report failed") }
 
+type fixedErrorReporter struct{ err error }
+
+func (reporter fixedErrorReporter) Report(context.Context, tool.Progress) error { return reporter.err }
+
+func TestDispatcherPreservesTypedExecutionAndReporterFailuresWithoutLeakingText(t *testing.T) {
+	t.Parallel()
+	call, _ := tool.NewCall("c", "a", json.RawMessage(`{}`))
+	reporterErr := errors.New("progress sink rejected")
+	wrappedReporter, _ := tool.NewExecutionError(
+		call.ID(),
+		tool.ExecutionDefinitive,
+		tool.RetryAllowed,
+		fmt.Errorf("report progress: %w", reporterErr),
+	)
+	dispatcher, _ := stage.NewDispatcher(map[string]tool.Tool{
+		"a": fakeTool{name: "a", progressID: call.ID(), executionErr: wrappedReporter},
+	})
+	_, err := dispatcher.Dispatch(t.Context(), call, fixedErrorReporter{err: reporterErr})
+	if !errors.Is(err, reporterErr) {
+		t.Fatalf("reporter rejection was not preserved: %v", err)
+	}
+	var combined *stage.DispatchFailure
+	var execution *tool.ExecutionError
+	if !errors.As(err, &combined) || !errors.As(err, &execution) || execution != wrappedReporter ||
+		combined.ExecutionFailure() != wrappedReporter || !errors.Is(combined.ReporterFailure(), reporterErr) ||
+		strings.Contains(err.Error(), reporterErr.Error()) {
+		t.Fatalf("combined failure was not preserved safely: %T, %v", err, err)
+	}
+
+	unrelated, _ := tool.NewExecutionError(
+		call.ID(),
+		tool.ExecutionDefinitive,
+		tool.RetryAllowed,
+		errors.New("worker unavailable"),
+	)
+	dispatcher, _ = stage.NewDispatcher(map[string]tool.Tool{
+		"a": fakeTool{name: "a", progressID: call.ID(), executionErr: unrelated},
+	})
+	_, err = dispatcher.Dispatch(t.Context(), call, fixedErrorReporter{err: reporterErr})
+	combined = nil
+	execution = nil
+	if !errors.As(err, &combined) || !errors.As(err, &execution) || execution != unrelated ||
+		combined.ExecutionFailure() != unrelated || !errors.Is(combined.ReporterFailure(), reporterErr) ||
+		strings.Contains(err.Error(), reporterErr.Error()) {
+		t.Fatalf("sanitized combined failure was not preserved safely: %T, %v", err, err)
+	}
+
+	_, err = dispatcher.Dispatch(t.Context(), call, fixedErrorReporter{err: context.Canceled})
+	combined = nil
+	if !errors.As(err, &combined) || !errors.Is(combined.ReporterFailure(), context.Canceled) ||
+		errors.Is(err, context.Canceled) {
+		t.Fatalf("reporter cancellation contaminated execution cancellation: %T, %v", err, err)
+	}
+
+	conflicting, _ := tool.NewExecutionError(
+		"different-call", tool.ExecutionDefinitive, tool.RetryNever, errors.New("conflicting reporter payload"),
+	)
+	_, err = dispatcher.Dispatch(t.Context(), call, fixedErrorReporter{err: conflicting})
+	combined = nil
+	execution = nil
+	if !errors.As(err, &combined) || !errors.As(err, &execution) || execution != unrelated ||
+		!errors.Is(combined.ReporterFailure(), conflicting) {
+		t.Fatalf("reporter execution error displaced authoritative outcome: %T, %v", err, err)
+	}
+}
+
 type cancellingTool struct {
 	cancel context.CancelFunc
 }
 
 func (implementation cancellingTool) Definition() tool.Definition {
-	definition, _ := tool.NewDefinition("cancel", "cancel", json.RawMessage(`{}`), tool.EffectReadOnly, tool.ReplaySafe)
+	definition, _ := tool.NewDefinition("cancel", "cancel", json.RawMessage(`{}`), tool.EffectMutating, tool.ReplayUnsafe)
 	return definition
 }
 
@@ -221,7 +287,7 @@ func TestDispatcherRejectsCancellationAndInvalidInputs(t *testing.T) {
 	postContext, postCancel := context.WithCancel(t.Context())
 	postDispatcher, _ := stage.NewDispatcher(map[string]tool.Tool{"cancel": cancellingTool{cancel: postCancel}})
 	postCall, _ := tool.NewCall("c", "cancel", json.RawMessage(`{}`))
-	if _, err := postDispatcher.Dispatch(postContext, postCall, nil); !errors.Is(err, context.Canceled) {
-		t.Fatalf("post-execute cancellation = %v", err)
+	if result, err := postDispatcher.Dispatch(postContext, postCall, nil); err != nil || result.CallID() != postCall.ID() {
+		t.Fatalf("committed result lost to concurrent cancellation: %#v, %v", result, err)
 	}
 }

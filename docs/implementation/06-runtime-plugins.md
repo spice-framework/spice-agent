@@ -11,6 +11,14 @@ effect/replay metadata and all execution failures use the correlated typed
 outcome contract. The plugin host must translate protocol failures into that
 same contract; it may not introduce a parallel error or retry model.
 
+The Phase 5.0B kernel seam is also complete: `ToolPlanSource` leases current or
+exact immutable plans, `Run.PlanIdentity` records the combined compiled/tool
+identity, resume fails closed on substitution, and release is exactly-once and
+terminal-authoritative. A source contractually performs only a non-blocking
+reference decrement during release; generation drain remains asynchronous and
+source-owned. This slice deliberately contains no plugin protocol,
+process host, daemon integration, or activation manager.
+
 ## Runtime-plugin contracts
 
 - One host process and one local gRPC connection exist per plugin generation.
@@ -84,6 +92,6 @@ Local call overhead targets the daemon event-latency budget and must not add an
 unbounded queue. Evidence includes digests, generation/lease timelines, process
 logs, conformance versions, and failure-injection results.
 
-Status is **in progress**. The execution-outcome prerequisite is implemented;
-plugin protocol, host, generation leases, fixtures, and developer loop remain
-pending.
+Status is **in progress**. The execution-outcome and kernel plan-lease
+prerequisites are implemented; plugin protocol, process-generation manager,
+fixtures, and developer loop remain pending.

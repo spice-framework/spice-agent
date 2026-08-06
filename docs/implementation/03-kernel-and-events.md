@@ -31,12 +31,19 @@ round-trip, and deterministic replay tests. **Status:** in progress.
   failures preserve cancellation, distinguish definitive from uncertain
   mutation outcomes, and cannot carry unsafe retry advice. Execution errors
   must be direct typed values rather than wrappers or joins. Tool-failure events
-  retain bounded call, name, outcome, and retry correlation.
+  retain bounded call, name, outcome, and retry correlation. A valid successful
+  result wins a concurrent cancellation after tool commit; a cancellation
+  sentinel returned while the run context is active remains a run failure.
+  Simultaneous execution and reporter failures retain the authoritative typed
+  outcome plus explicitly inspectable durability without reporter-controlled
+  cancellation classification.
 - Each run owns a count-and-encoded-byte-bounded authoritative event log.
   `Subscribe(ctx, afterSequence)` creates an independent gap-free replay/tail
   cursor. Typed out-of-range and resource-exhaustion errors provide recovery
   cursors and last-delivered sequence; health stats expose retention, eviction,
-  exhaustion, and slow-subscriber disconnection.
+  exhaustion, and slow-subscriber disconnection. Delivery keeps its in-flight
+  entry accounted until the consumer accepts it; concurrent cancellation or
+  exhaustion cannot panic, duplicate it, or report a stale recovery cursor.
 - The local log commits a sequence before required-observer acknowledgement.
   Post-commit acknowledgement failures never reuse that sequence and every
   committed lifecycle start is paired with exactly one terminal. Best-effort
@@ -49,8 +56,13 @@ Interaction completion and snapshot import/export are implemented as preview
 contracts. UI-neutral broker lifecycles are exactly
 terminal under response validation, cancellation, panic, and observer failure.
 Versioned snapshots round-trip deterministically, reject active or uncertain
-mutations, and resume only with exact static/dynamic plan identity and monotonic
-sequence continuation. Used interaction IDs survive snapshot import so a client
+mutations, and resume only after leasing and recomputing the exact combined
+compiled/tool `PlanIdentity`, with monotonic sequence continuation. Every run
+leases before mutation and releases exactly once; release failure is part of the
+authoritative failed terminal and a blocking callback is bounded by finalization.
+Portable import additionally requires an explicit compiler-generated
+compatibility identity covering every executable static bean; defaults remain
+inspection/local-resume only. Used interaction IDs survive snapshot import so a client
 cannot ambiguously reuse a completed lifecycle identity. Durable SQLite recovery and uncertain-operation policy
 remain the isolated Phase 7 stress proof rather than hidden kernel behavior.
 
