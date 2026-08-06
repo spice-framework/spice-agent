@@ -21,9 +21,11 @@ type scriptedBroker struct {
 	started        chan struct{}
 	block          bool
 	cancelOnReturn context.CancelFunc
+	scopes         []interaction.Scope
 }
 
-func (broker *scriptedBroker) Request(ctx context.Context, _ interaction.Request) (interaction.Response, error) {
+func (broker *scriptedBroker) Request(ctx context.Context, scope interaction.Scope, _ interaction.Request) (interaction.Response, error) {
+	broker.scopes = append(broker.scopes, scope)
 	if broker.panicAt {
 		panic("broker boom")
 	}
@@ -53,6 +55,9 @@ func TestInteractionLifecycleCompletesThroughInjectedBroker(t *testing.T) {
 	}
 	if _, err = run.Interact(t.Context(), request); err == nil || !strings.Contains(err.Error(), "already used") {
 		t.Fatalf("completed interaction ID reuse = %v", err)
+	}
+	if len(broker.scopes) != 1 || broker.scopes[0].RunID() != run.ID() {
+		t.Fatalf("broker scopes = %#v, run = %q", broker.scopes, run.ID())
 	}
 	run.Cancel()
 	events := collect(t, run)

@@ -23,8 +23,11 @@ const (
 	EngineService_Health_FullMethodName             = "/spice.agent.engine.v1.EngineService/Health"
 	EngineService_StartRun_FullMethodName           = "/spice.agent.engine.v1.EngineService/StartRun"
 	EngineService_StreamEvents_FullMethodName       = "/spice.agent.engine.v1.EngineService/StreamEvents"
+	EngineService_StreamInteractions_FullMethodName = "/spice.agent.engine.v1.EngineService/StreamInteractions"
 	EngineService_CancelRun_FullMethodName          = "/spice.agent.engine.v1.EngineService/CancelRun"
 	EngineService_RespondInteraction_FullMethodName = "/spice.agent.engine.v1.EngineService/RespondInteraction"
+	EngineService_SuspendRun_FullMethodName         = "/spice.agent.engine.v1.EngineService/SuspendRun"
+	EngineService_ResumeRun_FullMethodName          = "/spice.agent.engine.v1.EngineService/ResumeRun"
 	EngineService_ExportSnapshot_FullMethodName     = "/spice.agent.engine.v1.EngineService/ExportSnapshot"
 	EngineService_ImportSnapshot_FullMethodName     = "/spice.agent.engine.v1.EngineService/ImportSnapshot"
 )
@@ -43,13 +46,19 @@ type EngineServiceClient interface {
 	StartRun(ctx context.Context, in *StartRunRequest, opts ...grpc.CallOption) (*StartRunResponse, error)
 	// StreamEvents replays and optionally tails authoritative ordered events.
 	StreamEvents(ctx context.Context, in *StreamEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEventsResponse], error)
+	// StreamInteractions snapshots and tails pending prompts outside event replay.
+	StreamInteractions(ctx context.Context, in *StreamInteractionsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamInteractionsResponse], error)
 	// CancelRun cooperatively and idempotently cancels one run.
 	CancelRun(ctx context.Context, in *CancelRunRequest, opts ...grpc.CallOption) (*CancelRunResponse, error)
 	// RespondInteraction completes one pending interaction exactly once.
 	RespondInteraction(ctx context.Context, in *RespondInteractionRequest, opts ...grpc.CallOption) (*RespondInteractionResponse, error)
+	// SuspendRun pauses at a safe snapshot boundary without changing run identity.
+	SuspendRun(ctx context.Context, in *SuspendRunRequest, opts ...grpc.CallOption) (*SuspendRunResponse, error)
+	// ResumeRun continues a locally suspended run without changing run identity.
+	ResumeRun(ctx context.Context, in *ResumeRunRequest, opts ...grpc.CallOption) (*ResumeRunResponse, error)
 	// ExportSnapshot returns one validated safe snapshot boundary.
 	ExportSnapshot(ctx context.Context, in *ExportSnapshotRequest, opts ...grpc.CallOption) (*ExportSnapshotResponse, error)
-	// ImportSnapshot resumes one suspended snapshot under new ownership.
+	// ImportSnapshot resumes one suspended snapshot under its embedded run ID.
 	ImportSnapshot(ctx context.Context, in *ImportSnapshotRequest, opts ...grpc.CallOption) (*ImportSnapshotResponse, error)
 }
 
@@ -110,6 +119,25 @@ func (c *engineServiceClient) StreamEvents(ctx context.Context, in *StreamEvents
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type EngineService_StreamEventsClient = grpc.ServerStreamingClient[StreamEventsResponse]
 
+func (c *engineServiceClient) StreamInteractions(ctx context.Context, in *StreamInteractionsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamInteractionsResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &EngineService_ServiceDesc.Streams[1], EngineService_StreamInteractions_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamInteractionsRequest, StreamInteractionsResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type EngineService_StreamInteractionsClient = grpc.ServerStreamingClient[StreamInteractionsResponse]
+
 func (c *engineServiceClient) CancelRun(ctx context.Context, in *CancelRunRequest, opts ...grpc.CallOption) (*CancelRunResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CancelRunResponse)
@@ -124,6 +152,26 @@ func (c *engineServiceClient) RespondInteraction(ctx context.Context, in *Respon
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RespondInteractionResponse)
 	err := c.cc.Invoke(ctx, EngineService_RespondInteraction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *engineServiceClient) SuspendRun(ctx context.Context, in *SuspendRunRequest, opts ...grpc.CallOption) (*SuspendRunResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SuspendRunResponse)
+	err := c.cc.Invoke(ctx, EngineService_SuspendRun_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *engineServiceClient) ResumeRun(ctx context.Context, in *ResumeRunRequest, opts ...grpc.CallOption) (*ResumeRunResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResumeRunResponse)
+	err := c.cc.Invoke(ctx, EngineService_ResumeRun_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -164,13 +212,19 @@ type EngineServiceServer interface {
 	StartRun(context.Context, *StartRunRequest) (*StartRunResponse, error)
 	// StreamEvents replays and optionally tails authoritative ordered events.
 	StreamEvents(*StreamEventsRequest, grpc.ServerStreamingServer[StreamEventsResponse]) error
+	// StreamInteractions snapshots and tails pending prompts outside event replay.
+	StreamInteractions(*StreamInteractionsRequest, grpc.ServerStreamingServer[StreamInteractionsResponse]) error
 	// CancelRun cooperatively and idempotently cancels one run.
 	CancelRun(context.Context, *CancelRunRequest) (*CancelRunResponse, error)
 	// RespondInteraction completes one pending interaction exactly once.
 	RespondInteraction(context.Context, *RespondInteractionRequest) (*RespondInteractionResponse, error)
+	// SuspendRun pauses at a safe snapshot boundary without changing run identity.
+	SuspendRun(context.Context, *SuspendRunRequest) (*SuspendRunResponse, error)
+	// ResumeRun continues a locally suspended run without changing run identity.
+	ResumeRun(context.Context, *ResumeRunRequest) (*ResumeRunResponse, error)
 	// ExportSnapshot returns one validated safe snapshot boundary.
 	ExportSnapshot(context.Context, *ExportSnapshotRequest) (*ExportSnapshotResponse, error)
-	// ImportSnapshot resumes one suspended snapshot under new ownership.
+	// ImportSnapshot resumes one suspended snapshot under its embedded run ID.
 	ImportSnapshot(context.Context, *ImportSnapshotRequest) (*ImportSnapshotResponse, error)
 	mustEmbedUnimplementedEngineServiceServer()
 }
@@ -194,11 +248,20 @@ func (UnimplementedEngineServiceServer) StartRun(context.Context, *StartRunReque
 func (UnimplementedEngineServiceServer) StreamEvents(*StreamEventsRequest, grpc.ServerStreamingServer[StreamEventsResponse]) error {
 	return status.Error(codes.Unimplemented, "method StreamEvents not implemented")
 }
+func (UnimplementedEngineServiceServer) StreamInteractions(*StreamInteractionsRequest, grpc.ServerStreamingServer[StreamInteractionsResponse]) error {
+	return status.Error(codes.Unimplemented, "method StreamInteractions not implemented")
+}
 func (UnimplementedEngineServiceServer) CancelRun(context.Context, *CancelRunRequest) (*CancelRunResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CancelRun not implemented")
 }
 func (UnimplementedEngineServiceServer) RespondInteraction(context.Context, *RespondInteractionRequest) (*RespondInteractionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RespondInteraction not implemented")
+}
+func (UnimplementedEngineServiceServer) SuspendRun(context.Context, *SuspendRunRequest) (*SuspendRunResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SuspendRun not implemented")
+}
+func (UnimplementedEngineServiceServer) ResumeRun(context.Context, *ResumeRunRequest) (*ResumeRunResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResumeRun not implemented")
 }
 func (UnimplementedEngineServiceServer) ExportSnapshot(context.Context, *ExportSnapshotRequest) (*ExportSnapshotResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ExportSnapshot not implemented")
@@ -292,6 +355,17 @@ func _EngineService_StreamEvents_Handler(srv interface{}, stream grpc.ServerStre
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type EngineService_StreamEventsServer = grpc.ServerStreamingServer[StreamEventsResponse]
 
+func _EngineService_StreamInteractions_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamInteractionsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(EngineServiceServer).StreamInteractions(m, &grpc.GenericServerStream[StreamInteractionsRequest, StreamInteractionsResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type EngineService_StreamInteractionsServer = grpc.ServerStreamingServer[StreamInteractionsResponse]
+
 func _EngineService_CancelRun_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CancelRunRequest)
 	if err := dec(in); err != nil {
@@ -324,6 +398,42 @@ func _EngineService_RespondInteraction_Handler(srv interface{}, ctx context.Cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(EngineServiceServer).RespondInteraction(ctx, req.(*RespondInteractionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EngineService_SuspendRun_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SuspendRunRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EngineServiceServer).SuspendRun(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EngineService_SuspendRun_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EngineServiceServer).SuspendRun(ctx, req.(*SuspendRunRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EngineService_ResumeRun_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResumeRunRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EngineServiceServer).ResumeRun(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EngineService_ResumeRun_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EngineServiceServer).ResumeRun(ctx, req.(*ResumeRunRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -392,6 +502,14 @@ var EngineService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _EngineService_RespondInteraction_Handler,
 		},
 		{
+			MethodName: "SuspendRun",
+			Handler:    _EngineService_SuspendRun_Handler,
+		},
+		{
+			MethodName: "ResumeRun",
+			Handler:    _EngineService_ResumeRun_Handler,
+		},
+		{
 			MethodName: "ExportSnapshot",
 			Handler:    _EngineService_ExportSnapshot_Handler,
 		},
@@ -404,6 +522,11 @@ var EngineService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "StreamEvents",
 			Handler:       _EngineService_StreamEvents_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StreamInteractions",
+			Handler:       _EngineService_StreamInteractions_Handler,
 			ServerStreams: true,
 		},
 	},

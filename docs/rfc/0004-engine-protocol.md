@@ -14,29 +14,53 @@ interfaces directly.
 
 ## Initialization
 
-The first call presents protocol major/minor, client build identity, supported
-capabilities, maximum message limits, and the endpoint authentication token. The
-daemon returns its build identity, supported capabilities, configured limits,
-and health. Incompatible major versions or required capabilities fail before a
-run is created, with both observed and required values.
+Transport middleware authenticates the endpoint token from gRPC metadata before
+the first application payload is decoded. `Initialize` then presents protocol
+major/minor, client build identity, supported capabilities, and maximum message
+limits. A new owner receives a stable client ID at epoch one. Reconnect supplies
+that client ID and its expected epoch; the daemon performs a compare-and-swap
+and returns the same ID at exactly the next epoch. A stale claim fails without
+changing ownership.
+
+The daemon returns its build identity, supported capabilities, configured
+limits, health, and one immutable generated `DefinitionSet`. Definitions own
+model and turn-limit policy on the server. A run request selects only an exact
+definition ID/revision; it cannot supply provider configuration or any static
+or dynamic plan fingerprint. Incompatible major versions or required
+capabilities fail before a run is created, with both observed and required
+values.
 
 ## Operations
 
 - `Health` reports readiness, version, replay limits, active-run count, and
   bounded degraded reasons without configuration secrets.
-- `StartRun` accepts a validated agent definition reference, expected
-  static-plan fingerprint, initial message, and client operation ID. The server
-  selects and leases the current dynamic generation, then returns the stable run
-  ID, initial sequence, and immutable `plan_id`; clients cannot choose a plugin
-  generation through the run definition.
-- `StreamEvents(after_sequence)` replays/tails authoritative events and maps
-  out-of-range/resource-exhaustion errors to typed recovery details.
+- `StartRun` accepts an exact server-advertised definition reference, initial
+  message, and client operation ID. The server selects and leases the current
+  dynamic generation, then returns the stable run ID, initial sequence, and
+  immutable `plan_id`; clients cannot choose a model or plugin generation.
+- `StreamEvents(after_sequence)` atomically captures retained bounds and a
+  count/byte-bounded page. Its control reports optional `page_last_sequence`,
+  `has_more`, and `tailing`. Live tail registration occurs under the same lock
+  only at the captured head, preventing a replay/tail gap. Current peers always
+  send the page cursor; absence is accepted only as the provisional non-paging,
+  non-tailing compatibility shape. For current controls, `has_more` is exactly
+  equivalent to `page_last_sequence < latest_sequence`.
+- `StreamInteractions` always sends a complete atomic snapshot of every pending
+  prompt as its first frame. Revision-contiguous opened/closed deltas and a
+  final control follow. Reconnect never relies on retained delta history to
+  discover an unresolved prompt. Prompt/schema/response content remains outside
+  authoritative run events.
 - `CancelRun` is idempotent and reports whether the run was already terminal.
-- `RespondInteraction` uses interaction and response IDs to reject stale or
-  duplicate responses deterministically.
+- `RespondInteraction` uses the client operation ID plus run and interaction IDs
+  to reject stale correlation and deduplicate the mutation. It has no redundant
+  response identity or synthetic event-sequence acknowledgement.
+- `SuspendRun` pauses at a safe completed-turn boundary and `ResumeRun` continues
+  the same locally owned run without changing its identity.
 - `ExportSnapshot` returns a versioned provider-neutral safe snapshot at a
   supported boundary. `ImportSnapshot` is a separate explicit mutation with
-  idempotency and uncertain-outcome rules and accepts only suspended snapshots.
+  idempotency and uncertain-outcome rules, accepts only suspended v1alpha2
+  snapshots, and preserves the run ID embedded in the snapshot. Clients cannot
+  rename an imported run or assert a replacement plan.
 
 ## Bounds and backpressure
 
@@ -56,7 +80,7 @@ in compatibility manifests.
 ## Security boundary
 
 The initial protocol has no TCP listener. Unix sockets or Windows named pipes
-and endpoint metadata are current-user only. A random token protects against
+and endpoint metadata are current-user only. A random metadata token protects against
 accidental/ambient local connections but does not defend against code already
 running as the same user. Remote access requires a new threat model and protocol
 extension.
@@ -71,16 +95,16 @@ Cancellation is cooperative and terminal events remain authoritative.
 ## Acceptance before freeze
 
 The schema-foundation acceptance covers old/new versions, unknown fields,
-capability mismatch, validation before authentication-token retention,
+capability mismatch, transport-metadata authentication separation,
 deadline/cancellation fields, overload, cursor gap/recovery, stale interaction
 response, snapshot version skew, malformed input, fuzz smoke, Buf lint/breaking,
 and deterministic generation. Duplicate-operation behavior, actual transport
 authentication, reconnect, half-close, and Windows/Unix endpoint permissions
 remain acceptance requirements for the daemon host slice.
 
-Before final freeze, the host slice must also resolve interaction prompt replay
-and run identity, reconnect ownership CAS, remote suspend/resume and imported
-run identity, atomic replay-bound observation, and the invariant that a unary
-RPC context never owns the lifetime of the run it creates. The committed Buf
-baseline makes those amendments explicit; this provisional RFC does not claim
-the seams are complete.
+The pre-host contract repair resolves interaction prompt discovery, reconnect
+ownership CAS, remote suspend/resume, imported run identity, and atomic replay
+bounds in the provisional schema. The host slice must still prove those
+contracts over real RPCs and enforce the invariant that a unary RPC context
+never owns the lifetime of the run it creates. The committed Buf baseline makes
+the amendments explicit; this provisional RFC does not claim a daemon exists.

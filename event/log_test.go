@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -61,6 +62,171 @@ func TestLogSubscriptionHasGapFreeReplayAndTail(t *testing.T) {
 		if envelope.Sequence() != uint64(index+2) {
 			t.Fatalf("event %d sequence = %d", index, envelope.Sequence())
 		}
+	}
+}
+
+func TestLogReplayCapturesBoundedPagesAndRegistersFinalTailAtomically(t *testing.T) {
+	limits := event.DefaultLogLimits()
+	limits.MaxEvents = 7
+	limits.TerminalReserveEvents = 1
+	limits.SubscriberMaxEvents = 4
+	log := newLog(t, limits)
+	for sequence := uint64(1); sequence <= 4; sequence++ {
+		appendEnvelope(t, log, sequence, event.ModelDelta)
+	}
+
+	first, err := log.Replay(t.Context(), event.ReplayRequest{
+		AfterSequence: 0, MaxEvents: 2, MaxBytes: limits.SubscriberMaxBytes, Tail: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.EarliestSequence != 1 || first.LatestSequence != 4 ||
+		first.PageLastSequence != 2 || !first.HasMore || first.Tailing || first.Tail != nil {
+		t.Fatalf("first page = %#v", first)
+	}
+	second, err := log.Replay(t.Context(), event.ReplayRequest{
+		AfterSequence: first.PageLastSequence,
+		MaxEvents:     2, MaxBytes: limits.SubscriberMaxBytes, Tail: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.PageLastSequence != 4 || second.HasMore || !second.Tailing || second.Tail == nil {
+		t.Fatalf("second page = %#v", second)
+	}
+	for sequence := uint64(5); sequence <= 8; sequence++ {
+		appendEnvelope(t, log, sequence, event.ModelDelta)
+	}
+	log.Close()
+
+	all := append(slices.Clone(first.Events), second.Events...)
+	all = append(all, collectSubscription(t, second.Tail)...)
+	if len(all) != 8 {
+		t.Fatalf("replay/tail length = %d", len(all))
+	}
+	for index, envelope := range all {
+		if envelope.Sequence() != uint64(index+1) {
+			t.Fatalf("replay/tail event %d sequence = %d", index, envelope.Sequence())
+		}
+	}
+	earliest, latest := log.Bounds()
+	if earliest <= 1 || latest != 8 {
+		t.Fatalf("post-eviction bounds = [%d,%d]", earliest, latest)
+	}
+}
+
+func TestLogReplayEmptyInitialAndImportedTails(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		after    uint64
+		newLog   func(*testing.T) *event.Log
+		next     uint64
+		earliest uint64
+		latest   uint64
+	}{
+		{"initial", 0, func(t *testing.T) *event.Log { t.Helper(); return newLog(t, event.DefaultLogLimits()) }, 1, 1, 0},
+		{"imported", 7, func(t *testing.T) *event.Log {
+			t.Helper()
+			log, err := event.NewLogAfter("run", 7, event.DefaultLogLimits())
+			if err != nil {
+				t.Fatal(err)
+			}
+			return log
+		}, 8, 8, 7},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			log := test.newLog(t)
+			page, err := log.Replay(t.Context(), event.ReplayRequest{
+				AfterSequence: test.after, MaxEvents: 1, MaxBytes: 1024, Tail: true,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if page.EarliestSequence != test.earliest || page.LatestSequence != test.latest ||
+				page.PageLastSequence != test.after || page.HasMore || !page.Tailing || len(page.Events) != 0 {
+				t.Fatalf("empty page = %#v", page)
+			}
+			appendEnvelope(t, log, test.next, event.ModelDelta)
+			log.Close()
+			tail := collectSubscription(t, page.Tail)
+			if len(tail) != 1 || tail[0].Sequence() != test.next {
+				t.Fatalf("tail = %#v", tail)
+			}
+		})
+	}
+}
+
+func TestLogReplayRejectsStaleFutureAndUnprogressablePages(t *testing.T) {
+	limits := event.DefaultLogLimits()
+	limits.MaxEvents = 5
+	limits.TerminalReserveEvents = 1
+	log := newLog(t, limits)
+	for sequence := uint64(1); sequence <= 7; sequence++ {
+		appendEnvelope(t, log, sequence, event.ModelDelta)
+	}
+	earliest, latest := log.Bounds()
+	for _, after := range []uint64{0, latest + 1} {
+		_, err := log.Replay(t.Context(), event.ReplayRequest{
+			AfterSequence: after, MaxEvents: 1, MaxBytes: limits.SubscriberMaxBytes,
+		})
+		var outOfRange *event.OutOfRangeError
+		if !errors.As(err, &outOfRange) {
+			t.Fatalf("cursor %d error = %v", after, err)
+		}
+		if after == 0 && outOfRange.RecoveryAfter != earliest-1 || after > latest && outOfRange.RecoveryAfter != latest {
+			t.Fatalf("cursor %d recovery = %#v", after, outOfRange)
+		}
+	}
+	_, err := log.Replay(t.Context(), event.ReplayRequest{
+		AfterSequence: earliest - 1, MaxEvents: 1, MaxBytes: 1,
+	})
+	var exhausted *event.ResourceExhaustedError
+	if !errors.As(err, &exhausted) || exhausted.LastDelivered != earliest-1 {
+		t.Fatalf("unprogressable page = %#v, %v", exhausted, err)
+	}
+	if log.Stats().SubscriptionExhaustions != 1 {
+		t.Fatalf("replay exhaustion stats = %#v", log.Stats())
+	}
+	if _, err = log.Replay(t.Context(), event.ReplayRequest{MaxEvents: 0, MaxBytes: 1}); err == nil {
+		t.Fatal("zero event page bound succeeded")
+	}
+}
+
+func TestLogReplaySlowTailDisconnectsAtPageCursorAndRecoversWithoutGap(t *testing.T) {
+	limits := event.DefaultLogLimits()
+	limits.SubscriberMaxEvents = 2
+	log := newLog(t, limits)
+	appendEnvelope(t, log, 1, event.ModelDelta)
+	page, err := log.Replay(t.Context(), event.ReplayRequest{
+		AfterSequence: 0, MaxEvents: 1, MaxBytes: limits.SubscriberMaxBytes, Tail: true,
+	})
+	if err != nil || !page.Tailing || page.PageLastSequence != 1 {
+		t.Fatalf("page = %#v, %v", page, err)
+	}
+	for sequence := uint64(2); sequence <= 4; sequence++ {
+		appendEnvelope(t, log, sequence, event.ModelDelta)
+	}
+	var exhausted *event.ResourceExhaustedError
+	if err = page.Tail.Wait(t.Context()); !errors.As(err, &exhausted) || exhausted.LastDelivered != 1 {
+		t.Fatalf("slow tail = %#v, %v", exhausted, err)
+	}
+	recovery, err := log.Replay(t.Context(), event.ReplayRequest{
+		AfterSequence: exhausted.LastDelivered, MaxEvents: 2, MaxBytes: limits.SubscriberMaxBytes,
+	})
+	if err != nil || len(recovery.Events) != 2 || !recovery.HasMore {
+		t.Fatalf("recovery page = %#v, %v", recovery, err)
+	}
+	for index, envelope := range recovery.Events {
+		if envelope.Sequence() != uint64(index+2) {
+			t.Fatalf("recovery event %d sequence = %d", index, envelope.Sequence())
+		}
+	}
+	final, err := log.Replay(t.Context(), event.ReplayRequest{
+		AfterSequence: recovery.PageLastSequence, MaxEvents: 2, MaxBytes: limits.SubscriberMaxBytes,
+	})
+	if err != nil || len(final.Events) != 1 || final.HasMore || final.Events[0].Sequence() != 4 {
+		t.Fatalf("final recovery page = %#v, %v", final, err)
 	}
 }
 

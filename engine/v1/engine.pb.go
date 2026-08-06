@@ -235,6 +235,56 @@ func (SnapshotLifecycle) EnumDescriptor() ([]byte, []int) {
 	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{2}
 }
 
+// InteractionDeltaKind identifies a pending-set mutation.
+type InteractionDeltaKind int32
+
+const (
+	InteractionDeltaKind_INTERACTION_DELTA_KIND_UNSPECIFIED InteractionDeltaKind = 0
+	InteractionDeltaKind_INTERACTION_DELTA_KIND_OPENED      InteractionDeltaKind = 1
+	InteractionDeltaKind_INTERACTION_DELTA_KIND_CLOSED      InteractionDeltaKind = 2
+)
+
+// Enum value maps for InteractionDeltaKind.
+var (
+	InteractionDeltaKind_name = map[int32]string{
+		0: "INTERACTION_DELTA_KIND_UNSPECIFIED",
+		1: "INTERACTION_DELTA_KIND_OPENED",
+		2: "INTERACTION_DELTA_KIND_CLOSED",
+	}
+	InteractionDeltaKind_value = map[string]int32{
+		"INTERACTION_DELTA_KIND_UNSPECIFIED": 0,
+		"INTERACTION_DELTA_KIND_OPENED":      1,
+		"INTERACTION_DELTA_KIND_CLOSED":      2,
+	}
+)
+
+func (x InteractionDeltaKind) Enum() *InteractionDeltaKind {
+	p := new(InteractionDeltaKind)
+	*p = x
+	return p
+}
+
+func (x InteractionDeltaKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (InteractionDeltaKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_spice_agent_engine_v1_engine_proto_enumTypes[3].Descriptor()
+}
+
+func (InteractionDeltaKind) Type() protoreflect.EnumType {
+	return &file_spice_agent_engine_v1_engine_proto_enumTypes[3]
+}
+
+func (x InteractionDeltaKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use InteractionDeltaKind.Descriptor instead.
+func (InteractionDeltaKind) EnumDescriptor() ([]byte, []int) {
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{3}
+}
+
 // ToolCallPart is a bounded model-requested tool invocation.
 type ToolCallPart struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -588,15 +638,11 @@ func (x *Message) GetParts() []*ContentPart {
 
 // AgentDefinitionRef identifies a validated generated execution definition.
 type AgentDefinitionRef struct {
-	state    protoimpl.MessageState `protogen:"open.v1"`
-	Id       string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Revision string                 `protobuf:"bytes,2,opt,name=revision,proto3" json:"revision,omitempty"`
-	Model    string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
-	MaxTurns uint32                 `protobuf:"varint,4,opt,name=max_turns,json=maxTurns,proto3" json:"max_turns,omitempty"`
-	// expected_static_plan_fingerprint is an assertion, not client authority.
-	ExpectedStaticPlanFingerprint string `protobuf:"bytes,5,opt,name=expected_static_plan_fingerprint,json=expectedStaticPlanFingerprint,proto3" json:"expected_static_plan_fingerprint,omitempty"`
-	unknownFields                 protoimpl.UnknownFields
-	sizeCache                     protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Revision      string                 `protobuf:"bytes,2,opt,name=revision,proto3" json:"revision,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AgentDefinitionRef) Reset() {
@@ -643,28 +689,183 @@ func (x *AgentDefinitionRef) GetRevision() string {
 	return ""
 }
 
-func (x *AgentDefinitionRef) GetModel() string {
+// Definition is one immutable server-owned generated agent definition.
+type Definition struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Revision      string                 `protobuf:"bytes,2,opt,name=revision,proto3" json:"revision,omitempty"`
+	Model         string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
+	MaxTurns      uint32                 `protobuf:"varint,4,opt,name=max_turns,json=maxTurns,proto3" json:"max_turns,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Definition) Reset() {
+	*x = Definition{}
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Definition) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Definition) ProtoMessage() {}
+
+func (x *Definition) ProtoReflect() protoreflect.Message {
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Definition.ProtoReflect.Descriptor instead.
+func (*Definition) Descriptor() ([]byte, []int) {
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *Definition) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Definition) GetRevision() string {
+	if x != nil {
+		return x.Revision
+	}
+	return ""
+}
+
+func (x *Definition) GetModel() string {
 	if x != nil {
 		return x.Model
 	}
 	return ""
 }
 
-func (x *AgentDefinitionRef) GetMaxTurns() uint32 {
+func (x *Definition) GetMaxTurns() uint32 {
 	if x != nil {
 		return x.MaxTurns
 	}
 	return 0
 }
 
-func (x *AgentDefinitionRef) GetExpectedStaticPlanFingerprint() string {
+// DefinitionSet is the immutable generated catalog advertised at initialize.
+type DefinitionSet struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Revision      string                 `protobuf:"bytes,1,opt,name=revision,proto3" json:"revision,omitempty"`
+	Definitions   []*Definition          `protobuf:"bytes,2,rep,name=definitions,proto3" json:"definitions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DefinitionSet) Reset() {
+	*x = DefinitionSet{}
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DefinitionSet) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DefinitionSet) ProtoMessage() {}
+
+func (x *DefinitionSet) ProtoReflect() protoreflect.Message {
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[7]
 	if x != nil {
-		return x.ExpectedStaticPlanFingerprint
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DefinitionSet.ProtoReflect.Descriptor instead.
+func (*DefinitionSet) Descriptor() ([]byte, []int) {
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *DefinitionSet) GetRevision() string {
+	if x != nil {
+		return x.Revision
 	}
 	return ""
 }
 
-// InitializeRequest is the mandatory first authenticated client operation.
+func (x *DefinitionSet) GetDefinitions() []*Definition {
+	if x != nil {
+		return x.Definitions
+	}
+	return nil
+}
+
+// ReconnectClaim atomically claims an existing stable client at its last epoch.
+type ReconnectClaim struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	ClientId               string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	ExpectedOwnershipEpoch uint64                 `protobuf:"varint,2,opt,name=expected_ownership_epoch,json=expectedOwnershipEpoch,proto3" json:"expected_ownership_epoch,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *ReconnectClaim) Reset() {
+	*x = ReconnectClaim{}
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReconnectClaim) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReconnectClaim) ProtoMessage() {}
+
+func (x *ReconnectClaim) ProtoReflect() protoreflect.Message {
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReconnectClaim.ProtoReflect.Descriptor instead.
+func (*ReconnectClaim) Descriptor() ([]byte, []int) {
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ReconnectClaim) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *ReconnectClaim) GetExpectedOwnershipEpoch() uint64 {
+	if x != nil {
+		return x.ExpectedOwnershipEpoch
+	}
+	return 0
+}
+
+// InitializeRequest is the mandatory first client operation. Authentication is
+// carried by transport metadata and validated before this payload is handled.
 type InitializeRequest struct {
 	state                 protoimpl.MessageState `protogen:"open.v1"`
 	Protocol              *v1.ProtocolRange      `protobuf:"bytes,1,opt,name=protocol,proto3" json:"protocol,omitempty"`
@@ -672,14 +873,14 @@ type InitializeRequest struct {
 	SupportedCapabilities *v1.CapabilitySet      `protobuf:"bytes,3,opt,name=supported_capabilities,json=supportedCapabilities,proto3" json:"supported_capabilities,omitempty"`
 	RequiredCapabilities  *v1.CapabilitySet      `protobuf:"bytes,4,opt,name=required_capabilities,json=requiredCapabilities,proto3" json:"required_capabilities,omitempty"`
 	RequestedLimits       *v1.Limits             `protobuf:"bytes,5,opt,name=requested_limits,json=requestedLimits,proto3" json:"requested_limits,omitempty"`
-	AuthenticationToken   []byte                 `protobuf:"bytes,6,opt,name=authentication_token,json=authenticationToken,proto3" json:"authentication_token,omitempty"`
+	ReconnectClaim        *ReconnectClaim        `protobuf:"bytes,7,opt,name=reconnect_claim,json=reconnectClaim,proto3" json:"reconnect_claim,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
 
 func (x *InitializeRequest) Reset() {
 	*x = InitializeRequest{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[6]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -691,7 +892,7 @@ func (x *InitializeRequest) String() string {
 func (*InitializeRequest) ProtoMessage() {}
 
 func (x *InitializeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[6]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -704,7 +905,7 @@ func (x *InitializeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InitializeRequest.ProtoReflect.Descriptor instead.
 func (*InitializeRequest) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{6}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *InitializeRequest) GetProtocol() *v1.ProtocolRange {
@@ -742,9 +943,9 @@ func (x *InitializeRequest) GetRequestedLimits() *v1.Limits {
 	return nil
 }
 
-func (x *InitializeRequest) GetAuthenticationToken() []byte {
+func (x *InitializeRequest) GetReconnectClaim() *ReconnectClaim {
 	if x != nil {
-		return x.AuthenticationToken
+		return x.ReconnectClaim
 	}
 	return nil
 }
@@ -760,13 +961,14 @@ type InitializeResponse struct {
 	Health         *v1.Health             `protobuf:"bytes,6,opt,name=health,proto3" json:"health,omitempty"`
 	ClientId       string                 `protobuf:"bytes,7,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
 	OwnershipEpoch uint64                 `protobuf:"varint,8,opt,name=ownership_epoch,json=ownershipEpoch,proto3" json:"ownership_epoch,omitempty"`
+	Definitions    *DefinitionSet         `protobuf:"bytes,9,opt,name=definitions,proto3" json:"definitions,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *InitializeResponse) Reset() {
 	*x = InitializeResponse{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[7]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -778,7 +980,7 @@ func (x *InitializeResponse) String() string {
 func (*InitializeResponse) ProtoMessage() {}
 
 func (x *InitializeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[7]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -791,7 +993,7 @@ func (x *InitializeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InitializeResponse.ProtoReflect.Descriptor instead.
 func (*InitializeResponse) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{7}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *InitializeResponse) GetStatus() *v1.Status {
@@ -850,6 +1052,13 @@ func (x *InitializeResponse) GetOwnershipEpoch() uint64 {
 	return 0
 }
 
+func (x *InitializeResponse) GetDefinitions() *DefinitionSet {
+	if x != nil {
+		return x.Definitions
+	}
+	return nil
+}
+
 // HealthRequest identifies the initialized client.
 type HealthRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
@@ -861,7 +1070,7 @@ type HealthRequest struct {
 
 func (x *HealthRequest) Reset() {
 	*x = HealthRequest{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[8]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -873,7 +1082,7 @@ func (x *HealthRequest) String() string {
 func (*HealthRequest) ProtoMessage() {}
 
 func (x *HealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[8]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -886,7 +1095,7 @@ func (x *HealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthRequest.ProtoReflect.Descriptor instead.
 func (*HealthRequest) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{8}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *HealthRequest) GetClientId() string {
@@ -916,7 +1125,7 @@ type HealthResponse struct {
 
 func (x *HealthResponse) Reset() {
 	*x = HealthResponse{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[9]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -928,7 +1137,7 @@ func (x *HealthResponse) String() string {
 func (*HealthResponse) ProtoMessage() {}
 
 func (x *HealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[9]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -941,7 +1150,7 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
 func (*HealthResponse) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{9}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *HealthResponse) GetStatus() *v1.Status {
@@ -986,7 +1195,7 @@ type StartRunRequest struct {
 
 func (x *StartRunRequest) Reset() {
 	*x = StartRunRequest{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[10]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -998,7 +1207,7 @@ func (x *StartRunRequest) String() string {
 func (*StartRunRequest) ProtoMessage() {}
 
 func (x *StartRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[10]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1011,7 +1220,7 @@ func (x *StartRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartRunRequest.ProtoReflect.Descriptor instead.
 func (*StartRunRequest) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{10}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *StartRunRequest) GetClientId() string {
@@ -1064,7 +1273,7 @@ type StartRunResponse struct {
 
 func (x *StartRunResponse) Reset() {
 	*x = StartRunResponse{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[11]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1076,7 +1285,7 @@ func (x *StartRunResponse) String() string {
 func (*StartRunResponse) ProtoMessage() {}
 
 func (x *StartRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[11]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1089,7 +1298,7 @@ func (x *StartRunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartRunResponse.ProtoReflect.Descriptor instead.
 func (*StartRunResponse) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{11}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *StartRunResponse) GetStatus() *v1.Status {
@@ -1142,7 +1351,7 @@ type StreamEventsRequest struct {
 
 func (x *StreamEventsRequest) Reset() {
 	*x = StreamEventsRequest{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[12]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1154,7 +1363,7 @@ func (x *StreamEventsRequest) String() string {
 func (*StreamEventsRequest) ProtoMessage() {}
 
 func (x *StreamEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[12]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1167,7 +1376,7 @@ func (x *StreamEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamEventsRequest.ProtoReflect.Descriptor instead.
 func (*StreamEventsRequest) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{12}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *StreamEventsRequest) GetClientId() string {
@@ -1221,14 +1430,13 @@ type RunEvent struct {
 	Kind          EventKind              `protobuf:"varint,4,opt,name=kind,proto3,enum=spice.agent.engine.v1.EventKind" json:"kind,omitempty"`
 	PayloadJson   []byte                 `protobuf:"bytes,5,opt,name=payload_json,json=payloadJson,proto3" json:"payload_json,omitempty"`
 	Terminal      bool                   `protobuf:"varint,6,opt,name=terminal,proto3" json:"terminal,omitempty"`
-	OperationId   string                 `protobuf:"bytes,7,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RunEvent) Reset() {
 	*x = RunEvent{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[13]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1240,7 +1448,7 @@ func (x *RunEvent) String() string {
 func (*RunEvent) ProtoMessage() {}
 
 func (x *RunEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[13]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1253,7 +1461,7 @@ func (x *RunEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunEvent.ProtoReflect.Descriptor instead.
 func (*RunEvent) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{13}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RunEvent) GetRunId() string {
@@ -1298,13 +1506,6 @@ func (x *RunEvent) GetTerminal() bool {
 	return false
 }
 
-func (x *RunEvent) GetOperationId() string {
-	if x != nil {
-		return x.OperationId
-	}
-	return ""
-}
-
 // StreamControl marks replay bounds, terminal status, or disconnect position.
 type StreamControl struct {
 	state                 protoimpl.MessageState `protogen:"open.v1"`
@@ -1313,13 +1514,15 @@ type StreamControl struct {
 	LatestSequence        uint64                 `protobuf:"varint,3,opt,name=latest_sequence,json=latestSequence,proto3" json:"latest_sequence,omitempty"`
 	LastDeliveredSequence uint64                 `protobuf:"varint,4,opt,name=last_delivered_sequence,json=lastDeliveredSequence,proto3" json:"last_delivered_sequence,omitempty"`
 	Tailing               bool                   `protobuf:"varint,5,opt,name=tailing,proto3" json:"tailing,omitempty"`
+	PageLastSequence      *uint64                `protobuf:"varint,6,opt,name=page_last_sequence,json=pageLastSequence,proto3,oneof" json:"page_last_sequence,omitempty"`
+	HasMore               bool                   `protobuf:"varint,7,opt,name=has_more,json=hasMore,proto3" json:"has_more,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
 
 func (x *StreamControl) Reset() {
 	*x = StreamControl{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[14]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1331,7 +1534,7 @@ func (x *StreamControl) String() string {
 func (*StreamControl) ProtoMessage() {}
 
 func (x *StreamControl) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[14]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1344,7 +1547,7 @@ func (x *StreamControl) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamControl.ProtoReflect.Descriptor instead.
 func (*StreamControl) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{14}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *StreamControl) GetStatus() *v1.Status {
@@ -1382,6 +1585,20 @@ func (x *StreamControl) GetTailing() bool {
 	return false
 }
 
+func (x *StreamControl) GetPageLastSequence() uint64 {
+	if x != nil && x.PageLastSequence != nil {
+		return *x.PageLastSequence
+	}
+	return 0
+}
+
+func (x *StreamControl) GetHasMore() bool {
+	if x != nil {
+		return x.HasMore
+	}
+	return false
+}
+
 // StreamEventsResponse contains one event or one explicit control record.
 type StreamEventsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1396,7 +1613,7 @@ type StreamEventsResponse struct {
 
 func (x *StreamEventsResponse) Reset() {
 	*x = StreamEventsResponse{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[15]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1408,7 +1625,7 @@ func (x *StreamEventsResponse) String() string {
 func (*StreamEventsResponse) ProtoMessage() {}
 
 func (x *StreamEventsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[15]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1421,7 +1638,7 @@ func (x *StreamEventsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamEventsResponse.ProtoReflect.Descriptor instead.
 func (*StreamEventsResponse) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{15}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *StreamEventsResponse) GetPayload() isStreamEventsResponse_Payload {
@@ -1479,7 +1696,7 @@ type CancelRunRequest struct {
 
 func (x *CancelRunRequest) Reset() {
 	*x = CancelRunRequest{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[16]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1491,7 +1708,7 @@ func (x *CancelRunRequest) String() string {
 func (*CancelRunRequest) ProtoMessage() {}
 
 func (x *CancelRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[16]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1504,7 +1721,7 @@ func (x *CancelRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelRunRequest.ProtoReflect.Descriptor instead.
 func (*CancelRunRequest) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{16}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CancelRunRequest) GetClientId() string {
@@ -1555,7 +1772,7 @@ type CancelRunResponse struct {
 
 func (x *CancelRunResponse) Reset() {
 	*x = CancelRunResponse{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[17]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1567,7 +1784,7 @@ func (x *CancelRunResponse) String() string {
 func (*CancelRunResponse) ProtoMessage() {}
 
 func (x *CancelRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[17]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1580,7 +1797,7 @@ func (x *CancelRunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelRunResponse.ProtoReflect.Descriptor instead.
 func (*CancelRunResponse) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{17}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *CancelRunResponse) GetStatus() *v1.Status {
@@ -1619,7 +1836,6 @@ type RespondInteractionRequest struct {
 	ClientOperationId string                 `protobuf:"bytes,3,opt,name=client_operation_id,json=clientOperationId,proto3" json:"client_operation_id,omitempty"`
 	RunId             string                 `protobuf:"bytes,4,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	InteractionId     string                 `protobuf:"bytes,5,opt,name=interaction_id,json=interactionId,proto3" json:"interaction_id,omitempty"`
-	ResponseId        string                 `protobuf:"bytes,6,opt,name=response_id,json=responseId,proto3" json:"response_id,omitempty"`
 	ValueJson         []byte                 `protobuf:"bytes,7,opt,name=value_json,json=valueJson,proto3" json:"value_json,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
@@ -1627,7 +1843,7 @@ type RespondInteractionRequest struct {
 
 func (x *RespondInteractionRequest) Reset() {
 	*x = RespondInteractionRequest{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[18]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1639,7 +1855,7 @@ func (x *RespondInteractionRequest) String() string {
 func (*RespondInteractionRequest) ProtoMessage() {}
 
 func (x *RespondInteractionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[18]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1652,7 +1868,7 @@ func (x *RespondInteractionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RespondInteractionRequest.ProtoReflect.Descriptor instead.
 func (*RespondInteractionRequest) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{18}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *RespondInteractionRequest) GetClientId() string {
@@ -1690,13 +1906,6 @@ func (x *RespondInteractionRequest) GetInteractionId() string {
 	return ""
 }
 
-func (x *RespondInteractionRequest) GetResponseId() string {
-	if x != nil {
-		return x.ResponseId
-	}
-	return ""
-}
-
 func (x *RespondInteractionRequest) GetValueJson() []byte {
 	if x != nil {
 		return x.ValueJson
@@ -1706,18 +1915,17 @@ func (x *RespondInteractionRequest) GetValueJson() []byte {
 
 // RespondInteractionResponse reports duplicate and committed responses.
 type RespondInteractionResponse struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Status            *v1.Status             `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	Accepted          bool                   `protobuf:"varint,2,opt,name=accepted,proto3" json:"accepted,omitempty"`
-	DuplicateResponse bool                   `protobuf:"varint,3,opt,name=duplicate_response,json=duplicateResponse,proto3" json:"duplicate_response,omitempty"`
-	CommittedSequence uint64                 `protobuf:"varint,4,opt,name=committed_sequence,json=committedSequence,proto3" json:"committed_sequence,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Status             *v1.Status             `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Accepted           bool                   `protobuf:"varint,2,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	DuplicateOperation bool                   `protobuf:"varint,5,opt,name=duplicate_operation,json=duplicateOperation,proto3" json:"duplicate_operation,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *RespondInteractionResponse) Reset() {
 	*x = RespondInteractionResponse{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[19]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1729,7 +1937,7 @@ func (x *RespondInteractionResponse) String() string {
 func (*RespondInteractionResponse) ProtoMessage() {}
 
 func (x *RespondInteractionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[19]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1742,7 +1950,7 @@ func (x *RespondInteractionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RespondInteractionResponse.ProtoReflect.Descriptor instead.
 func (*RespondInteractionResponse) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{19}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *RespondInteractionResponse) GetStatus() *v1.Status {
@@ -1759,18 +1967,724 @@ func (x *RespondInteractionResponse) GetAccepted() bool {
 	return false
 }
 
-func (x *RespondInteractionResponse) GetDuplicateResponse() bool {
+func (x *RespondInteractionResponse) GetDuplicateOperation() bool {
 	if x != nil {
-		return x.DuplicateResponse
+		return x.DuplicateOperation
 	}
 	return false
 }
 
-func (x *RespondInteractionResponse) GetCommittedSequence() uint64 {
+// PendingInteraction is UI-neutral prompt state kept outside RunEvent replay.
+type PendingInteraction struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	InteractionId string                 `protobuf:"bytes,2,opt,name=interaction_id,json=interactionId,proto3" json:"interaction_id,omitempty"`
+	Kind          string                 `protobuf:"bytes,3,opt,name=kind,proto3" json:"kind,omitempty"`
+	Prompt        string                 `protobuf:"bytes,4,opt,name=prompt,proto3" json:"prompt,omitempty"`
+	SchemaJson    []byte                 `protobuf:"bytes,5,opt,name=schema_json,json=schemaJson,proto3" json:"schema_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PendingInteraction) Reset() {
+	*x = PendingInteraction{}
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PendingInteraction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PendingInteraction) ProtoMessage() {}
+
+func (x *PendingInteraction) ProtoReflect() protoreflect.Message {
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[23]
 	if x != nil {
-		return x.CommittedSequence
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PendingInteraction.ProtoReflect.Descriptor instead.
+func (*PendingInteraction) Descriptor() ([]byte, []int) {
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *PendingInteraction) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *PendingInteraction) GetInteractionId() string {
+	if x != nil {
+		return x.InteractionId
+	}
+	return ""
+}
+
+func (x *PendingInteraction) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *PendingInteraction) GetPrompt() string {
+	if x != nil {
+		return x.Prompt
+	}
+	return ""
+}
+
+func (x *PendingInteraction) GetSchemaJson() []byte {
+	if x != nil {
+		return x.SchemaJson
+	}
+	return nil
+}
+
+// InteractionDelta is one revisioned pending-set mutation.
+type InteractionDelta struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Revision      uint64                 `protobuf:"varint,1,opt,name=revision,proto3" json:"revision,omitempty"`
+	Kind          InteractionDeltaKind   `protobuf:"varint,2,opt,name=kind,proto3,enum=spice.agent.engine.v1.InteractionDeltaKind" json:"kind,omitempty"`
+	Interaction   *PendingInteraction    `protobuf:"bytes,3,opt,name=interaction,proto3" json:"interaction,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InteractionDelta) Reset() {
+	*x = InteractionDelta{}
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InteractionDelta) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InteractionDelta) ProtoMessage() {}
+
+func (x *InteractionDelta) ProtoReflect() protoreflect.Message {
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InteractionDelta.ProtoReflect.Descriptor instead.
+func (*InteractionDelta) Descriptor() ([]byte, []int) {
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *InteractionDelta) GetRevision() uint64 {
+	if x != nil {
+		return x.Revision
 	}
 	return 0
+}
+
+func (x *InteractionDelta) GetKind() InteractionDeltaKind {
+	if x != nil {
+		return x.Kind
+	}
+	return InteractionDeltaKind_INTERACTION_DELTA_KIND_UNSPECIFIED
+}
+
+func (x *InteractionDelta) GetInteraction() *PendingInteraction {
+	if x != nil {
+		return x.Interaction
+	}
+	return nil
+}
+
+// InteractionSnapshot is an atomic sorted view of all currently pending prompts.
+type InteractionSnapshot struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Revision      uint64                 `protobuf:"varint,1,opt,name=revision,proto3" json:"revision,omitempty"`
+	Pending       []*PendingInteraction  `protobuf:"bytes,2,rep,name=pending,proto3" json:"pending,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InteractionSnapshot) Reset() {
+	*x = InteractionSnapshot{}
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InteractionSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InteractionSnapshot) ProtoMessage() {}
+
+func (x *InteractionSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InteractionSnapshot.ProtoReflect.Descriptor instead.
+func (*InteractionSnapshot) Descriptor() ([]byte, []int) {
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *InteractionSnapshot) GetRevision() uint64 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
+func (x *InteractionSnapshot) GetPending() []*PendingInteraction {
+	if x != nil {
+		return x.Pending
+	}
+	return nil
+}
+
+// StreamInteractionsRequest always produces one complete atomic pending
+// snapshot first, then revision-contiguous deltas after that snapshot.
+type StreamInteractionsRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ClientId       string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	OwnershipEpoch uint64                 `protobuf:"varint,2,opt,name=ownership_epoch,json=ownershipEpoch,proto3" json:"ownership_epoch,omitempty"`
+	ReplayLimit    uint32                 `protobuf:"varint,3,opt,name=replay_limit,json=replayLimit,proto3" json:"replay_limit,omitempty"`
+	Tail           bool                   `protobuf:"varint,4,opt,name=tail,proto3" json:"tail,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *StreamInteractionsRequest) Reset() {
+	*x = StreamInteractionsRequest{}
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamInteractionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamInteractionsRequest) ProtoMessage() {}
+
+func (x *StreamInteractionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamInteractionsRequest.ProtoReflect.Descriptor instead.
+func (*StreamInteractionsRequest) Descriptor() ([]byte, []int) {
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *StreamInteractionsRequest) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *StreamInteractionsRequest) GetOwnershipEpoch() uint64 {
+	if x != nil {
+		return x.OwnershipEpoch
+	}
+	return 0
+}
+
+func (x *StreamInteractionsRequest) GetReplayLimit() uint32 {
+	if x != nil {
+		return x.ReplayLimit
+	}
+	return 0
+}
+
+func (x *StreamInteractionsRequest) GetTail() bool {
+	if x != nil {
+		return x.Tail
+	}
+	return false
+}
+
+// InteractionStreamControl reports the captured revision page and tail state.
+type InteractionStreamControl struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Status           *v1.Status             `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	LatestRevision   uint64                 `protobuf:"varint,2,opt,name=latest_revision,json=latestRevision,proto3" json:"latest_revision,omitempty"`
+	PageLastRevision uint64                 `protobuf:"varint,3,opt,name=page_last_revision,json=pageLastRevision,proto3" json:"page_last_revision,omitempty"`
+	HasMore          bool                   `protobuf:"varint,4,opt,name=has_more,json=hasMore,proto3" json:"has_more,omitempty"`
+	Tailing          bool                   `protobuf:"varint,5,opt,name=tailing,proto3" json:"tailing,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *InteractionStreamControl) Reset() {
+	*x = InteractionStreamControl{}
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InteractionStreamControl) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InteractionStreamControl) ProtoMessage() {}
+
+func (x *InteractionStreamControl) ProtoReflect() protoreflect.Message {
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InteractionStreamControl.ProtoReflect.Descriptor instead.
+func (*InteractionStreamControl) Descriptor() ([]byte, []int) {
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *InteractionStreamControl) GetStatus() *v1.Status {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+func (x *InteractionStreamControl) GetLatestRevision() uint64 {
+	if x != nil {
+		return x.LatestRevision
+	}
+	return 0
+}
+
+func (x *InteractionStreamControl) GetPageLastRevision() uint64 {
+	if x != nil {
+		return x.PageLastRevision
+	}
+	return 0
+}
+
+func (x *InteractionStreamControl) GetHasMore() bool {
+	if x != nil {
+		return x.HasMore
+	}
+	return false
+}
+
+func (x *InteractionStreamControl) GetTailing() bool {
+	if x != nil {
+		return x.Tailing
+	}
+	return false
+}
+
+// StreamInteractionsResponse carries a snapshot, delta, or explicit control.
+type StreamInteractionsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Payload:
+	//
+	//	*StreamInteractionsResponse_Snapshot
+	//	*StreamInteractionsResponse_Delta
+	//	*StreamInteractionsResponse_Control
+	Payload       isStreamInteractionsResponse_Payload `protobuf_oneof:"payload"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamInteractionsResponse) Reset() {
+	*x = StreamInteractionsResponse{}
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamInteractionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamInteractionsResponse) ProtoMessage() {}
+
+func (x *StreamInteractionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamInteractionsResponse.ProtoReflect.Descriptor instead.
+func (*StreamInteractionsResponse) Descriptor() ([]byte, []int) {
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *StreamInteractionsResponse) GetPayload() isStreamInteractionsResponse_Payload {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *StreamInteractionsResponse) GetSnapshot() *InteractionSnapshot {
+	if x != nil {
+		if x, ok := x.Payload.(*StreamInteractionsResponse_Snapshot); ok {
+			return x.Snapshot
+		}
+	}
+	return nil
+}
+
+func (x *StreamInteractionsResponse) GetDelta() *InteractionDelta {
+	if x != nil {
+		if x, ok := x.Payload.(*StreamInteractionsResponse_Delta); ok {
+			return x.Delta
+		}
+	}
+	return nil
+}
+
+func (x *StreamInteractionsResponse) GetControl() *InteractionStreamControl {
+	if x != nil {
+		if x, ok := x.Payload.(*StreamInteractionsResponse_Control); ok {
+			return x.Control
+		}
+	}
+	return nil
+}
+
+type isStreamInteractionsResponse_Payload interface {
+	isStreamInteractionsResponse_Payload()
+}
+
+type StreamInteractionsResponse_Snapshot struct {
+	Snapshot *InteractionSnapshot `protobuf:"bytes,1,opt,name=snapshot,proto3,oneof"`
+}
+
+type StreamInteractionsResponse_Delta struct {
+	Delta *InteractionDelta `protobuf:"bytes,2,opt,name=delta,proto3,oneof"`
+}
+
+type StreamInteractionsResponse_Control struct {
+	Control *InteractionStreamControl `protobuf:"bytes,3,opt,name=control,proto3,oneof"`
+}
+
+func (*StreamInteractionsResponse_Snapshot) isStreamInteractionsResponse_Payload() {}
+
+func (*StreamInteractionsResponse_Delta) isStreamInteractionsResponse_Payload() {}
+
+func (*StreamInteractionsResponse_Control) isStreamInteractionsResponse_Payload() {}
+
+// SuspendRunRequest pauses a run at its next safe completed-turn boundary.
+type SuspendRunRequest struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	ClientId          string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	OwnershipEpoch    uint64                 `protobuf:"varint,2,opt,name=ownership_epoch,json=ownershipEpoch,proto3" json:"ownership_epoch,omitempty"`
+	ClientOperationId string                 `protobuf:"bytes,3,opt,name=client_operation_id,json=clientOperationId,proto3" json:"client_operation_id,omitempty"`
+	RunId             string                 `protobuf:"bytes,4,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *SuspendRunRequest) Reset() {
+	*x = SuspendRunRequest{}
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuspendRunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuspendRunRequest) ProtoMessage() {}
+
+func (x *SuspendRunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuspendRunRequest.ProtoReflect.Descriptor instead.
+func (*SuspendRunRequest) Descriptor() ([]byte, []int) {
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *SuspendRunRequest) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *SuspendRunRequest) GetOwnershipEpoch() uint64 {
+	if x != nil {
+		return x.OwnershipEpoch
+	}
+	return 0
+}
+
+func (x *SuspendRunRequest) GetClientOperationId() string {
+	if x != nil {
+		return x.ClientOperationId
+	}
+	return ""
+}
+
+func (x *SuspendRunRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+// SuspendRunResponse identifies the committed safe boundary.
+type SuspendRunResponse struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Status             *v1.Status             `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Suspended          bool                   `protobuf:"varint,2,opt,name=suspended,proto3" json:"suspended,omitempty"`
+	BoundarySequence   uint64                 `protobuf:"varint,3,opt,name=boundary_sequence,json=boundarySequence,proto3" json:"boundary_sequence,omitempty"`
+	DuplicateOperation bool                   `protobuf:"varint,4,opt,name=duplicate_operation,json=duplicateOperation,proto3" json:"duplicate_operation,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *SuspendRunResponse) Reset() {
+	*x = SuspendRunResponse{}
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuspendRunResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuspendRunResponse) ProtoMessage() {}
+
+func (x *SuspendRunResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuspendRunResponse.ProtoReflect.Descriptor instead.
+func (*SuspendRunResponse) Descriptor() ([]byte, []int) {
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *SuspendRunResponse) GetStatus() *v1.Status {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+func (x *SuspendRunResponse) GetSuspended() bool {
+	if x != nil {
+		return x.Suspended
+	}
+	return false
+}
+
+func (x *SuspendRunResponse) GetBoundarySequence() uint64 {
+	if x != nil {
+		return x.BoundarySequence
+	}
+	return 0
+}
+
+func (x *SuspendRunResponse) GetDuplicateOperation() bool {
+	if x != nil {
+		return x.DuplicateOperation
+	}
+	return false
+}
+
+// ResumeRunRequest continues a locally suspended run without changing identity.
+type ResumeRunRequest struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	ClientId          string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	OwnershipEpoch    uint64                 `protobuf:"varint,2,opt,name=ownership_epoch,json=ownershipEpoch,proto3" json:"ownership_epoch,omitempty"`
+	ClientOperationId string                 `protobuf:"bytes,3,opt,name=client_operation_id,json=clientOperationId,proto3" json:"client_operation_id,omitempty"`
+	RunId             string                 `protobuf:"bytes,4,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ResumeRunRequest) Reset() {
+	*x = ResumeRunRequest{}
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResumeRunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResumeRunRequest) ProtoMessage() {}
+
+func (x *ResumeRunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResumeRunRequest.ProtoReflect.Descriptor instead.
+func (*ResumeRunRequest) Descriptor() ([]byte, []int) {
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *ResumeRunRequest) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *ResumeRunRequest) GetOwnershipEpoch() uint64 {
+	if x != nil {
+		return x.OwnershipEpoch
+	}
+	return 0
+}
+
+func (x *ResumeRunRequest) GetClientOperationId() string {
+	if x != nil {
+		return x.ClientOperationId
+	}
+	return ""
+}
+
+func (x *ResumeRunRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+// ResumeRunResponse reports the stable run's next authoritative sequence.
+type ResumeRunResponse struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Status             *v1.Status             `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Resumed            bool                   `protobuf:"varint,2,opt,name=resumed,proto3" json:"resumed,omitempty"`
+	NextSequence       uint64                 `protobuf:"varint,3,opt,name=next_sequence,json=nextSequence,proto3" json:"next_sequence,omitempty"`
+	DuplicateOperation bool                   `protobuf:"varint,4,opt,name=duplicate_operation,json=duplicateOperation,proto3" json:"duplicate_operation,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *ResumeRunResponse) Reset() {
+	*x = ResumeRunResponse{}
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResumeRunResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResumeRunResponse) ProtoMessage() {}
+
+func (x *ResumeRunResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResumeRunResponse.ProtoReflect.Descriptor instead.
+func (*ResumeRunResponse) Descriptor() ([]byte, []int) {
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *ResumeRunResponse) GetStatus() *v1.Status {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+func (x *ResumeRunResponse) GetResumed() bool {
+	if x != nil {
+		return x.Resumed
+	}
+	return false
+}
+
+func (x *ResumeRunResponse) GetNextSequence() uint64 {
+	if x != nil {
+		return x.NextSequence
+	}
+	return 0
+}
+
+func (x *ResumeRunResponse) GetDuplicateOperation() bool {
+	if x != nil {
+		return x.DuplicateOperation
+	}
+	return false
 }
 
 // SnapshotEnvelope carries one checksummed provider-neutral safe snapshot.
@@ -1788,7 +2702,7 @@ type SnapshotEnvelope struct {
 
 func (x *SnapshotEnvelope) Reset() {
 	*x = SnapshotEnvelope{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[20]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1800,7 +2714,7 @@ func (x *SnapshotEnvelope) String() string {
 func (*SnapshotEnvelope) ProtoMessage() {}
 
 func (x *SnapshotEnvelope) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[20]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1813,7 +2727,7 @@ func (x *SnapshotEnvelope) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SnapshotEnvelope.ProtoReflect.Descriptor instead.
 func (*SnapshotEnvelope) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{20}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *SnapshotEnvelope) GetFormat() string {
@@ -1870,7 +2784,7 @@ type ExportSnapshotRequest struct {
 
 func (x *ExportSnapshotRequest) Reset() {
 	*x = ExportSnapshotRequest{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[21]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1882,7 +2796,7 @@ func (x *ExportSnapshotRequest) String() string {
 func (*ExportSnapshotRequest) ProtoMessage() {}
 
 func (x *ExportSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[21]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1895,7 +2809,7 @@ func (x *ExportSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*ExportSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{21}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *ExportSnapshotRequest) GetClientId() string {
@@ -1930,7 +2844,7 @@ type ExportSnapshotResponse struct {
 
 func (x *ExportSnapshotResponse) Reset() {
 	*x = ExportSnapshotResponse{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[22]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1942,7 +2856,7 @@ func (x *ExportSnapshotResponse) String() string {
 func (*ExportSnapshotResponse) ProtoMessage() {}
 
 func (x *ExportSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[22]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1955,7 +2869,7 @@ func (x *ExportSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*ExportSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{22}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *ExportSnapshotResponse) GetStatus() *v1.Status {
@@ -1974,21 +2888,18 @@ func (x *ExportSnapshotResponse) GetSnapshot() *SnapshotEnvelope {
 
 // ImportSnapshotRequest resumes a suspended snapshot with explicit ownership.
 type ImportSnapshotRequest struct {
-	state                         protoimpl.MessageState `protogen:"open.v1"`
-	ClientId                      string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
-	OwnershipEpoch                uint64                 `protobuf:"varint,2,opt,name=ownership_epoch,json=ownershipEpoch,proto3" json:"ownership_epoch,omitempty"`
-	ClientOperationId             string                 `protobuf:"bytes,3,opt,name=client_operation_id,json=clientOperationId,proto3" json:"client_operation_id,omitempty"`
-	NewRunId                      string                 `protobuf:"bytes,4,opt,name=new_run_id,json=newRunId,proto3" json:"new_run_id,omitempty"`
-	ExpectedStaticPlanFingerprint string                 `protobuf:"bytes,5,opt,name=expected_static_plan_fingerprint,json=expectedStaticPlanFingerprint,proto3" json:"expected_static_plan_fingerprint,omitempty"`
-	ExpectedPlanId                string                 `protobuf:"bytes,6,opt,name=expected_plan_id,json=expectedPlanId,proto3" json:"expected_plan_id,omitempty"`
-	Snapshot                      *SnapshotEnvelope      `protobuf:"bytes,7,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
-	unknownFields                 protoimpl.UnknownFields
-	sizeCache                     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	ClientId          string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	OwnershipEpoch    uint64                 `protobuf:"varint,2,opt,name=ownership_epoch,json=ownershipEpoch,proto3" json:"ownership_epoch,omitempty"`
+	ClientOperationId string                 `protobuf:"bytes,3,opt,name=client_operation_id,json=clientOperationId,proto3" json:"client_operation_id,omitempty"`
+	Snapshot          *SnapshotEnvelope      `protobuf:"bytes,7,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *ImportSnapshotRequest) Reset() {
 	*x = ImportSnapshotRequest{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[23]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2000,7 +2911,7 @@ func (x *ImportSnapshotRequest) String() string {
 func (*ImportSnapshotRequest) ProtoMessage() {}
 
 func (x *ImportSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[23]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2013,7 +2924,7 @@ func (x *ImportSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImportSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*ImportSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{23}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ImportSnapshotRequest) GetClientId() string {
@@ -2033,27 +2944,6 @@ func (x *ImportSnapshotRequest) GetOwnershipEpoch() uint64 {
 func (x *ImportSnapshotRequest) GetClientOperationId() string {
 	if x != nil {
 		return x.ClientOperationId
-	}
-	return ""
-}
-
-func (x *ImportSnapshotRequest) GetNewRunId() string {
-	if x != nil {
-		return x.NewRunId
-	}
-	return ""
-}
-
-func (x *ImportSnapshotRequest) GetExpectedStaticPlanFingerprint() string {
-	if x != nil {
-		return x.ExpectedStaticPlanFingerprint
-	}
-	return ""
-}
-
-func (x *ImportSnapshotRequest) GetExpectedPlanId() string {
-	if x != nil {
-		return x.ExpectedPlanId
 	}
 	return ""
 }
@@ -2078,7 +2968,7 @@ type ImportSnapshotResponse struct {
 
 func (x *ImportSnapshotResponse) Reset() {
 	*x = ImportSnapshotResponse{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[24]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2090,7 +2980,7 @@ func (x *ImportSnapshotResponse) String() string {
 func (*ImportSnapshotResponse) ProtoMessage() {}
 
 func (x *ImportSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[24]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2103,7 +2993,7 @@ func (x *ImportSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImportSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*ImportSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{24}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *ImportSnapshotResponse) GetStatus() *v1.Status {
@@ -2162,20 +3052,29 @@ const file_spice_agent_engine_v1_engine_proto_rawDesc = "" +
 	"\aMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x126\n" +
 	"\x04role\x18\x02 \x01(\x0e2\".spice.agent.engine.v1.MessageRoleR\x04role\x128\n" +
-	"\x05parts\x18\x03 \x03(\v2\".spice.agent.engine.v1.ContentPartR\x05parts\"\xc2\x01\n" +
+	"\x05parts\x18\x03 \x03(\v2\".spice.agent.engine.v1.ContentPartR\x05parts\"z\n" +
 	"\x12AgentDefinitionRef\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
+	"\brevision\x18\x02 \x01(\tR\brevisionJ\x04\b\x03\x10\aR\x05modelR\tmax_turnsR expected_static_plan_fingerprint\"k\n" +
+	"\n" +
+	"Definition\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\brevision\x18\x02 \x01(\tR\brevision\x12\x14\n" +
 	"\x05model\x18\x03 \x01(\tR\x05model\x12\x1b\n" +
-	"\tmax_turns\x18\x04 \x01(\rR\bmaxTurns\x12G\n" +
-	" expected_static_plan_fingerprint\x18\x05 \x01(\tR\x1dexpectedStaticPlanFingerprintJ\x04\b\x06\x10\a\"\xc8\x03\n" +
+	"\tmax_turns\x18\x04 \x01(\rR\bmaxTurns\"p\n" +
+	"\rDefinitionSet\x12\x1a\n" +
+	"\brevision\x18\x01 \x01(\tR\brevision\x12C\n" +
+	"\vdefinitions\x18\x02 \x03(\v2!.spice.agent.engine.v1.DefinitionR\vdefinitions\"g\n" +
+	"\x0eReconnectClaim\x12\x1b\n" +
+	"\tclient_id\x18\x01 \x01(\tR\bclientId\x128\n" +
+	"\x18expected_ownership_epoch\x18\x02 \x01(\x04R\x16expectedOwnershipEpoch\"\x81\x04\n" +
 	"\x11InitializeRequest\x12@\n" +
 	"\bprotocol\x18\x01 \x01(\v2$.spice.agent.common.v1.ProtocolRangeR\bprotocol\x12<\n" +
 	"\x06client\x18\x02 \x01(\v2$.spice.agent.common.v1.BuildIdentityR\x06client\x12[\n" +
 	"\x16supported_capabilities\x18\x03 \x01(\v2$.spice.agent.common.v1.CapabilitySetR\x15supportedCapabilities\x12Y\n" +
 	"\x15required_capabilities\x18\x04 \x01(\v2$.spice.agent.common.v1.CapabilitySetR\x14requiredCapabilities\x12H\n" +
-	"\x10requested_limits\x18\x05 \x01(\v2\x1d.spice.agent.common.v1.LimitsR\x0frequestedLimits\x121\n" +
-	"\x14authentication_token\x18\x06 \x01(\fR\x13authenticationToken\"\xcb\x03\n" +
+	"\x10requested_limits\x18\x05 \x01(\v2\x1d.spice.agent.common.v1.LimitsR\x0frequestedLimits\x12N\n" +
+	"\x0freconnect_claim\x18\a \x01(\v2%.spice.agent.engine.v1.ReconnectClaimR\x0ereconnectClaimJ\x04\b\x06\x10\aR\x14authentication_token\"\x93\x04\n" +
 	"\x12InitializeResponse\x125\n" +
 	"\x06status\x18\x01 \x01(\v2\x1d.spice.agent.common.v1.StatusR\x06status\x12B\n" +
 	"\bprotocol\x18\x02 \x01(\v2&.spice.agent.common.v1.ProtocolVersionR\bprotocol\x12<\n" +
@@ -2184,7 +3083,8 @@ const file_spice_agent_engine_v1_engine_proto_rawDesc = "" +
 	"\x06limits\x18\x05 \x01(\v2\x1d.spice.agent.common.v1.LimitsR\x06limits\x125\n" +
 	"\x06health\x18\x06 \x01(\v2\x1d.spice.agent.common.v1.HealthR\x06health\x12\x1b\n" +
 	"\tclient_id\x18\a \x01(\tR\bclientId\x12'\n" +
-	"\x0fownership_epoch\x18\b \x01(\x04R\x0eownershipEpoch\"U\n" +
+	"\x0fownership_epoch\x18\b \x01(\x04R\x0eownershipEpoch\x12F\n" +
+	"\vdefinitions\x18\t \x01(\v2$.spice.agent.engine.v1.DefinitionSetR\vdefinitions\"U\n" +
 	"\rHealthRequest\x12\x1b\n" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12'\n" +
 	"\x0fownership_epoch\x18\x02 \x01(\x04R\x0eownershipEpoch\"\x80\x02\n" +
@@ -2213,21 +3113,23 @@ const file_spice_agent_engine_v1_engine_proto_rawDesc = "" +
 	"\x06run_id\x18\x03 \x01(\tR\x05runId\x12%\n" +
 	"\x0eafter_sequence\x18\x04 \x01(\x04R\rafterSequence\x12!\n" +
 	"\freplay_limit\x18\x05 \x01(\rR\vreplayLimit\x12\x12\n" +
-	"\x04tail\x18\x06 \x01(\bR\x04tail\"\xf2\x01\n" +
+	"\x04tail\x18\x06 \x01(\bR\x04tail\"\xe3\x01\n" +
 	"\bRunEvent\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x1a\n" +
 	"\bsequence\x18\x02 \x01(\x04R\bsequence\x12\x1b\n" +
 	"\tunix_nano\x18\x03 \x01(\x03R\bunixNano\x124\n" +
 	"\x04kind\x18\x04 \x01(\x0e2 .spice.agent.engine.v1.EventKindR\x04kind\x12!\n" +
 	"\fpayload_json\x18\x05 \x01(\fR\vpayloadJson\x12\x1a\n" +
-	"\bterminal\x18\x06 \x01(\bR\bterminal\x12!\n" +
-	"\foperation_id\x18\a \x01(\tR\voperationId\"\xee\x01\n" +
+	"\bterminal\x18\x06 \x01(\bR\bterminalJ\x04\b\a\x10\bR\foperation_id\"\xd3\x02\n" +
 	"\rStreamControl\x125\n" +
 	"\x06status\x18\x01 \x01(\v2\x1d.spice.agent.common.v1.StatusR\x06status\x12+\n" +
 	"\x11earliest_sequence\x18\x02 \x01(\x04R\x10earliestSequence\x12'\n" +
 	"\x0flatest_sequence\x18\x03 \x01(\x04R\x0elatestSequence\x126\n" +
 	"\x17last_delivered_sequence\x18\x04 \x01(\x04R\x15lastDeliveredSequence\x12\x18\n" +
-	"\atailing\x18\x05 \x01(\bR\atailing\"\x9c\x01\n" +
+	"\atailing\x18\x05 \x01(\bR\atailing\x121\n" +
+	"\x12page_last_sequence\x18\x06 \x01(\x04H\x00R\x10pageLastSequence\x88\x01\x01\x12\x19\n" +
+	"\bhas_more\x18\a \x01(\bR\ahasMoreB\x15\n" +
+	"\x13_page_last_sequence\"\x9c\x01\n" +
 	"\x14StreamEventsResponse\x127\n" +
 	"\x05event\x18\x01 \x01(\v2\x1f.spice.agent.engine.v1.RunEventH\x00R\x05event\x12@\n" +
 	"\acontrol\x18\x02 \x01(\v2$.spice.agent.engine.v1.StreamControlH\x00R\acontrolB\t\n" +
@@ -2242,22 +3144,69 @@ const file_spice_agent_engine_v1_engine_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\v2\x1d.spice.agent.common.v1.StatusR\x06status\x125\n" +
 	"\x16cancellation_requested\x18\x02 \x01(\bR\x15cancellationRequested\x12)\n" +
 	"\x10already_terminal\x18\x03 \x01(\bR\x0falreadyTerminal\x12+\n" +
-	"\x11terminal_sequence\x18\x04 \x01(\x04R\x10terminalSequence\"\x8f\x02\n" +
+	"\x11terminal_sequence\x18\x04 \x01(\x04R\x10terminalSequence\"\x81\x02\n" +
 	"\x19RespondInteractionRequest\x12\x1b\n" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12'\n" +
 	"\x0fownership_epoch\x18\x02 \x01(\x04R\x0eownershipEpoch\x12.\n" +
 	"\x13client_operation_id\x18\x03 \x01(\tR\x11clientOperationId\x12\x15\n" +
 	"\x06run_id\x18\x04 \x01(\tR\x05runId\x12%\n" +
-	"\x0einteraction_id\x18\x05 \x01(\tR\rinteractionId\x12\x1f\n" +
-	"\vresponse_id\x18\x06 \x01(\tR\n" +
-	"responseId\x12\x1d\n" +
+	"\x0einteraction_id\x18\x05 \x01(\tR\rinteractionId\x12\x1d\n" +
 	"\n" +
-	"value_json\x18\a \x01(\fR\tvalueJson\"\xcd\x01\n" +
+	"value_json\x18\a \x01(\fR\tvalueJsonJ\x04\b\x06\x10\aR\vresponse_id\"\xd4\x01\n" +
 	"\x1aRespondInteractionResponse\x125\n" +
 	"\x06status\x18\x01 \x01(\v2\x1d.spice.agent.common.v1.StatusR\x06status\x12\x1a\n" +
-	"\baccepted\x18\x02 \x01(\bR\baccepted\x12-\n" +
-	"\x12duplicate_response\x18\x03 \x01(\bR\x11duplicateResponse\x12-\n" +
-	"\x12committed_sequence\x18\x04 \x01(\x04R\x11committedSequence\"\xe0\x01\n" +
+	"\baccepted\x18\x02 \x01(\bR\baccepted\x12/\n" +
+	"\x13duplicate_operation\x18\x05 \x01(\bR\x12duplicateOperationJ\x04\b\x03\x10\x04J\x04\b\x04\x10\x05R\x12duplicate_responseR\x12committed_sequence\"\x9f\x01\n" +
+	"\x12PendingInteraction\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12%\n" +
+	"\x0einteraction_id\x18\x02 \x01(\tR\rinteractionId\x12\x12\n" +
+	"\x04kind\x18\x03 \x01(\tR\x04kind\x12\x16\n" +
+	"\x06prompt\x18\x04 \x01(\tR\x06prompt\x12\x1f\n" +
+	"\vschema_json\x18\x05 \x01(\fR\n" +
+	"schemaJson\"\xbc\x01\n" +
+	"\x10InteractionDelta\x12\x1a\n" +
+	"\brevision\x18\x01 \x01(\x04R\brevision\x12?\n" +
+	"\x04kind\x18\x02 \x01(\x0e2+.spice.agent.engine.v1.InteractionDeltaKindR\x04kind\x12K\n" +
+	"\vinteraction\x18\x03 \x01(\v2).spice.agent.engine.v1.PendingInteractionR\vinteraction\"v\n" +
+	"\x13InteractionSnapshot\x12\x1a\n" +
+	"\brevision\x18\x01 \x01(\x04R\brevision\x12C\n" +
+	"\apending\x18\x02 \x03(\v2).spice.agent.engine.v1.PendingInteractionR\apending\"\x98\x01\n" +
+	"\x19StreamInteractionsRequest\x12\x1b\n" +
+	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12'\n" +
+	"\x0fownership_epoch\x18\x02 \x01(\x04R\x0eownershipEpoch\x12!\n" +
+	"\freplay_limit\x18\x03 \x01(\rR\vreplayLimit\x12\x12\n" +
+	"\x04tail\x18\x04 \x01(\bR\x04tail\"\xdd\x01\n" +
+	"\x18InteractionStreamControl\x125\n" +
+	"\x06status\x18\x01 \x01(\v2\x1d.spice.agent.common.v1.StatusR\x06status\x12'\n" +
+	"\x0flatest_revision\x18\x02 \x01(\x04R\x0elatestRevision\x12,\n" +
+	"\x12page_last_revision\x18\x03 \x01(\x04R\x10pageLastRevision\x12\x19\n" +
+	"\bhas_more\x18\x04 \x01(\bR\ahasMore\x12\x18\n" +
+	"\atailing\x18\x05 \x01(\bR\atailing\"\xff\x01\n" +
+	"\x1aStreamInteractionsResponse\x12H\n" +
+	"\bsnapshot\x18\x01 \x01(\v2*.spice.agent.engine.v1.InteractionSnapshotH\x00R\bsnapshot\x12?\n" +
+	"\x05delta\x18\x02 \x01(\v2'.spice.agent.engine.v1.InteractionDeltaH\x00R\x05delta\x12K\n" +
+	"\acontrol\x18\x03 \x01(\v2/.spice.agent.engine.v1.InteractionStreamControlH\x00R\acontrolB\t\n" +
+	"\apayload\"\xa0\x01\n" +
+	"\x11SuspendRunRequest\x12\x1b\n" +
+	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12'\n" +
+	"\x0fownership_epoch\x18\x02 \x01(\x04R\x0eownershipEpoch\x12.\n" +
+	"\x13client_operation_id\x18\x03 \x01(\tR\x11clientOperationId\x12\x15\n" +
+	"\x06run_id\x18\x04 \x01(\tR\x05runId\"\xc7\x01\n" +
+	"\x12SuspendRunResponse\x125\n" +
+	"\x06status\x18\x01 \x01(\v2\x1d.spice.agent.common.v1.StatusR\x06status\x12\x1c\n" +
+	"\tsuspended\x18\x02 \x01(\bR\tsuspended\x12+\n" +
+	"\x11boundary_sequence\x18\x03 \x01(\x04R\x10boundarySequence\x12/\n" +
+	"\x13duplicate_operation\x18\x04 \x01(\bR\x12duplicateOperation\"\x9f\x01\n" +
+	"\x10ResumeRunRequest\x12\x1b\n" +
+	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12'\n" +
+	"\x0fownership_epoch\x18\x02 \x01(\x04R\x0eownershipEpoch\x12.\n" +
+	"\x13client_operation_id\x18\x03 \x01(\tR\x11clientOperationId\x12\x15\n" +
+	"\x06run_id\x18\x04 \x01(\tR\x05runId\"\xba\x01\n" +
+	"\x11ResumeRunResponse\x125\n" +
+	"\x06status\x18\x01 \x01(\v2\x1d.spice.agent.common.v1.StatusR\x06status\x12\x18\n" +
+	"\aresumed\x18\x02 \x01(\bR\aresumed\x12#\n" +
+	"\rnext_sequence\x18\x03 \x01(\x04R\fnextSequence\x12/\n" +
+	"\x13duplicate_operation\x18\x04 \x01(\bR\x12duplicateOperation\"\xe0\x01\n" +
 	"\x10SnapshotEnvelope\x12\x16\n" +
 	"\x06format\x18\x01 \x01(\tR\x06format\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12#\n" +
@@ -2271,16 +3220,13 @@ const file_spice_agent_engine_v1_engine_proto_rawDesc = "" +
 	"\x06run_id\x18\x03 \x01(\tR\x05runId\"\x94\x01\n" +
 	"\x16ExportSnapshotResponse\x125\n" +
 	"\x06status\x18\x01 \x01(\v2\x1d.spice.agent.common.v1.StatusR\x06status\x12C\n" +
-	"\bsnapshot\x18\x02 \x01(\v2'.spice.agent.engine.v1.SnapshotEnvelopeR\bsnapshot\"\xe3\x02\n" +
+	"\bsnapshot\x18\x02 \x01(\v2'.spice.agent.engine.v1.SnapshotEnvelopeR\bsnapshot\"\x98\x02\n" +
 	"\x15ImportSnapshotRequest\x12\x1b\n" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12'\n" +
 	"\x0fownership_epoch\x18\x02 \x01(\x04R\x0eownershipEpoch\x12.\n" +
-	"\x13client_operation_id\x18\x03 \x01(\tR\x11clientOperationId\x12\x1c\n" +
-	"\n" +
-	"new_run_id\x18\x04 \x01(\tR\bnewRunId\x12G\n" +
-	" expected_static_plan_fingerprint\x18\x05 \x01(\tR\x1dexpectedStaticPlanFingerprint\x12(\n" +
-	"\x10expected_plan_id\x18\x06 \x01(\tR\x0eexpectedPlanId\x12C\n" +
-	"\bsnapshot\x18\a \x01(\v2'.spice.agent.engine.v1.SnapshotEnvelopeR\bsnapshot\"\xbc\x01\n" +
+	"\x13client_operation_id\x18\x03 \x01(\tR\x11clientOperationId\x12C\n" +
+	"\bsnapshot\x18\a \x01(\v2'.spice.agent.engine.v1.SnapshotEnvelopeR\bsnapshotJ\x04\b\x04\x10\aR\n" +
+	"new_run_idR expected_static_plan_fingerprintR\x10expected_plan_id\"\xbc\x01\n" +
 	"\x16ImportSnapshotResponse\x125\n" +
 	"\x06status\x18\x01 \x01(\v2\x1d.spice.agent.common.v1.StatusR\x06status\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12#\n" +
@@ -2319,15 +3265,23 @@ const file_spice_agent_engine_v1_engine_proto_rawDesc = "" +
 	"\x1cSNAPSHOT_LIFECYCLE_SUSPENDED\x10\x01\x12 \n" +
 	"\x1cSNAPSHOT_LIFECYCLE_COMPLETED\x10\x02\x12\x1d\n" +
 	"\x19SNAPSHOT_LIFECYCLE_FAILED\x10\x03\x12 \n" +
-	"\x1cSNAPSHOT_LIFECYCLE_CANCELLED\x10\x042\xca\x06\n" +
+	"\x1cSNAPSHOT_LIFECYCLE_CANCELLED\x10\x04*\x84\x01\n" +
+	"\x14InteractionDeltaKind\x12&\n" +
+	"\"INTERACTION_DELTA_KIND_UNSPECIFIED\x10\x00\x12!\n" +
+	"\x1dINTERACTION_DELTA_KIND_OPENED\x10\x01\x12!\n" +
+	"\x1dINTERACTION_DELTA_KIND_CLOSED\x10\x022\x8a\t\n" +
 	"\rEngineService\x12a\n" +
 	"\n" +
 	"Initialize\x12(.spice.agent.engine.v1.InitializeRequest\x1a).spice.agent.engine.v1.InitializeResponse\x12U\n" +
 	"\x06Health\x12$.spice.agent.engine.v1.HealthRequest\x1a%.spice.agent.engine.v1.HealthResponse\x12[\n" +
 	"\bStartRun\x12&.spice.agent.engine.v1.StartRunRequest\x1a'.spice.agent.engine.v1.StartRunResponse\x12i\n" +
-	"\fStreamEvents\x12*.spice.agent.engine.v1.StreamEventsRequest\x1a+.spice.agent.engine.v1.StreamEventsResponse0\x01\x12^\n" +
+	"\fStreamEvents\x12*.spice.agent.engine.v1.StreamEventsRequest\x1a+.spice.agent.engine.v1.StreamEventsResponse0\x01\x12{\n" +
+	"\x12StreamInteractions\x120.spice.agent.engine.v1.StreamInteractionsRequest\x1a1.spice.agent.engine.v1.StreamInteractionsResponse0\x01\x12^\n" +
 	"\tCancelRun\x12'.spice.agent.engine.v1.CancelRunRequest\x1a(.spice.agent.engine.v1.CancelRunResponse\x12y\n" +
-	"\x12RespondInteraction\x120.spice.agent.engine.v1.RespondInteractionRequest\x1a1.spice.agent.engine.v1.RespondInteractionResponse\x12m\n" +
+	"\x12RespondInteraction\x120.spice.agent.engine.v1.RespondInteractionRequest\x1a1.spice.agent.engine.v1.RespondInteractionResponse\x12a\n" +
+	"\n" +
+	"SuspendRun\x12(.spice.agent.engine.v1.SuspendRunRequest\x1a).spice.agent.engine.v1.SuspendRunResponse\x12^\n" +
+	"\tResumeRun\x12'.spice.agent.engine.v1.ResumeRunRequest\x1a(.spice.agent.engine.v1.ResumeRunResponse\x12m\n" +
 	"\x0eExportSnapshot\x12,.spice.agent.engine.v1.ExportSnapshotRequest\x1a-.spice.agent.engine.v1.ExportSnapshotResponse\x12m\n" +
 	"\x0eImportSnapshot\x12,.spice.agent.engine.v1.ImportSnapshotRequest\x1a-.spice.agent.engine.v1.ImportSnapshotResponseB;Z9github.com/spice-framework/spice-agent/engine/v1;enginev1b\x06proto3"
 
@@ -2343,101 +3297,133 @@ func file_spice_agent_engine_v1_engine_proto_rawDescGZIP() []byte {
 	return file_spice_agent_engine_v1_engine_proto_rawDescData
 }
 
-var file_spice_agent_engine_v1_engine_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_spice_agent_engine_v1_engine_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_spice_agent_engine_v1_engine_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_spice_agent_engine_v1_engine_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
 var file_spice_agent_engine_v1_engine_proto_goTypes = []any{
 	(MessageRole)(0),                   // 0: spice.agent.engine.v1.MessageRole
 	(EventKind)(0),                     // 1: spice.agent.engine.v1.EventKind
 	(SnapshotLifecycle)(0),             // 2: spice.agent.engine.v1.SnapshotLifecycle
-	(*ToolCallPart)(nil),               // 3: spice.agent.engine.v1.ToolCallPart
-	(*ToolResultPart)(nil),             // 4: spice.agent.engine.v1.ToolResultPart
-	(*ExtensionPart)(nil),              // 5: spice.agent.engine.v1.ExtensionPart
-	(*ContentPart)(nil),                // 6: spice.agent.engine.v1.ContentPart
-	(*Message)(nil),                    // 7: spice.agent.engine.v1.Message
-	(*AgentDefinitionRef)(nil),         // 8: spice.agent.engine.v1.AgentDefinitionRef
-	(*InitializeRequest)(nil),          // 9: spice.agent.engine.v1.InitializeRequest
-	(*InitializeResponse)(nil),         // 10: spice.agent.engine.v1.InitializeResponse
-	(*HealthRequest)(nil),              // 11: spice.agent.engine.v1.HealthRequest
-	(*HealthResponse)(nil),             // 12: spice.agent.engine.v1.HealthResponse
-	(*StartRunRequest)(nil),            // 13: spice.agent.engine.v1.StartRunRequest
-	(*StartRunResponse)(nil),           // 14: spice.agent.engine.v1.StartRunResponse
-	(*StreamEventsRequest)(nil),        // 15: spice.agent.engine.v1.StreamEventsRequest
-	(*RunEvent)(nil),                   // 16: spice.agent.engine.v1.RunEvent
-	(*StreamControl)(nil),              // 17: spice.agent.engine.v1.StreamControl
-	(*StreamEventsResponse)(nil),       // 18: spice.agent.engine.v1.StreamEventsResponse
-	(*CancelRunRequest)(nil),           // 19: spice.agent.engine.v1.CancelRunRequest
-	(*CancelRunResponse)(nil),          // 20: spice.agent.engine.v1.CancelRunResponse
-	(*RespondInteractionRequest)(nil),  // 21: spice.agent.engine.v1.RespondInteractionRequest
-	(*RespondInteractionResponse)(nil), // 22: spice.agent.engine.v1.RespondInteractionResponse
-	(*SnapshotEnvelope)(nil),           // 23: spice.agent.engine.v1.SnapshotEnvelope
-	(*ExportSnapshotRequest)(nil),      // 24: spice.agent.engine.v1.ExportSnapshotRequest
-	(*ExportSnapshotResponse)(nil),     // 25: spice.agent.engine.v1.ExportSnapshotResponse
-	(*ImportSnapshotRequest)(nil),      // 26: spice.agent.engine.v1.ImportSnapshotRequest
-	(*ImportSnapshotResponse)(nil),     // 27: spice.agent.engine.v1.ImportSnapshotResponse
-	(*v1.ProtocolRange)(nil),           // 28: spice.agent.common.v1.ProtocolRange
-	(*v1.BuildIdentity)(nil),           // 29: spice.agent.common.v1.BuildIdentity
-	(*v1.CapabilitySet)(nil),           // 30: spice.agent.common.v1.CapabilitySet
-	(*v1.Limits)(nil),                  // 31: spice.agent.common.v1.Limits
-	(*v1.Status)(nil),                  // 32: spice.agent.common.v1.Status
-	(*v1.ProtocolVersion)(nil),         // 33: spice.agent.common.v1.ProtocolVersion
-	(*v1.Health)(nil),                  // 34: spice.agent.common.v1.Health
+	(InteractionDeltaKind)(0),          // 3: spice.agent.engine.v1.InteractionDeltaKind
+	(*ToolCallPart)(nil),               // 4: spice.agent.engine.v1.ToolCallPart
+	(*ToolResultPart)(nil),             // 5: spice.agent.engine.v1.ToolResultPart
+	(*ExtensionPart)(nil),              // 6: spice.agent.engine.v1.ExtensionPart
+	(*ContentPart)(nil),                // 7: spice.agent.engine.v1.ContentPart
+	(*Message)(nil),                    // 8: spice.agent.engine.v1.Message
+	(*AgentDefinitionRef)(nil),         // 9: spice.agent.engine.v1.AgentDefinitionRef
+	(*Definition)(nil),                 // 10: spice.agent.engine.v1.Definition
+	(*DefinitionSet)(nil),              // 11: spice.agent.engine.v1.DefinitionSet
+	(*ReconnectClaim)(nil),             // 12: spice.agent.engine.v1.ReconnectClaim
+	(*InitializeRequest)(nil),          // 13: spice.agent.engine.v1.InitializeRequest
+	(*InitializeResponse)(nil),         // 14: spice.agent.engine.v1.InitializeResponse
+	(*HealthRequest)(nil),              // 15: spice.agent.engine.v1.HealthRequest
+	(*HealthResponse)(nil),             // 16: spice.agent.engine.v1.HealthResponse
+	(*StartRunRequest)(nil),            // 17: spice.agent.engine.v1.StartRunRequest
+	(*StartRunResponse)(nil),           // 18: spice.agent.engine.v1.StartRunResponse
+	(*StreamEventsRequest)(nil),        // 19: spice.agent.engine.v1.StreamEventsRequest
+	(*RunEvent)(nil),                   // 20: spice.agent.engine.v1.RunEvent
+	(*StreamControl)(nil),              // 21: spice.agent.engine.v1.StreamControl
+	(*StreamEventsResponse)(nil),       // 22: spice.agent.engine.v1.StreamEventsResponse
+	(*CancelRunRequest)(nil),           // 23: spice.agent.engine.v1.CancelRunRequest
+	(*CancelRunResponse)(nil),          // 24: spice.agent.engine.v1.CancelRunResponse
+	(*RespondInteractionRequest)(nil),  // 25: spice.agent.engine.v1.RespondInteractionRequest
+	(*RespondInteractionResponse)(nil), // 26: spice.agent.engine.v1.RespondInteractionResponse
+	(*PendingInteraction)(nil),         // 27: spice.agent.engine.v1.PendingInteraction
+	(*InteractionDelta)(nil),           // 28: spice.agent.engine.v1.InteractionDelta
+	(*InteractionSnapshot)(nil),        // 29: spice.agent.engine.v1.InteractionSnapshot
+	(*StreamInteractionsRequest)(nil),  // 30: spice.agent.engine.v1.StreamInteractionsRequest
+	(*InteractionStreamControl)(nil),   // 31: spice.agent.engine.v1.InteractionStreamControl
+	(*StreamInteractionsResponse)(nil), // 32: spice.agent.engine.v1.StreamInteractionsResponse
+	(*SuspendRunRequest)(nil),          // 33: spice.agent.engine.v1.SuspendRunRequest
+	(*SuspendRunResponse)(nil),         // 34: spice.agent.engine.v1.SuspendRunResponse
+	(*ResumeRunRequest)(nil),           // 35: spice.agent.engine.v1.ResumeRunRequest
+	(*ResumeRunResponse)(nil),          // 36: spice.agent.engine.v1.ResumeRunResponse
+	(*SnapshotEnvelope)(nil),           // 37: spice.agent.engine.v1.SnapshotEnvelope
+	(*ExportSnapshotRequest)(nil),      // 38: spice.agent.engine.v1.ExportSnapshotRequest
+	(*ExportSnapshotResponse)(nil),     // 39: spice.agent.engine.v1.ExportSnapshotResponse
+	(*ImportSnapshotRequest)(nil),      // 40: spice.agent.engine.v1.ImportSnapshotRequest
+	(*ImportSnapshotResponse)(nil),     // 41: spice.agent.engine.v1.ImportSnapshotResponse
+	(*v1.ProtocolRange)(nil),           // 42: spice.agent.common.v1.ProtocolRange
+	(*v1.BuildIdentity)(nil),           // 43: spice.agent.common.v1.BuildIdentity
+	(*v1.CapabilitySet)(nil),           // 44: spice.agent.common.v1.CapabilitySet
+	(*v1.Limits)(nil),                  // 45: spice.agent.common.v1.Limits
+	(*v1.Status)(nil),                  // 46: spice.agent.common.v1.Status
+	(*v1.ProtocolVersion)(nil),         // 47: spice.agent.common.v1.ProtocolVersion
+	(*v1.Health)(nil),                  // 48: spice.agent.common.v1.Health
 }
 var file_spice_agent_engine_v1_engine_proto_depIdxs = []int32{
-	3,  // 0: spice.agent.engine.v1.ContentPart.tool_call:type_name -> spice.agent.engine.v1.ToolCallPart
-	4,  // 1: spice.agent.engine.v1.ContentPart.tool_result:type_name -> spice.agent.engine.v1.ToolResultPart
-	5,  // 2: spice.agent.engine.v1.ContentPart.extension:type_name -> spice.agent.engine.v1.ExtensionPart
+	4,  // 0: spice.agent.engine.v1.ContentPart.tool_call:type_name -> spice.agent.engine.v1.ToolCallPart
+	5,  // 1: spice.agent.engine.v1.ContentPart.tool_result:type_name -> spice.agent.engine.v1.ToolResultPart
+	6,  // 2: spice.agent.engine.v1.ContentPart.extension:type_name -> spice.agent.engine.v1.ExtensionPart
 	0,  // 3: spice.agent.engine.v1.Message.role:type_name -> spice.agent.engine.v1.MessageRole
-	6,  // 4: spice.agent.engine.v1.Message.parts:type_name -> spice.agent.engine.v1.ContentPart
-	28, // 5: spice.agent.engine.v1.InitializeRequest.protocol:type_name -> spice.agent.common.v1.ProtocolRange
-	29, // 6: spice.agent.engine.v1.InitializeRequest.client:type_name -> spice.agent.common.v1.BuildIdentity
-	30, // 7: spice.agent.engine.v1.InitializeRequest.supported_capabilities:type_name -> spice.agent.common.v1.CapabilitySet
-	30, // 8: spice.agent.engine.v1.InitializeRequest.required_capabilities:type_name -> spice.agent.common.v1.CapabilitySet
-	31, // 9: spice.agent.engine.v1.InitializeRequest.requested_limits:type_name -> spice.agent.common.v1.Limits
-	32, // 10: spice.agent.engine.v1.InitializeResponse.status:type_name -> spice.agent.common.v1.Status
-	33, // 11: spice.agent.engine.v1.InitializeResponse.protocol:type_name -> spice.agent.common.v1.ProtocolVersion
-	29, // 12: spice.agent.engine.v1.InitializeResponse.server:type_name -> spice.agent.common.v1.BuildIdentity
-	30, // 13: spice.agent.engine.v1.InitializeResponse.capabilities:type_name -> spice.agent.common.v1.CapabilitySet
-	31, // 14: spice.agent.engine.v1.InitializeResponse.limits:type_name -> spice.agent.common.v1.Limits
-	34, // 15: spice.agent.engine.v1.InitializeResponse.health:type_name -> spice.agent.common.v1.Health
-	32, // 16: spice.agent.engine.v1.HealthResponse.status:type_name -> spice.agent.common.v1.Status
-	29, // 17: spice.agent.engine.v1.HealthResponse.server:type_name -> spice.agent.common.v1.BuildIdentity
-	33, // 18: spice.agent.engine.v1.HealthResponse.protocol:type_name -> spice.agent.common.v1.ProtocolVersion
-	34, // 19: spice.agent.engine.v1.HealthResponse.health:type_name -> spice.agent.common.v1.Health
-	8,  // 20: spice.agent.engine.v1.StartRunRequest.definition:type_name -> spice.agent.engine.v1.AgentDefinitionRef
-	7,  // 21: spice.agent.engine.v1.StartRunRequest.input:type_name -> spice.agent.engine.v1.Message
-	32, // 22: spice.agent.engine.v1.StartRunResponse.status:type_name -> spice.agent.common.v1.Status
-	1,  // 23: spice.agent.engine.v1.RunEvent.kind:type_name -> spice.agent.engine.v1.EventKind
-	32, // 24: spice.agent.engine.v1.StreamControl.status:type_name -> spice.agent.common.v1.Status
-	16, // 25: spice.agent.engine.v1.StreamEventsResponse.event:type_name -> spice.agent.engine.v1.RunEvent
-	17, // 26: spice.agent.engine.v1.StreamEventsResponse.control:type_name -> spice.agent.engine.v1.StreamControl
-	32, // 27: spice.agent.engine.v1.CancelRunResponse.status:type_name -> spice.agent.common.v1.Status
-	32, // 28: spice.agent.engine.v1.RespondInteractionResponse.status:type_name -> spice.agent.common.v1.Status
-	2,  // 29: spice.agent.engine.v1.SnapshotEnvelope.lifecycle:type_name -> spice.agent.engine.v1.SnapshotLifecycle
-	32, // 30: spice.agent.engine.v1.ExportSnapshotResponse.status:type_name -> spice.agent.common.v1.Status
-	23, // 31: spice.agent.engine.v1.ExportSnapshotResponse.snapshot:type_name -> spice.agent.engine.v1.SnapshotEnvelope
-	23, // 32: spice.agent.engine.v1.ImportSnapshotRequest.snapshot:type_name -> spice.agent.engine.v1.SnapshotEnvelope
-	32, // 33: spice.agent.engine.v1.ImportSnapshotResponse.status:type_name -> spice.agent.common.v1.Status
-	9,  // 34: spice.agent.engine.v1.EngineService.Initialize:input_type -> spice.agent.engine.v1.InitializeRequest
-	11, // 35: spice.agent.engine.v1.EngineService.Health:input_type -> spice.agent.engine.v1.HealthRequest
-	13, // 36: spice.agent.engine.v1.EngineService.StartRun:input_type -> spice.agent.engine.v1.StartRunRequest
-	15, // 37: spice.agent.engine.v1.EngineService.StreamEvents:input_type -> spice.agent.engine.v1.StreamEventsRequest
-	19, // 38: spice.agent.engine.v1.EngineService.CancelRun:input_type -> spice.agent.engine.v1.CancelRunRequest
-	21, // 39: spice.agent.engine.v1.EngineService.RespondInteraction:input_type -> spice.agent.engine.v1.RespondInteractionRequest
-	24, // 40: spice.agent.engine.v1.EngineService.ExportSnapshot:input_type -> spice.agent.engine.v1.ExportSnapshotRequest
-	26, // 41: spice.agent.engine.v1.EngineService.ImportSnapshot:input_type -> spice.agent.engine.v1.ImportSnapshotRequest
-	10, // 42: spice.agent.engine.v1.EngineService.Initialize:output_type -> spice.agent.engine.v1.InitializeResponse
-	12, // 43: spice.agent.engine.v1.EngineService.Health:output_type -> spice.agent.engine.v1.HealthResponse
-	14, // 44: spice.agent.engine.v1.EngineService.StartRun:output_type -> spice.agent.engine.v1.StartRunResponse
-	18, // 45: spice.agent.engine.v1.EngineService.StreamEvents:output_type -> spice.agent.engine.v1.StreamEventsResponse
-	20, // 46: spice.agent.engine.v1.EngineService.CancelRun:output_type -> spice.agent.engine.v1.CancelRunResponse
-	22, // 47: spice.agent.engine.v1.EngineService.RespondInteraction:output_type -> spice.agent.engine.v1.RespondInteractionResponse
-	25, // 48: spice.agent.engine.v1.EngineService.ExportSnapshot:output_type -> spice.agent.engine.v1.ExportSnapshotResponse
-	27, // 49: spice.agent.engine.v1.EngineService.ImportSnapshot:output_type -> spice.agent.engine.v1.ImportSnapshotResponse
-	42, // [42:50] is the sub-list for method output_type
-	34, // [34:42] is the sub-list for method input_type
-	34, // [34:34] is the sub-list for extension type_name
-	34, // [34:34] is the sub-list for extension extendee
-	0,  // [0:34] is the sub-list for field type_name
+	7,  // 4: spice.agent.engine.v1.Message.parts:type_name -> spice.agent.engine.v1.ContentPart
+	10, // 5: spice.agent.engine.v1.DefinitionSet.definitions:type_name -> spice.agent.engine.v1.Definition
+	42, // 6: spice.agent.engine.v1.InitializeRequest.protocol:type_name -> spice.agent.common.v1.ProtocolRange
+	43, // 7: spice.agent.engine.v1.InitializeRequest.client:type_name -> spice.agent.common.v1.BuildIdentity
+	44, // 8: spice.agent.engine.v1.InitializeRequest.supported_capabilities:type_name -> spice.agent.common.v1.CapabilitySet
+	44, // 9: spice.agent.engine.v1.InitializeRequest.required_capabilities:type_name -> spice.agent.common.v1.CapabilitySet
+	45, // 10: spice.agent.engine.v1.InitializeRequest.requested_limits:type_name -> spice.agent.common.v1.Limits
+	12, // 11: spice.agent.engine.v1.InitializeRequest.reconnect_claim:type_name -> spice.agent.engine.v1.ReconnectClaim
+	46, // 12: spice.agent.engine.v1.InitializeResponse.status:type_name -> spice.agent.common.v1.Status
+	47, // 13: spice.agent.engine.v1.InitializeResponse.protocol:type_name -> spice.agent.common.v1.ProtocolVersion
+	43, // 14: spice.agent.engine.v1.InitializeResponse.server:type_name -> spice.agent.common.v1.BuildIdentity
+	44, // 15: spice.agent.engine.v1.InitializeResponse.capabilities:type_name -> spice.agent.common.v1.CapabilitySet
+	45, // 16: spice.agent.engine.v1.InitializeResponse.limits:type_name -> spice.agent.common.v1.Limits
+	48, // 17: spice.agent.engine.v1.InitializeResponse.health:type_name -> spice.agent.common.v1.Health
+	11, // 18: spice.agent.engine.v1.InitializeResponse.definitions:type_name -> spice.agent.engine.v1.DefinitionSet
+	46, // 19: spice.agent.engine.v1.HealthResponse.status:type_name -> spice.agent.common.v1.Status
+	43, // 20: spice.agent.engine.v1.HealthResponse.server:type_name -> spice.agent.common.v1.BuildIdentity
+	47, // 21: spice.agent.engine.v1.HealthResponse.protocol:type_name -> spice.agent.common.v1.ProtocolVersion
+	48, // 22: spice.agent.engine.v1.HealthResponse.health:type_name -> spice.agent.common.v1.Health
+	9,  // 23: spice.agent.engine.v1.StartRunRequest.definition:type_name -> spice.agent.engine.v1.AgentDefinitionRef
+	8,  // 24: spice.agent.engine.v1.StartRunRequest.input:type_name -> spice.agent.engine.v1.Message
+	46, // 25: spice.agent.engine.v1.StartRunResponse.status:type_name -> spice.agent.common.v1.Status
+	1,  // 26: spice.agent.engine.v1.RunEvent.kind:type_name -> spice.agent.engine.v1.EventKind
+	46, // 27: spice.agent.engine.v1.StreamControl.status:type_name -> spice.agent.common.v1.Status
+	20, // 28: spice.agent.engine.v1.StreamEventsResponse.event:type_name -> spice.agent.engine.v1.RunEvent
+	21, // 29: spice.agent.engine.v1.StreamEventsResponse.control:type_name -> spice.agent.engine.v1.StreamControl
+	46, // 30: spice.agent.engine.v1.CancelRunResponse.status:type_name -> spice.agent.common.v1.Status
+	46, // 31: spice.agent.engine.v1.RespondInteractionResponse.status:type_name -> spice.agent.common.v1.Status
+	3,  // 32: spice.agent.engine.v1.InteractionDelta.kind:type_name -> spice.agent.engine.v1.InteractionDeltaKind
+	27, // 33: spice.agent.engine.v1.InteractionDelta.interaction:type_name -> spice.agent.engine.v1.PendingInteraction
+	27, // 34: spice.agent.engine.v1.InteractionSnapshot.pending:type_name -> spice.agent.engine.v1.PendingInteraction
+	46, // 35: spice.agent.engine.v1.InteractionStreamControl.status:type_name -> spice.agent.common.v1.Status
+	29, // 36: spice.agent.engine.v1.StreamInteractionsResponse.snapshot:type_name -> spice.agent.engine.v1.InteractionSnapshot
+	28, // 37: spice.agent.engine.v1.StreamInteractionsResponse.delta:type_name -> spice.agent.engine.v1.InteractionDelta
+	31, // 38: spice.agent.engine.v1.StreamInteractionsResponse.control:type_name -> spice.agent.engine.v1.InteractionStreamControl
+	46, // 39: spice.agent.engine.v1.SuspendRunResponse.status:type_name -> spice.agent.common.v1.Status
+	46, // 40: spice.agent.engine.v1.ResumeRunResponse.status:type_name -> spice.agent.common.v1.Status
+	2,  // 41: spice.agent.engine.v1.SnapshotEnvelope.lifecycle:type_name -> spice.agent.engine.v1.SnapshotLifecycle
+	46, // 42: spice.agent.engine.v1.ExportSnapshotResponse.status:type_name -> spice.agent.common.v1.Status
+	37, // 43: spice.agent.engine.v1.ExportSnapshotResponse.snapshot:type_name -> spice.agent.engine.v1.SnapshotEnvelope
+	37, // 44: spice.agent.engine.v1.ImportSnapshotRequest.snapshot:type_name -> spice.agent.engine.v1.SnapshotEnvelope
+	46, // 45: spice.agent.engine.v1.ImportSnapshotResponse.status:type_name -> spice.agent.common.v1.Status
+	13, // 46: spice.agent.engine.v1.EngineService.Initialize:input_type -> spice.agent.engine.v1.InitializeRequest
+	15, // 47: spice.agent.engine.v1.EngineService.Health:input_type -> spice.agent.engine.v1.HealthRequest
+	17, // 48: spice.agent.engine.v1.EngineService.StartRun:input_type -> spice.agent.engine.v1.StartRunRequest
+	19, // 49: spice.agent.engine.v1.EngineService.StreamEvents:input_type -> spice.agent.engine.v1.StreamEventsRequest
+	30, // 50: spice.agent.engine.v1.EngineService.StreamInteractions:input_type -> spice.agent.engine.v1.StreamInteractionsRequest
+	23, // 51: spice.agent.engine.v1.EngineService.CancelRun:input_type -> spice.agent.engine.v1.CancelRunRequest
+	25, // 52: spice.agent.engine.v1.EngineService.RespondInteraction:input_type -> spice.agent.engine.v1.RespondInteractionRequest
+	33, // 53: spice.agent.engine.v1.EngineService.SuspendRun:input_type -> spice.agent.engine.v1.SuspendRunRequest
+	35, // 54: spice.agent.engine.v1.EngineService.ResumeRun:input_type -> spice.agent.engine.v1.ResumeRunRequest
+	38, // 55: spice.agent.engine.v1.EngineService.ExportSnapshot:input_type -> spice.agent.engine.v1.ExportSnapshotRequest
+	40, // 56: spice.agent.engine.v1.EngineService.ImportSnapshot:input_type -> spice.agent.engine.v1.ImportSnapshotRequest
+	14, // 57: spice.agent.engine.v1.EngineService.Initialize:output_type -> spice.agent.engine.v1.InitializeResponse
+	16, // 58: spice.agent.engine.v1.EngineService.Health:output_type -> spice.agent.engine.v1.HealthResponse
+	18, // 59: spice.agent.engine.v1.EngineService.StartRun:output_type -> spice.agent.engine.v1.StartRunResponse
+	22, // 60: spice.agent.engine.v1.EngineService.StreamEvents:output_type -> spice.agent.engine.v1.StreamEventsResponse
+	32, // 61: spice.agent.engine.v1.EngineService.StreamInteractions:output_type -> spice.agent.engine.v1.StreamInteractionsResponse
+	24, // 62: spice.agent.engine.v1.EngineService.CancelRun:output_type -> spice.agent.engine.v1.CancelRunResponse
+	26, // 63: spice.agent.engine.v1.EngineService.RespondInteraction:output_type -> spice.agent.engine.v1.RespondInteractionResponse
+	34, // 64: spice.agent.engine.v1.EngineService.SuspendRun:output_type -> spice.agent.engine.v1.SuspendRunResponse
+	36, // 65: spice.agent.engine.v1.EngineService.ResumeRun:output_type -> spice.agent.engine.v1.ResumeRunResponse
+	39, // 66: spice.agent.engine.v1.EngineService.ExportSnapshot:output_type -> spice.agent.engine.v1.ExportSnapshotResponse
+	41, // 67: spice.agent.engine.v1.EngineService.ImportSnapshot:output_type -> spice.agent.engine.v1.ImportSnapshotResponse
+	57, // [57:68] is the sub-list for method output_type
+	46, // [46:57] is the sub-list for method input_type
+	46, // [46:46] is the sub-list for extension type_name
+	46, // [46:46] is the sub-list for extension extendee
+	0,  // [0:46] is the sub-list for field type_name
 }
 
 func init() { file_spice_agent_engine_v1_engine_proto_init() }
@@ -2451,17 +3437,23 @@ func file_spice_agent_engine_v1_engine_proto_init() {
 		(*ContentPart_ToolResult)(nil),
 		(*ContentPart_Extension)(nil),
 	}
-	file_spice_agent_engine_v1_engine_proto_msgTypes[15].OneofWrappers = []any{
+	file_spice_agent_engine_v1_engine_proto_msgTypes[17].OneofWrappers = []any{}
+	file_spice_agent_engine_v1_engine_proto_msgTypes[18].OneofWrappers = []any{
 		(*StreamEventsResponse_Event)(nil),
 		(*StreamEventsResponse_Control)(nil),
+	}
+	file_spice_agent_engine_v1_engine_proto_msgTypes[28].OneofWrappers = []any{
+		(*StreamInteractionsResponse_Snapshot)(nil),
+		(*StreamInteractionsResponse_Delta)(nil),
+		(*StreamInteractionsResponse_Control)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_spice_agent_engine_v1_engine_proto_rawDesc), len(file_spice_agent_engine_v1_engine_proto_rawDesc)),
-			NumEnums:      3,
-			NumMessages:   25,
+			NumEnums:      4,
+			NumMessages:   38,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -27,13 +27,14 @@ func TestInitializeResponseAndServerFailureBoundaries(t *testing.T) {
 
 	validResponse := enginev1.NegotiateInitialize(
 		request, commonv1.SupportedProtocolRange(), build("spice-agentd"),
-		capabilities("events", "snapshots"), protocolLimits(), health(), "client-1", 1,
+		capabilities("events", "snapshots"), protocolLimits(), health(), definitionSet(), "client-1", 1,
 	)
 	for name, mutate := range map[string]func(*enginev1.InitializeResponse){
 		"build":        func(value *enginev1.InitializeResponse) { value.Server = nil },
 		"capabilities": func(value *enginev1.InitializeResponse) { value.Capabilities = nil },
 		"limits":       func(value *enginev1.InitializeResponse) { value.Limits = nil },
 		"health":       func(value *enginev1.InitializeResponse) { value.Health = nil },
+		"definitions":  func(value *enginev1.InitializeResponse) { value.Definitions = nil },
 		"client":       func(value *enginev1.InitializeResponse) { value.ClientId = "" },
 		"epoch":        func(value *enginev1.InitializeResponse) { value.OwnershipEpoch = 0 },
 	} {
@@ -49,10 +50,11 @@ func TestInitializeResponseAndServerFailureBoundaries(t *testing.T) {
 	}
 
 	for name, response := range map[string]*enginev1.InitializeResponse{
-		"nil request":      enginev1.NegotiateInitialize(nil, commonv1.SupportedProtocolRange(), build("server"), capabilities("events"), protocolLimits(), health(), "client", 1),
-		"bad server build": enginev1.NegotiateInitialize(request, commonv1.SupportedProtocolRange(), nil, capabilities("events"), protocolLimits(), health(), "client", 1),
-		"bad health":       enginev1.NegotiateInitialize(request, commonv1.SupportedProtocolRange(), build("server"), capabilities("events"), protocolLimits(), nil, "client", 1),
-		"bad ownership":    enginev1.NegotiateInitialize(request, commonv1.SupportedProtocolRange(), build("server"), capabilities("events"), protocolLimits(), health(), "", 0),
+		"nil request":      enginev1.NegotiateInitialize(nil, commonv1.SupportedProtocolRange(), build("server"), capabilities("events"), protocolLimits(), health(), definitionSet(), "client", 1),
+		"bad server build": enginev1.NegotiateInitialize(request, commonv1.SupportedProtocolRange(), nil, capabilities("events"), protocolLimits(), health(), definitionSet(), "client", 1),
+		"bad health":       enginev1.NegotiateInitialize(request, commonv1.SupportedProtocolRange(), build("server"), capabilities("events"), protocolLimits(), nil, definitionSet(), "client", 1),
+		"bad definitions":  enginev1.NegotiateInitialize(request, commonv1.SupportedProtocolRange(), build("server"), capabilities("events"), protocolLimits(), health(), nil, "client", 1),
+		"bad ownership":    enginev1.NegotiateInitialize(request, commonv1.SupportedProtocolRange(), build("server"), capabilities("events"), protocolLimits(), health(), definitionSet(), "", 0),
 	} {
 		if response.GetStatus().GetCode() == commonv1.ErrorCode_ERROR_CODE_OK {
 			t.Errorf("%s negotiation succeeded", name)
@@ -96,7 +98,7 @@ func TestMessageUnionAndRunRequestBoundaries(t *testing.T) {
 	}
 	for name, mutate := range map[string]func(*enginev1.StartRunRequest){
 		"definition": func(value *enginev1.StartRunRequest) { value.Definition = nil },
-		"turns":      func(value *enginev1.StartRunRequest) { value.Definition.MaxTurns = 0 },
+		"revision":   func(value *enginev1.StartRunRequest) { value.Definition.Revision = "" },
 		"message":    func(value *enginev1.StartRunRequest) { value.Input = nil },
 		"role":       func(value *enginev1.StartRunRequest) { value.Input.Role = enginev1.MessageRole_MESSAGE_ROLE_SYSTEM },
 	} {
@@ -167,13 +169,13 @@ func TestInteractionAndSnapshotFailureBoundaries(t *testing.T) {
 	}
 	request := &enginev1.RespondInteractionRequest{
 		ClientId: "client", OwnershipEpoch: 1, ClientOperationId: "respond",
-		RunId: "wrong", InteractionId: "interaction", ResponseId: "response", ValueJson: []byte(`true`),
+		RunId: "wrong", InteractionId: "interaction", ValueJson: []byte(`true`),
 	}
 	if status := enginev1.ValidateInteractionResponse(request, "client", 1, "run", "interaction"); status.GetCode() != commonv1.ErrorCode_ERROR_CODE_CONFLICT {
 		t.Fatalf("wrong interaction correlation = %#v", status)
 	}
 
-	valid, err := enginev1.NewSnapshotEnvelope("run", 1, enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED, []byte(`{"safe":true}`))
+	valid, err := enginev1.NewSnapshotEnvelope("run", 1, enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED, []byte(`{"safe":true,"run_id":"run"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,8 +198,7 @@ func TestInteractionAndSnapshotFailureBoundaries(t *testing.T) {
 	}
 	if err = enginev1.ValidateImportSnapshotRequest(&enginev1.ImportSnapshotRequest{
 		ClientId: "client", OwnershipEpoch: 1, ClientOperationId: "import",
-		NewRunId: "run-2", ExpectedStaticPlanFingerprint: "static",
-		ExpectedPlanId: "plan", Snapshot: valid,
+		Snapshot: valid,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -207,8 +208,7 @@ func validStartRunRequest() *enginev1.StartRunRequest {
 	return &enginev1.StartRunRequest{
 		ClientId: "client", OwnershipEpoch: 1, ClientOperationId: "start",
 		Definition: &enginev1.AgentDefinitionRef{
-			Id: "agent", Revision: "v1", Model: "model", MaxTurns: 4,
-			ExpectedStaticPlanFingerprint: "static",
+			Id: "agent", Revision: "v1",
 		},
 		Input: &enginev1.Message{
 			Id: "message", Role: enginev1.MessageRole_MESSAGE_ROLE_USER,

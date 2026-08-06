@@ -21,15 +21,17 @@ func TestInitializeNegotiatesVersionCapabilitiesLimitsAndHealth(t *testing.T) {
 		capabilities("events", "plugins", "snapshots"),
 		limits(4<<20, 128, 256, 8<<20, 8, 32),
 		health(),
+		definitionSet(),
 		"client-1",
-		7,
+		1,
 	)
 	if err := enginev1.ValidateInitializeResponse(response); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(response.GetCapabilities().GetNames(), []string{"events", "snapshots"}) ||
 		response.GetLimits().GetMaxReplayEvents() != 128 ||
-		response.GetProtocol().GetMajor() != 1 || response.GetOwnershipEpoch() != 7 {
+		response.GetProtocol().GetMajor() != 1 || response.GetOwnershipEpoch() != 1 ||
+		response.GetDefinitions().GetRevision() != "catalog-v1" {
 		t.Fatalf("initialize response = %#v", response)
 	}
 	server := response.GetServer()
@@ -41,16 +43,18 @@ func TestInitializeNegotiatesVersionCapabilitiesLimitsAndHealth(t *testing.T) {
 	if health().GetState() != commonv1.HealthState_HEALTH_STATE_READY {
 		t.Fatal("test health fixture unexpectedly mutable")
 	}
-	encoded, err := proto.Marshal(response)
-	if err != nil {
-		t.Fatal(err)
+	definitions := response.GetDefinitions()
+	if definitions == nil {
+		t.Fatal("initialize response omitted definitions")
+		return
 	}
-	if bytes.Contains(encoded, request.GetAuthenticationToken()) {
-		t.Fatal("initialize response leaked the authentication token")
+	definitions.Revision = "mutated"
+	if definitionSet().GetRevision() != "catalog-v1" {
+		t.Fatal("initialize response retained server-owned definitions")
 	}
 }
 
-func TestInitializeFailsClosedForOldNewMissingCapabilityAndBadToken(t *testing.T) {
+func TestInitializeFailsClosedForOldNewAndMissingCapability(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct {
 		name   string
@@ -79,13 +83,6 @@ func TestInitializeFailsClosedForOldNewMissingCapabilityAndBadToken(t *testing.T
 			},
 			commonv1.ErrorCode_ERROR_CODE_MISSING_CAPABILITY,
 		},
-		{
-			"short token",
-			func(request *enginev1.InitializeRequest) {
-				request.AuthenticationToken = []byte("short")
-			},
-			commonv1.ErrorCode_ERROR_CODE_INVALID_ARGUMENT,
-		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
@@ -98,6 +95,7 @@ func TestInitializeFailsClosedForOldNewMissingCapabilityAndBadToken(t *testing.T
 				capabilities("events", "snapshots"),
 				limits(4<<20, 128, 256, 8<<20, 8, 32),
 				health(),
+				definitionSet(),
 				"client-1",
 				1,
 			)
@@ -108,6 +106,41 @@ func TestInitializeFailsClosedForOldNewMissingCapabilityAndBadToken(t *testing.T
 	}
 }
 
+func TestInitializeReconnectClaimRequiresOwnershipEpochCompareAndSwap(t *testing.T) {
+	t.Parallel()
+	request := validInitializeRequest()
+	request.ReconnectClaim = &enginev1.ReconnectClaim{ClientId: "client-1", ExpectedOwnershipEpoch: 7}
+	response := enginev1.NegotiateInitialize(
+		request, commonv1.SupportedProtocolRange(), build("spice-agentd"),
+		capabilities("events", "snapshots"), protocolLimits(), health(), definitionSet(), "client-1", 8,
+	)
+	if err := enginev1.ValidateInitializeResponseForRequest(request, response); err != nil || response.GetOwnershipEpoch() != 8 {
+		t.Fatalf("reconnect response = %#v, %v", response, err)
+	}
+	wrongEpoch, valid := proto.Clone(response).(*enginev1.InitializeResponse)
+	if !valid {
+		t.Fatal("initialize clone had unexpected type")
+	}
+	wrongEpoch.OwnershipEpoch = 9
+	if err := enginev1.ValidateInitializeResponseForRequest(request, wrongEpoch); err == nil {
+		t.Fatal("client accepted reconnect outside expected epoch CAS")
+	}
+	for _, test := range []struct {
+		client string
+		epoch  uint64
+	}{
+		{"other", 8}, {"client-1", 7}, {"client-1", 9},
+	} {
+		response = enginev1.NegotiateInitialize(
+			request, commonv1.SupportedProtocolRange(), build("spice-agentd"),
+			capabilities("events", "snapshots"), protocolLimits(), health(), definitionSet(), test.client, test.epoch,
+		)
+		if response.GetStatus().GetCode() == commonv1.ErrorCode_ERROR_CODE_OK {
+			t.Fatalf("invalid reconnect %q/%d succeeded", test.client, test.epoch)
+		}
+	}
+}
+
 func TestRunCreationAndCancellationAreBoundedIdempotentContracts(t *testing.T) {
 	t.Parallel()
 	request := &enginev1.StartRunRequest{
@@ -115,8 +148,7 @@ func TestRunCreationAndCancellationAreBoundedIdempotentContracts(t *testing.T) {
 		OwnershipEpoch:    1,
 		ClientOperationId: "start-1",
 		Definition: &enginev1.AgentDefinitionRef{
-			Id: "coding", Revision: "v1", Model: "reasoning", MaxTurns: 8,
-			ExpectedStaticPlanFingerprint: "sha256:static",
+			Id: "coding", Revision: "v1",
 		},
 		Input: &enginev1.Message{
 			Id: "message-1", Role: enginev1.MessageRole_MESSAGE_ROLE_USER,
@@ -156,7 +188,8 @@ func TestReplayBoundsOrderingOverloadAndUnknownLifecycle(t *testing.T) {
 	if status := enginev1.CheckReplayCursor(20, 10, 20); status != nil {
 		t.Fatalf("tail cursor = %#v", status)
 	}
-	if status := enginev1.CheckReplayCursor(21, 10, 20); status.GetReplayBounds() == nil {
+	if status := enginev1.CheckReplayCursor(21, 10, 20); status.GetReplayBounds() == nil ||
+		status.GetReplayBounds().GetRecoverySequence() != 20 {
 		t.Fatalf("future cursor = %#v", status)
 	}
 	events := []*enginev1.RunEvent{
@@ -186,8 +219,8 @@ func TestStaleInteractionResponseFailsBeforePayloadAcceptance(t *testing.T) {
 	request := &enginev1.RespondInteractionRequest{
 		ClientId: "client-1", OwnershipEpoch: 6,
 		ClientOperationId: "respond-1", RunId: "run-1",
-		InteractionId: "interaction-1", ResponseId: "response-1",
-		ValueJson: []byte(`{"approved":true}`),
+		InteractionId: "interaction-1",
+		ValueJson:     []byte(`{"approved":true}`),
 	}
 	status := enginev1.ValidateInteractionResponse(
 		request, "client-1", 7, "run-1", "interaction-1",
@@ -213,7 +246,7 @@ func TestStaleInteractionResponseFailsBeforePayloadAcceptance(t *testing.T) {
 
 func TestSnapshotDigestLifecycleAndImportSafety(t *testing.T) {
 	t.Parallel()
-	payload := []byte(`{"version":"spice.agent.snapshot/v1alpha2"}`)
+	payload := []byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"run-1"}`)
 	snapshot, err := enginev1.NewSnapshotEnvelope(
 		"run-1",
 		42,
@@ -238,10 +271,7 @@ func TestSnapshotDigestLifecycleAndImportSafety(t *testing.T) {
 	}
 	request := &enginev1.ImportSnapshotRequest{
 		ClientId: "client-1", OwnershipEpoch: 1,
-		ClientOperationId: "import-1", NewRunId: "run-2",
-		ExpectedStaticPlanFingerprint: "sha256:static",
-		ExpectedPlanId:                "plan:v1",
-		Snapshot:                      snapshot,
+		ClientOperationId: "import-1", Snapshot: snapshot,
 	}
 	if err = enginev1.ValidateImportSnapshotRequest(request); err != nil {
 		t.Fatal(err)
@@ -254,7 +284,7 @@ func TestSnapshotDigestLifecycleAndImportSafety(t *testing.T) {
 		"run-1",
 		42,
 		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_COMPLETED,
-		[]byte(`{"complete":true}`),
+		[]byte(`{"complete":true,"run_id":"run-1"}`),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -294,9 +324,11 @@ func TestGeneratedServiceDescriptorFreezesOnlyTheProcessBoundary(t *testing.T) {
 	t.Parallel()
 	descriptor := enginev1.EngineService_ServiceDesc
 	if descriptor.ServiceName != "spice.agent.engine.v1.EngineService" ||
-		len(descriptor.Methods) != 7 || len(descriptor.Streams) != 1 ||
+		len(descriptor.Methods) != 9 || len(descriptor.Streams) != 2 ||
 		descriptor.Streams[0].StreamName != "StreamEvents" ||
-		!descriptor.Streams[0].ServerStreams || descriptor.Streams[0].ClientStreams {
+		descriptor.Streams[1].StreamName != "StreamInteractions" ||
+		!descriptor.Streams[0].ServerStreams || descriptor.Streams[0].ClientStreams ||
+		!descriptor.Streams[1].ServerStreams || descriptor.Streams[1].ClientStreams {
 		t.Fatalf("service descriptor = %#v", descriptor)
 	}
 }
@@ -331,7 +363,15 @@ func validInitializeRequest() *enginev1.InitializeRequest {
 		SupportedCapabilities: capabilities("events", "snapshots", "tools"),
 		RequiredCapabilities:  capabilities("events", "snapshots"),
 		RequestedLimits:       limits(2<<20, 64, 128, 4<<20, 4, 8),
-		AuthenticationToken:   []byte("0123456789abcdef0123456789abcdef"),
+	}
+}
+
+func definitionSet() *enginev1.DefinitionSet {
+	return &enginev1.DefinitionSet{
+		Revision: "catalog-v1",
+		Definitions: []*enginev1.Definition{{
+			Id: "coding", Revision: "v1", Model: "reasoning", MaxTurns: 8,
+		}},
 	}
 }
 

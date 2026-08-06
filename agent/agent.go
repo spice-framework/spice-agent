@@ -350,6 +350,15 @@ func (run *Run) Subscribe(ctx context.Context, afterSequence uint64) (*event.Sub
 	return run.log.Subscribe(ctx, afterSequence)
 }
 
+// ReplayEvents captures one bounded authoritative replay page and may
+// atomically register a live tail when the page reaches the captured head.
+func (run *Run) ReplayEvents(ctx context.Context, request event.ReplayRequest) (event.ReplayPage, error) {
+	if run == nil {
+		return event.ReplayPage{}, errors.New("agent run is nil")
+	}
+	return run.log.Replay(ctx, request)
+}
+
 // Cancel requests cooperative run cancellation.
 func (run *Run) Cancel() {
 	if run != nil {
@@ -422,8 +431,7 @@ func (run *Run) Suspend(ctx context.Context) error {
 			run.suspendWaiter = nil
 			run.status = runStatusRunning
 		} else if run.status == LifecycleSuspended && run.resumeSignal != nil {
-			close(run.resumeSignal)
-			run.resumeSignal = nil
+			_ = run.resumeLocked()
 		}
 		run.stateMu.Unlock()
 		return ctx.Err()
@@ -439,11 +447,20 @@ func (run *Run) Resume() error {
 	}
 	run.stateMu.Lock()
 	defer run.stateMu.Unlock()
+	return run.resumeLocked()
+}
+
+func (run *Run) resumeLocked() error {
 	if run.status != LifecycleSuspended || run.resumeSignal == nil {
 		return &UnsafeSnapshotError{Status: run.status, ActiveInteractions: len(run.activeInteractions)}
 	}
-	close(run.resumeSignal)
+	resumeSignal := run.resumeSignal
+	// Make snapshot export fail before unblocking execution. Otherwise the
+	// caller can duplicate suspended authority between Resume returning and the
+	// execution goroutine observing resumeSignal.
+	run.status = runStatusRunning
 	run.resumeSignal = nil
+	close(resumeSignal)
 	return nil
 }
 
@@ -493,7 +510,13 @@ func (run *Run) Interact(ctx context.Context, request interaction.Request) (inte
 	}
 	brokerContext, cancel := context.WithCancel(ctx)
 	stop := context.AfterFunc(run.ctx, cancel)
-	response, err := safeInteraction(brokerContext, run.engine.broker, request.Clone())
+	scope, scopeErr := interaction.NewScope(run.id)
+	if scopeErr != nil {
+		stop()
+		cancel()
+		return interaction.Response{}, errors.Join(scopeErr, run.emitter.interactionFailure(ctx, event.InteractionFailed, request.ID()))
+	}
+	response, err := safeInteraction(brokerContext, run.engine.broker, scope, request.Clone())
 	stop()
 	cancel()
 	if err != nil {
@@ -1241,13 +1264,13 @@ func safeDispatch(ctx context.Context, dispatcher stage.ToolDispatcher, call too
 	return dispatcher.Dispatch(ctx, call, reporter)
 }
 
-func safeInteraction(ctx context.Context, broker interaction.Broker, request interaction.Request) (response interaction.Response, err error) {
+func safeInteraction(ctx context.Context, broker interaction.Broker, scope interaction.Scope, request interaction.Request) (response interaction.Response, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("interaction broker panic: %v", recovered)
 		}
 	}()
-	return broker.Request(ctx, request)
+	return broker.Request(ctx, scope, request)
 }
 
 func (run *Run) markStarted(started bool) {
@@ -1297,11 +1320,6 @@ func (run *Run) suspendAtBoundary(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-resumeSignal:
-		run.stateMu.Lock()
-		if run.status == LifecycleSuspended {
-			run.status = runStatusRunning
-		}
-		run.stateMu.Unlock()
 		return nil
 	}
 }

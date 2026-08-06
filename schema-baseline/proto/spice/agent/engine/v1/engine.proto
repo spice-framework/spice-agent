@@ -89,21 +89,41 @@ message Message {
 message AgentDefinitionRef {
   string id = 1;
   string revision = 2;
-  string model = 3;
-  uint32 max_turns = 4;
-  // expected_static_plan_fingerprint is an assertion, not client authority.
-  string expected_static_plan_fingerprint = 5;
-  reserved 6;
+  reserved 3 to 6;
+  reserved "model", "max_turns", "expected_static_plan_fingerprint";
 }
 
-// InitializeRequest is the mandatory first authenticated client operation.
+// Definition is one immutable server-owned generated agent definition.
+message Definition {
+  string id = 1;
+  string revision = 2;
+  string model = 3;
+  uint32 max_turns = 4;
+}
+
+// DefinitionSet is the immutable generated catalog advertised at initialize.
+message DefinitionSet {
+  string revision = 1;
+  repeated Definition definitions = 2;
+}
+
+// ReconnectClaim atomically claims an existing stable client at its last epoch.
+message ReconnectClaim {
+  string client_id = 1;
+  uint64 expected_ownership_epoch = 2;
+}
+
+// InitializeRequest is the mandatory first client operation. Authentication is
+// carried by transport metadata and validated before this payload is handled.
 message InitializeRequest {
   spice.agent.common.v1.ProtocolRange protocol = 1;
   spice.agent.common.v1.BuildIdentity client = 2;
   spice.agent.common.v1.CapabilitySet supported_capabilities = 3;
   spice.agent.common.v1.CapabilitySet required_capabilities = 4;
   spice.agent.common.v1.Limits requested_limits = 5;
-  bytes authentication_token = 6;
+  reserved 6;
+  reserved "authentication_token";
+  ReconnectClaim reconnect_claim = 7;
 }
 
 // InitializeResponse contains the negotiated connection contract.
@@ -116,6 +136,7 @@ message InitializeResponse {
   spice.agent.common.v1.Health health = 6;
   string client_id = 7;
   uint64 ownership_epoch = 8;
+  DefinitionSet definitions = 9;
 }
 
 // HealthRequest identifies the initialized client.
@@ -169,7 +190,8 @@ message RunEvent {
   EventKind kind = 4;
   bytes payload_json = 5;
   bool terminal = 6;
-  string operation_id = 7;
+  reserved 7;
+  reserved "operation_id";
 }
 
 // StreamControl marks replay bounds, terminal status, or disconnect position.
@@ -179,6 +201,8 @@ message StreamControl {
   uint64 latest_sequence = 3;
   uint64 last_delivered_sequence = 4;
   bool tailing = 5;
+  optional uint64 page_last_sequence = 6;
+  bool has_more = 7;
 }
 
 // StreamEventsResponse contains one event or one explicit control record.
@@ -213,7 +237,8 @@ message RespondInteractionRequest {
   string client_operation_id = 3;
   string run_id = 4;
   string interaction_id = 5;
-  string response_id = 6;
+  reserved 6;
+  reserved "response_id";
   bytes value_json = 7;
 }
 
@@ -221,8 +246,97 @@ message RespondInteractionRequest {
 message RespondInteractionResponse {
   spice.agent.common.v1.Status status = 1;
   bool accepted = 2;
-  bool duplicate_response = 3;
-  uint64 committed_sequence = 4;
+  reserved 3, 4;
+  reserved "duplicate_response", "committed_sequence";
+  bool duplicate_operation = 5;
+}
+
+// PendingInteraction is UI-neutral prompt state kept outside RunEvent replay.
+message PendingInteraction {
+  string run_id = 1;
+  string interaction_id = 2;
+  string kind = 3;
+  string prompt = 4;
+  bytes schema_json = 5;
+}
+
+// InteractionDeltaKind identifies a pending-set mutation.
+enum InteractionDeltaKind {
+  INTERACTION_DELTA_KIND_UNSPECIFIED = 0;
+  INTERACTION_DELTA_KIND_OPENED = 1;
+  INTERACTION_DELTA_KIND_CLOSED = 2;
+}
+
+// InteractionDelta is one revisioned pending-set mutation.
+message InteractionDelta {
+  uint64 revision = 1;
+  InteractionDeltaKind kind = 2;
+  PendingInteraction interaction = 3;
+}
+
+// InteractionSnapshot is an atomic sorted view of all currently pending prompts.
+message InteractionSnapshot {
+  uint64 revision = 1;
+  repeated PendingInteraction pending = 2;
+}
+
+// StreamInteractionsRequest always produces one complete atomic pending
+// snapshot first, then revision-contiguous deltas after that snapshot.
+message StreamInteractionsRequest {
+  string client_id = 1;
+  uint64 ownership_epoch = 2;
+  uint32 replay_limit = 3;
+  bool tail = 4;
+}
+
+// InteractionStreamControl reports the captured revision page and tail state.
+message InteractionStreamControl {
+  spice.agent.common.v1.Status status = 1;
+  uint64 latest_revision = 2;
+  uint64 page_last_revision = 3;
+  bool has_more = 4;
+  bool tailing = 5;
+}
+
+// StreamInteractionsResponse carries a snapshot, delta, or explicit control.
+message StreamInteractionsResponse {
+  oneof payload {
+    InteractionSnapshot snapshot = 1;
+    InteractionDelta delta = 2;
+    InteractionStreamControl control = 3;
+  }
+}
+
+// SuspendRunRequest pauses a run at its next safe completed-turn boundary.
+message SuspendRunRequest {
+  string client_id = 1;
+  uint64 ownership_epoch = 2;
+  string client_operation_id = 3;
+  string run_id = 4;
+}
+
+// SuspendRunResponse identifies the committed safe boundary.
+message SuspendRunResponse {
+  spice.agent.common.v1.Status status = 1;
+  bool suspended = 2;
+  uint64 boundary_sequence = 3;
+  bool duplicate_operation = 4;
+}
+
+// ResumeRunRequest continues a locally suspended run without changing identity.
+message ResumeRunRequest {
+  string client_id = 1;
+  uint64 ownership_epoch = 2;
+  string client_operation_id = 3;
+  string run_id = 4;
+}
+
+// ResumeRunResponse reports the stable run's next authoritative sequence.
+message ResumeRunResponse {
+  spice.agent.common.v1.Status status = 1;
+  bool resumed = 2;
+  uint64 next_sequence = 3;
+  bool duplicate_operation = 4;
 }
 
 // SnapshotEnvelope carries one checksummed provider-neutral safe snapshot.
@@ -253,9 +367,8 @@ message ImportSnapshotRequest {
   string client_id = 1;
   uint64 ownership_epoch = 2;
   string client_operation_id = 3;
-  string new_run_id = 4;
-  string expected_static_plan_fingerprint = 5;
-  string expected_plan_id = 6;
+  reserved 4 to 6;
+  reserved "new_run_id", "expected_static_plan_fingerprint", "expected_plan_id";
   SnapshotEnvelope snapshot = 7;
 }
 
@@ -277,12 +390,18 @@ service EngineService {
   rpc StartRun(StartRunRequest) returns (StartRunResponse);
   // StreamEvents replays and optionally tails authoritative ordered events.
   rpc StreamEvents(StreamEventsRequest) returns (stream StreamEventsResponse);
+  // StreamInteractions snapshots and tails pending prompts outside event replay.
+  rpc StreamInteractions(StreamInteractionsRequest) returns (stream StreamInteractionsResponse);
   // CancelRun cooperatively and idempotently cancels one run.
   rpc CancelRun(CancelRunRequest) returns (CancelRunResponse);
   // RespondInteraction completes one pending interaction exactly once.
   rpc RespondInteraction(RespondInteractionRequest) returns (RespondInteractionResponse);
+  // SuspendRun pauses at a safe snapshot boundary without changing run identity.
+  rpc SuspendRun(SuspendRunRequest) returns (SuspendRunResponse);
+  // ResumeRun continues a locally suspended run without changing run identity.
+  rpc ResumeRun(ResumeRunRequest) returns (ResumeRunResponse);
   // ExportSnapshot returns one validated safe snapshot boundary.
   rpc ExportSnapshot(ExportSnapshotRequest) returns (ExportSnapshotResponse);
-  // ImportSnapshot resumes one suspended snapshot under new ownership.
+  // ImportSnapshot resumes one suspended snapshot under its embedded run ID.
   rpc ImportSnapshot(ImportSnapshotRequest) returns (ImportSnapshotResponse);
 }

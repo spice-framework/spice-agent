@@ -10,9 +10,12 @@ stable enough to encode in a versioned protocol.
 ## Engine protocol contracts
 
 `common/v1` and `engine/v1` are Protobuf APIs governed by Buf lint and breaking
-checks. They provide initialization and version/capability negotiation, health,
-run creation, sequenced event streaming with `after_sequence`, cancellation,
-interaction responses, snapshots, and bounded replay diagnostics.
+checks. They provide initialization and version/capability negotiation,
+server-owned definitions, stable-owner reconnect CAS, health, run creation,
+atomic paged event replay/tailing, complete pending-interaction snapshots with
+revisioned deltas, cancellation, interaction responses, suspend/resume, safe
+snapshot import, and bounded replay diagnostics. Authentication is transport
+metadata, never an application payload.
 
 Every request has count, byte, and deadline limits. Unknown fields follow the
 documented additive-compatibility rule. Protocol errors distinguish invalid
@@ -90,9 +93,10 @@ managed startup, client/session translation, Bubble Tea behavior, and real
 Windows/Linux reconnect acceptance. See
 [`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
 
-The baseline remains intentionally provisional. Before the final Phase 4
-freeze, the daemon host slice must close interaction-delivery/run-identity,
-reconnect ownership, snapshot suspend/import identity, atomic replay bounds,
-and RPC-context/run-lifetime seams. Buf protects changes against the committed
-baseline so every amendment is explicit; it does not imply those semantics are
-already stable.
+The baseline remains intentionally provisional. The pre-host repair closes the
+schema and kernel seams for interaction discovery/run identity, reconnect CAS,
+suspend/resume/import identity, and atomic replay bounds. Before the final Phase
+4 freeze, the daemon host must prove them over real RPCs, enforce run tombstones
+and import authority, and separate RPC contexts from run lifetime. Buf protects
+changes against the committed baseline; it does not imply those host semantics
+are already implemented.

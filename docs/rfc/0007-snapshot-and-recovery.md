@@ -29,8 +29,11 @@ The leased definition fingerprints cover the exact tool contracts. Before event
 log creation or engine mutation, the importer leases the recorded `ToolPlanID`
 and recomputes the combined `PlanIdentity`; missing, substituted, or changed
 plans fail closed and release the candidate lease. Resume additionally requires
-exclusive ownership after the original run authority is unavailable and a
-previously unseen run ID in that engine. Resume
+exclusive ownership. In the same daemon, a known active, suspended, terminal,
+or tombstoned run ID conflicts deterministically; import never replaces that
+authority. Across processes, import is permitted only after the caller
+establishes that the original run authority is dead, and the destination engine
+must not have seen the embedded run ID. Resume
 does not emit a second `RunStarted`; it continues at `last_sequence+1`, starts
 the next turn, and derives run-scoped model/message identities so a fresh process
 cannot reuse earlier lifecycle IDs. Terminal snapshots are inspectable but never

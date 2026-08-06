@@ -9,6 +9,10 @@ import (
 )
 
 func TestRequestAndResponseAreImmutable(t *testing.T) {
+	scope, err := interaction.NewScope("run-1")
+	if err != nil || scope.RunID() != "run-1" || scope.Validate() != nil {
+		t.Fatalf("scope = %#v, %v", scope, err)
+	}
 	schema := json.RawMessage(`{"type":"boolean"}`)
 	request, err := interaction.NewRequest("i1", "confirm", "Continue?", schema)
 	if err != nil {
@@ -71,11 +75,15 @@ func TestRequestAndResponseRejectInvalidValues(t *testing.T) {
 	if (interaction.Request{}).Validate() == nil || (interaction.Response{}).Validate() == nil {
 		t.Fatal("zero interaction value succeeded")
 	}
+	if _, err := interaction.NewScope(""); err == nil || (interaction.Scope{}).Validate() == nil {
+		t.Fatal("invalid interaction scope succeeded")
+	}
 }
 
 func TestUnavailableBrokerFailsClosed(t *testing.T) {
 	request, _ := interaction.NewRequest("i", "confirm", "Continue?", json.RawMessage(`{}`))
-	if _, err := (interaction.UnavailableBroker{}).Request(t.Context(), request); err == nil {
+	scope, _ := interaction.NewScope("run")
+	if _, err := (interaction.UnavailableBroker{}).Request(t.Context(), scope, request); err == nil {
 		t.Fatal("unavailable broker succeeded")
 	}
 }

@@ -730,8 +730,17 @@ func TestPublicAccessorsAndTypedDurabilityErrors(t *testing.T) {
 		t.Fatal("run ID accessor empty")
 	}
 	_ = collect(t, run)
+	page, err := run.ReplayEvents(t.Context(), event.ReplayRequest{
+		AfterSequence: 0, MaxEvents: 32, MaxBytes: 1 << 20, Tail: true,
+	})
+	if err != nil || len(page.Events) == 0 || page.Tailing || page.Tail != nil {
+		t.Fatalf("closed run replay = %#v, %v", page, err)
+	}
 	if _, err := (*agent.Run)(nil).Subscribe(t.Context(), 0); err == nil {
 		t.Fatal("nil run subscription succeeded")
+	}
+	if _, err := (*agent.Run)(nil).ReplayEvents(t.Context(), event.ReplayRequest{}); err == nil {
+		t.Fatal("nil run replay succeeded")
 	}
 }
 

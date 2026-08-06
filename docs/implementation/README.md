@@ -73,7 +73,11 @@ default.
 `common/v1` and `engine/v1` now define the provisional repository-owned Protobuf boundary
 and handwritten fail-closed validation for negotiation, health, run creation,
 ordered bounded replay, cancellation, stale interactions, and safe snapshot
-transfer. Buf lint, FILE-level breaking comparison against
+transfer. The repaired boundary advertises server-owned definitions, encodes
+and validates stable-owner reconnect CAS, keeps auth in transport metadata, separates pending
+interaction snapshots/deltas from run events, pages replay atomically, and
+preserves snapshot run identity through suspend/resume/import. Buf lint,
+FILE-level breaking comparison against
 `schema-baseline`, exact local Go-tool generation, and byte-identical freshness
 are normal offline gates. Unknown fields, old/new peers, capabilities, overload,
 replay gaps, stale clients, snapshot version skew, generated service shape, and
@@ -81,9 +85,9 @@ protocol fuzzing are covered. No daemon, listener, transport authentication,
 managed startup, or TUI implementation is claimed by this slice. Reproducible
 commands are recorded in
 [`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
-The schema is not the final Phase 4 freeze: the host slice must reconcile
-interaction delivery and run identity, reconnect ownership, suspend/import
-semantics, atomic replay bounds, and RPC-context versus run-lifetime ownership
+The schema is not the final Phase 4 freeze: the host slice must prove these
+repaired contracts over real RPCs, enforce same-daemon run tombstones and
+cross-process import authority, and ensure RPC contexts never own run lifetime
 before the baseline can be declared stable.
 
 ## Phase 5.0A execution prerequisite

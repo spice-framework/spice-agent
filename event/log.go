@@ -70,6 +70,28 @@ type LogStats struct {
 	SlowSubscriberDisconnects uint64
 }
 
+// ReplayRequest bounds one atomic retained-history page and optionally asks to
+// register a live tail when that page reaches the captured latest sequence.
+type ReplayRequest struct {
+	AfterSequence uint64
+	MaxEvents     int
+	MaxBytes      int
+	Tail          bool
+}
+
+// ReplayPage is one gap-free page captured with its retained bounds. Tail is
+// non-nil only when Tailing is true and future appends were registered under
+// the same log lock that captured Events and LatestSequence.
+type ReplayPage struct {
+	EarliestSequence uint64
+	LatestSequence   uint64
+	PageLastSequence uint64
+	Events           []Envelope
+	HasMore          bool
+	Tailing          bool
+	Tail             *Subscription
+}
+
 // Log is a count-and-byte-bounded authoritative per-run replay log.
 type Log struct {
 	mu           sync.Mutex
@@ -180,6 +202,112 @@ func (log *Log) boundsLocked() (uint64, uint64) {
 	return log.entries[0].envelope.Sequence(), log.lastSequence
 }
 
+// Replay atomically captures retained bounds and one count-and-byte-bounded
+// page after a cursor. When Tail is requested on the final page, a live
+// subscription is registered before the log lock is released, so an append
+// cannot fall between replay and tail delivery.
+func (log *Log) Replay(ctx context.Context, request ReplayRequest) (ReplayPage, error) {
+	if ctx == nil {
+		return ReplayPage{}, errors.New("event replay context must not be nil")
+	}
+	if log == nil {
+		return ReplayPage{}, errors.New("event log is nil")
+	}
+	if err := ctx.Err(); err != nil {
+		return ReplayPage{}, err
+	}
+	if request.MaxEvents < 1 || request.MaxEvents > log.limits.SubscriberMaxEvents {
+		return ReplayPage{}, fmt.Errorf("event replay max events must be between 1 and %d", log.limits.SubscriberMaxEvents)
+	}
+	if request.MaxBytes < 1 || request.MaxBytes > log.limits.SubscriberMaxBytes {
+		return ReplayPage{}, fmt.Errorf("event replay max bytes must be between 1 and %d", log.limits.SubscriberMaxBytes)
+	}
+
+	log.mu.Lock()
+	defer log.mu.Unlock()
+	entries, page, err := log.replayPageLocked(request)
+	if err != nil {
+		return ReplayPage{}, err
+	}
+	page.Events = make([]Envelope, len(entries))
+	for index, entry := range entries {
+		page.Events[index] = entry.envelope
+	}
+	if request.Tail && !page.HasMore && !log.closed {
+		page.Tail = log.registerSubscriptionLocked(ctx, page.PageLastSequence, nil)
+		page.Tailing = true
+	}
+	return page, nil
+}
+
+func (log *Log) replayPageLocked(request ReplayRequest) ([]logEntry, ReplayPage, error) {
+	earliest, latest := log.boundsLocked()
+	page := ReplayPage{
+		EarliestSequence: earliest,
+		LatestSequence:   latest,
+		PageLastSequence: request.AfterSequence,
+	}
+	if replayCursorOutside(request.AfterSequence, earliest, latest) {
+		recovery := latest
+		if request.AfterSequence < earliest {
+			recovery = earliest - 1
+		}
+		return nil, ReplayPage{}, &OutOfRangeError{
+			RequestedAfter: request.AfterSequence,
+			Earliest:       earliest, Latest: latest, RecoveryAfter: recovery,
+		}
+	}
+	entries := make([]logEntry, 0, min(request.MaxEvents, len(log.entries)))
+	bytes := 0
+	for _, entry := range log.entries {
+		if entry.envelope.Sequence() <= request.AfterSequence {
+			continue
+		}
+		if len(entries) == request.MaxEvents || bytes+entry.bytes > request.MaxBytes {
+			break
+		}
+		entries = append(entries, entry)
+		bytes += entry.bytes
+		page.PageLastSequence = entry.envelope.Sequence()
+	}
+	if page.PageLastSequence < latest {
+		if len(entries) == 0 {
+			log.stats.SubscriptionExhaustions++
+			return nil, ReplayPage{}, &ResourceExhaustedError{
+				LastDelivered: request.AfterSequence,
+				MaxEvents:     request.MaxEvents, MaxBytes: request.MaxBytes,
+			}
+		}
+		page.HasMore = true
+	}
+	return entries, page, nil
+}
+
+func replayCursorOutside(after, earliest, latest uint64) bool {
+	if earliest == latest+1 { // Empty initial [1,0] or imported tail [N+1,N].
+		return after != latest
+	}
+	return after > latest || after < earliest-1
+}
+
+func (log *Log) registerSubscriptionLocked(ctx context.Context, after uint64, replay []logEntry) *Subscription {
+	log.nextSubID++
+	subscription := newSubscription(ctx, after, log.limits, replay, nil)
+	id := log.nextSubID
+	subscription.onDone = func() {
+		log.mu.Lock()
+		delete(log.subscribers, id)
+		log.mu.Unlock()
+	}
+	if log.closed {
+		subscription.finish(nil)
+	} else {
+		log.subscribers[id] = subscription
+	}
+	go subscription.deliver()
+	return subscription
+}
+
 // Subscribe atomically replays entries after a cursor and tails future appends.
 func (log *Log) Subscribe(ctx context.Context, afterSequence uint64) (*Subscription, error) {
 	if ctx == nil {
@@ -193,42 +321,20 @@ func (log *Log) Subscribe(ctx context.Context, afterSequence uint64) (*Subscript
 	}
 	log.mu.Lock()
 	defer log.mu.Unlock()
-	earliest, latest := log.boundsLocked()
-	if afterSequence > latest || (latest != 0 && earliest > 1 && afterSequence < earliest-1) {
-		recovery := latest
-		if afterSequence <= latest {
-			recovery = earliest - 1
-		}
-		return nil, &OutOfRangeError{RequestedAfter: afterSequence, Earliest: earliest, Latest: latest, RecoveryAfter: recovery}
+	replay, page, err := log.replayPageLocked(ReplayRequest{
+		AfterSequence: afterSequence,
+		MaxEvents:     log.limits.SubscriberMaxEvents,
+		MaxBytes:      log.limits.SubscriberMaxBytes,
+		Tail:          true,
+	})
+	if err != nil {
+		return nil, err
 	}
-	replay := make([]logEntry, 0)
-	replayBytes := 0
-	for _, entry := range log.entries {
-		if entry.envelope.Sequence() <= afterSequence {
-			continue
-		}
-		replay = append(replay, entry)
-		replayBytes += entry.bytes
-	}
-	if len(replay) > log.limits.SubscriberMaxEvents || replayBytes > log.limits.SubscriberMaxBytes {
+	if page.HasMore {
 		log.stats.SubscriptionExhaustions++
 		return nil, &ResourceExhaustedError{LastDelivered: afterSequence, MaxEvents: log.limits.SubscriberMaxEvents, MaxBytes: log.limits.SubscriberMaxBytes}
 	}
-	log.nextSubID++
-	subscription := newSubscription(ctx, afterSequence, log.limits, replay, nil)
-	id := log.nextSubID
-	subscription.onDone = func() {
-		log.mu.Lock()
-		delete(log.subscribers, id)
-		log.mu.Unlock()
-	}
-	if log.closed {
-		subscription.finish(nil)
-	} else {
-		log.subscribers[id] = subscription
-	}
-	go subscription.deliver()
-	return subscription, nil
+	return log.registerSubscriptionLocked(ctx, afterSequence, replay), nil
 }
 
 // Close completes live subscribers after their queued tail is delivered.

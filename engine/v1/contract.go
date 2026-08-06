@@ -17,16 +17,16 @@ const (
 	// SnapshotFormat is the only safe kernel snapshot format accepted by v1.
 	SnapshotFormat = "spice.agent.snapshot/v1alpha2"
 	// MaximumSnapshotBytes matches the bounded kernel snapshot contract.
-	MaximumSnapshotBytes  = 16 << 20
-	maximumJSONBytes      = 1 << 20
-	maximumTokenBytes     = 256
-	maximumMessageParts   = 128
-	minimumAuthTokenBytes = 32
-	maximumAuthTokenBytes = 128
+	MaximumSnapshotBytes    = 16 << 20
+	maximumJSONBytes        = 1 << 20
+	maximumInteractionBytes = 512 << 10
+	maximumTokenBytes       = 256
+	maximumMessageParts     = 128
+	maximumDefinitionTurns  = 1000
 )
 
-// NegotiateInitialize validates the first request and returns a complete
-// response without retaining or reflecting the authentication token.
+// NegotiateInitialize validates the first application payload after transport
+// metadata authentication and returns a complete immutable connection contract.
 func NegotiateInitialize(
 	request *InitializeRequest,
 	serverRange *commonv1.ProtocolRange,
@@ -34,6 +34,7 @@ func NegotiateInitialize(
 	serverCapabilities *commonv1.CapabilitySet,
 	serverLimits *commonv1.Limits,
 	health *commonv1.Health,
+	definitions *DefinitionSet,
 	clientID string,
 	ownershipEpoch uint64,
 ) *InitializeResponse {
@@ -43,11 +44,11 @@ func NegotiateInitialize(
 	if request == nil {
 		return invalid("initialize request is required")
 	}
-	if size := len(request.GetAuthenticationToken()); size < minimumAuthTokenBytes || size > maximumAuthTokenBytes {
-		return invalid("authentication token must be between 32 and 128 bytes")
-	}
 	if err := commonv1.ValidateBuildIdentity(request.GetClient()); err != nil {
 		return invalid("client build identity: " + err.Error())
+	}
+	if err := validateReconnectClaim(request.GetReconnectClaim()); err != nil {
+		return invalid("reconnect claim: " + err.Error())
 	}
 	if err := commonv1.ValidateBuildIdentity(serverBuild); err != nil {
 		return &InitializeResponse{Status: protocolStatus(commonv1.ErrorCode_ERROR_CODE_INTERNAL, "server build identity is invalid")}
@@ -55,7 +56,10 @@ func NegotiateInitialize(
 	if err := commonv1.ValidateHealth(health); err != nil {
 		return &InitializeResponse{Status: protocolStatus(commonv1.ErrorCode_ERROR_CODE_INTERNAL, "server health is invalid")}
 	}
-	if err := token("client ID", clientID, 128); err != nil || ownershipEpoch == 0 {
+	if err := ValidateDefinitionSet(definitions, serverLimits); err != nil {
+		return &InitializeResponse{Status: protocolStatus(commonv1.ErrorCode_ERROR_CODE_INTERNAL, "server definition set is invalid")}
+	}
+	if err := validateReconnectResult(request.GetReconnectClaim(), clientID, ownershipEpoch); err != nil {
 		return &InitializeResponse{Status: protocolStatus(commonv1.ErrorCode_ERROR_CODE_INTERNAL, "server client ownership is invalid")}
 	}
 	version, negotiationStatus := commonv1.NegotiateProtocol(request.GetProtocol(), serverRange)
@@ -83,6 +87,7 @@ func NegotiateInitialize(
 		Health:         clone(health),
 		ClientId:       clientID,
 		OwnershipEpoch: ownershipEpoch,
+		Definitions:    clone(definitions),
 	}
 }
 
@@ -120,6 +125,127 @@ func ValidateInitializeResponse(response *InitializeResponse) error {
 	}
 	if response.GetOwnershipEpoch() == 0 {
 		return errors.New("ownership epoch must be positive")
+	}
+	if err := ValidateDefinitionSet(response.GetDefinitions(), response.GetLimits()); err != nil {
+		return err
+	}
+	return commonv1.ValidateEncodedSize(response, response.GetLimits().GetMaxMessageBytes())
+}
+
+// ValidateInitializeResponseForRequest additionally verifies that ownership is
+// the exact result of the request's new-owner or reconnect CAS contract.
+func ValidateInitializeResponseForRequest(request *InitializeRequest, response *InitializeResponse) error {
+	if request == nil {
+		return errors.New("initialize request is required")
+	}
+	if err := validateReconnectClaim(request.GetReconnectClaim()); err != nil {
+		return err
+	}
+	if err := ValidateInitializeResponse(response); err != nil {
+		return err
+	}
+	return validateReconnectResult(request.GetReconnectClaim(), response.GetClientId(), response.GetOwnershipEpoch())
+}
+
+// ValidateDefinitionSet rejects mutable-looking, ambiguous, or unsorted server
+// catalogs. Generated definitions are authoritative; clients send only refs.
+func ValidateDefinitionSet(value *DefinitionSet, limits *commonv1.Limits) error {
+	if value == nil {
+		return errors.New("definition set is required")
+	}
+	if err := token("definition set revision", value.GetRevision(), maximumTokenBytes); err != nil {
+		return err
+	}
+	if err := commonv1.ValidateLimits(limits); err != nil {
+		return err
+	}
+	if len(value.GetDefinitions()) == 0 || len(value.GetDefinitions()) > int(limits.GetMaxCollectionItems()) {
+		return fmt.Errorf("definition count must be between 1 and %d", limits.GetMaxCollectionItems())
+	}
+	previous := ""
+	for index, definition := range value.GetDefinitions() {
+		if err := validateDefinition(definition); err != nil {
+			return fmt.Errorf("definition %d: %w", index, err)
+		}
+		key := definition.GetId() + "\x00" + definition.GetRevision()
+		if key <= previous {
+			return errors.New("definitions must be sorted and unique by ID and revision")
+		}
+		previous = key
+	}
+	return commonv1.ValidateEncodedSize(value, limits.GetMaxMessageBytes())
+}
+
+func validateDefinition(value *Definition) error {
+	if value == nil {
+		return errors.New("definition is required")
+	}
+	for _, field := range [][2]string{
+		{"definition ID", value.GetId()},
+		{"definition revision", value.GetRevision()},
+		{"model", value.GetModel()},
+	} {
+		if err := token(field[0], field[1], maximumTokenBytes); err != nil {
+			return err
+		}
+	}
+	if value.GetMaxTurns() == 0 || value.GetMaxTurns() > maximumDefinitionTurns {
+		return fmt.Errorf("agent definition max turns must be between 1 and %d", maximumDefinitionTurns)
+	}
+	return nil
+}
+
+// ResolveDefinition returns the exact immutable server definition selected by
+// a minimal client reference.
+func ResolveDefinition(reference *AgentDefinitionRef, definitions *DefinitionSet, limits *commonv1.Limits) (*Definition, error) {
+	if reference == nil {
+		return nil, errors.New("agent definition reference is required")
+	}
+	if err := token("definition ID", reference.GetId(), maximumTokenBytes); err != nil {
+		return nil, err
+	}
+	if err := token("definition revision", reference.GetRevision(), maximumTokenBytes); err != nil {
+		return nil, err
+	}
+	if err := ValidateDefinitionSet(definitions, limits); err != nil {
+		return nil, err
+	}
+	for _, definition := range definitions.GetDefinitions() {
+		if definition.GetId() == reference.GetId() && definition.GetRevision() == reference.GetRevision() {
+			return clone(definition), nil
+		}
+	}
+	return nil, fmt.Errorf("agent definition %q at revision %q is unavailable", reference.GetId(), reference.GetRevision())
+}
+
+func validateReconnectClaim(claim *ReconnectClaim) error {
+	if claim == nil {
+		return nil
+	}
+	if err := token("reconnect client ID", claim.GetClientId(), 128); err != nil {
+		return err
+	}
+	if claim.GetExpectedOwnershipEpoch() == 0 || claim.GetExpectedOwnershipEpoch() == math.MaxUint64 {
+		return errors.New("reconnect expected ownership epoch must be incrementable")
+	}
+	return nil
+}
+
+func validateReconnectResult(claim *ReconnectClaim, clientID string, ownershipEpoch uint64) error {
+	if err := token("client ID", clientID, 128); err != nil {
+		return err
+	}
+	if claim == nil {
+		if ownershipEpoch != 1 {
+			return errors.New("new client ownership epoch must be one")
+		}
+		return nil
+	}
+	if err := validateReconnectClaim(claim); err != nil {
+		return err
+	}
+	if clientID != claim.GetClientId() || ownershipEpoch != claim.GetExpectedOwnershipEpoch()+1 {
+		return errors.New("reconnect result does not satisfy the ownership epoch compare-and-swap")
 	}
 	return nil
 }
@@ -164,15 +290,10 @@ func ValidateStartRunRequest(request *StartRunRequest, limits *commonv1.Limits) 
 	for _, field := range [][2]string{
 		{"definition ID", definition.GetId()},
 		{"definition revision", definition.GetRevision()},
-		{"model", definition.GetModel()},
-		{"expected static plan fingerprint", definition.GetExpectedStaticPlanFingerprint()},
 	} {
 		if err := token(field[0], field[1], maximumTokenBytes); err != nil {
 			return err
 		}
-	}
-	if definition.GetMaxTurns() == 0 {
-		return errors.New("agent definition max turns must be positive")
 	}
 	if err := ValidateMessage(request.GetInput()); err != nil {
 		return fmt.Errorf("initial message: %w", err)
@@ -233,6 +354,230 @@ func ValidateStreamEventsRequest(
 	return commonv1.ValidateEncodedSize(request, limits.GetMaxMessageBytes())
 }
 
+// ValidateStreamControl enforces captured bounds and an explicit page/tail
+// relationship. The optional page cursor permits additive older-peer handling.
+func ValidateStreamControl(value *StreamControl) error {
+	if value == nil {
+		return errors.New("stream control is required")
+	}
+	if err := commonv1.ValidateStatus(value.GetStatus()); err != nil {
+		return err
+	}
+	if value.GetStatus().GetCode() != commonv1.ErrorCode_ERROR_CODE_OK {
+		return nil
+	}
+	return validateSuccessfulStreamControl(value)
+}
+
+func validateSuccessfulStreamControl(value *StreamControl) error {
+	earliest, latest := value.GetEarliestSequence(), value.GetLatestSequence()
+	validWindow := earliest > 0 && latest >= earliest
+	emptyWindow := earliest > 0 && latest < math.MaxUint64 && earliest == latest+1
+	if !validWindow && !emptyWindow {
+		return errors.New("stream control retained bounds are invalid")
+	}
+	if value.PageLastSequence == nil {
+		return validateLegacyStreamControl(value, earliest, latest)
+	}
+	return validateCurrentStreamControl(value, earliest, latest)
+}
+
+func validateLegacyStreamControl(value *StreamControl, earliest, latest uint64) error {
+	if value.GetHasMore() || value.GetTailing() {
+		return errors.New("stream control page cursor is required for paging or tailing")
+	}
+	// Compatibility-only shape for a provisional older peer. Current
+	// successful paging/tailing controls always set page_last_sequence.
+	if value.GetLastDeliveredSequence() < earliest-1 || value.GetLastDeliveredSequence() > latest {
+		return errors.New("legacy stream control delivery cursor is outside retained bounds")
+	}
+	return nil
+}
+
+func validateCurrentStreamControl(value *StreamControl, earliest, latest uint64) error {
+	pageLast := value.GetPageLastSequence()
+	if pageLast < earliest-1 || pageLast > latest ||
+		value.GetLastDeliveredSequence() < earliest-1 || value.GetLastDeliveredSequence() > pageLast {
+		return errors.New("stream control cursors exceed the captured latest sequence")
+	}
+	if value.GetHasMore() != (pageLast < latest) {
+		return errors.New("stream control has_more must exactly identify a non-final page")
+	}
+	if value.GetHasMore() && value.GetTailing() {
+		return errors.New("stream control cannot tail a non-final page")
+	}
+	if value.GetTailing() && pageLast != latest {
+		return errors.New("stream control may tail only from the captured latest sequence")
+	}
+	return nil
+}
+
+// ValidateStreamInteractionsRequest bounds the separate pending-prompt stream.
+func ValidateStreamInteractionsRequest(request *StreamInteractionsRequest, limits *commonv1.Limits) error {
+	if request == nil {
+		return errors.New("stream interactions request is required")
+	}
+	if err := validateClient(request.GetClientId(), request.GetOwnershipEpoch()); err != nil {
+		return err
+	}
+	if err := commonv1.ValidateLimits(limits); err != nil {
+		return err
+	}
+	if request.GetReplayLimit() == 0 || request.GetReplayLimit() > limits.GetMaxReplayEvents() {
+		return fmt.Errorf("interaction replay limit must be between 1 and %d", limits.GetMaxReplayEvents())
+	}
+	return commonv1.ValidateEncodedSize(request, limits.GetMaxMessageBytes())
+}
+
+// ValidatePendingInteraction rejects uncorrelated or unbounded prompt state.
+func ValidatePendingInteraction(value *PendingInteraction) error {
+	if value == nil {
+		return errors.New("pending interaction is required")
+	}
+	for _, field := range [][2]string{
+		{"run ID", value.GetRunId()},
+		{"interaction ID", value.GetInteractionId()},
+		{"interaction kind", value.GetKind()},
+	} {
+		if err := token(field[0], field[1], 128); err != nil {
+			return err
+		}
+	}
+	if value.GetPrompt() == "" || value.GetPrompt() != strings.TrimSpace(value.GetPrompt()) || len(value.GetPrompt()) > maximumInteractionBytes {
+		return errors.New("interaction prompt must be non-empty, trimmed, and bounded")
+	}
+	return validateBoundedJSON("interaction schema", value.GetSchemaJson(), maximumInteractionBytes)
+}
+
+// ValidateInteractionSnapshot enforces an atomic sorted pending-set snapshot.
+func ValidateInteractionSnapshot(value *InteractionSnapshot, limits *commonv1.Limits) error {
+	if value == nil {
+		return errors.New("interaction snapshot is required")
+	}
+	if err := commonv1.ValidateLimits(limits); err != nil {
+		return err
+	}
+	if len(value.GetPending()) > int(limits.GetMaxCollectionItems()) {
+		return fmt.Errorf("pending interaction count exceeds %d", limits.GetMaxCollectionItems())
+	}
+	previous := ""
+	for index, pending := range value.GetPending() {
+		if err := ValidatePendingInteraction(pending); err != nil {
+			return fmt.Errorf("pending interaction %d: %w", index, err)
+		}
+		key := pending.GetRunId() + "\x00" + pending.GetInteractionId()
+		if key <= previous {
+			return errors.New("pending interactions must be sorted and unique by run and interaction ID")
+		}
+		previous = key
+	}
+	return commonv1.ValidateEncodedSize(value, limits.GetMaxMessageBytes())
+}
+
+// ValidateInteractionDelta enforces one strictly revisioned opened/closed item.
+func ValidateInteractionDelta(value *InteractionDelta) error {
+	if value == nil {
+		return errors.New("interaction delta is required")
+	}
+	if value.GetRevision() == 0 {
+		return errors.New("interaction delta revision must be positive")
+	}
+	if value.GetKind() != InteractionDeltaKind_INTERACTION_DELTA_KIND_OPENED &&
+		value.GetKind() != InteractionDeltaKind_INTERACTION_DELTA_KIND_CLOSED {
+		return fmt.Errorf("interaction delta kind %d is unsupported", value.GetKind())
+	}
+	return ValidatePendingInteraction(value.GetInteraction())
+}
+
+// ValidateInteractionStreamControl enforces paging before live delta tailing.
+func ValidateInteractionStreamControl(value *InteractionStreamControl) error {
+	if value == nil {
+		return errors.New("interaction stream control is required")
+	}
+	if err := commonv1.ValidateStatus(value.GetStatus()); err != nil {
+		return err
+	}
+	if value.GetStatus().GetCode() != commonv1.ErrorCode_ERROR_CODE_OK {
+		return nil
+	}
+	if value.GetPageLastRevision() > value.GetLatestRevision() {
+		return errors.New("interaction page cursor exceeds the captured latest revision")
+	}
+	if value.GetHasMore() != (value.GetPageLastRevision() < value.GetLatestRevision()) {
+		return errors.New("interaction has_more must exactly identify a non-final page")
+	}
+	if value.GetHasMore() && value.GetTailing() {
+		return errors.New("interaction stream cannot tail a non-final page")
+	}
+	if value.GetTailing() && value.GetPageLastRevision() != value.GetLatestRevision() {
+		return errors.New("interaction stream may tail only from the captured latest revision")
+	}
+	return nil
+}
+
+// ValidateInteractionStreamPage proves the mandatory reconnect contract: the
+// first frame is always a complete atomic pending snapshot, followed by
+// revision-contiguous deltas and one final page control. A client therefore
+// never depends on evicted delta history to discover an unresolved prompt.
+func ValidateInteractionStreamPage(values []*StreamInteractionsResponse, limits *commonv1.Limits) error {
+	if len(values) < 2 {
+		return errors.New("interaction stream page requires a snapshot and control")
+	}
+	if err := commonv1.ValidateLimits(limits); err != nil {
+		return err
+	}
+	snapshot := values[0].GetSnapshot()
+	if err := ValidateInteractionSnapshot(snapshot, limits); err != nil {
+		return fmt.Errorf("first interaction frame: %w", err)
+	}
+	revision := snapshot.GetRevision()
+	pending := make(map[string]struct{}, len(snapshot.GetPending()))
+	for _, interaction := range snapshot.GetPending() {
+		pending[interactionKey(interaction)] = struct{}{}
+	}
+	deltaCount := 0
+	for index, response := range values[1 : len(values)-1] {
+		delta := response.GetDelta()
+		if err := ValidateInteractionDelta(delta); err != nil {
+			return fmt.Errorf("interaction frame %d: %w", index+1, err)
+		}
+		if revision == math.MaxUint64 || delta.GetRevision() != revision+1 {
+			return fmt.Errorf("interaction frame %d is not the next revision", index+1)
+		}
+		revision = delta.GetRevision()
+		key := interactionKey(delta.GetInteraction())
+		_, exists := pending[key]
+		switch delta.GetKind() {
+		case InteractionDeltaKind_INTERACTION_DELTA_KIND_OPENED:
+			if exists {
+				return fmt.Errorf("interaction frame %d opens an already-pending interaction", index+1)
+			}
+			pending[key] = struct{}{}
+		case InteractionDeltaKind_INTERACTION_DELTA_KIND_CLOSED:
+			if !exists {
+				return fmt.Errorf("interaction frame %d closes a non-pending interaction", index+1)
+			}
+			delete(pending, key)
+		}
+		deltaCount++
+	}
+	if deltaCount > int(limits.GetMaxReplayEvents()) {
+		return fmt.Errorf("interaction delta count exceeds %d", limits.GetMaxReplayEvents())
+	}
+	control := values[len(values)-1].GetControl()
+	if err := ValidateInteractionStreamControl(control); err != nil {
+		return fmt.Errorf("final interaction frame: %w", err)
+	}
+	if commonv1.AsError(control.GetStatus()) == nil && control.GetPageLastRevision() != revision {
+		return errors.New("interaction control page cursor does not match the delivered revision")
+	}
+	return nil
+}
+
+func interactionKey(value *PendingInteraction) string {
+	return value.GetRunId() + "\x00" + value.GetInteractionId()
+}
+
 // CheckReplayCursor returns typed recovery bounds when retained events cannot
 // satisfy the requested cursor.
 func CheckReplayCursor(
@@ -241,12 +586,13 @@ func CheckReplayCursor(
 	latest uint64,
 ) *commonv1.Status {
 	validWindow := earliest > 0 && latest >= earliest
-	if validWindow && requestedAfter != math.MaxUint64 &&
+	emptyWindow := earliest > 0 && latest < math.MaxUint64 && earliest == latest+1
+	if emptyWindow && requestedAfter == latest || validWindow && requestedAfter != math.MaxUint64 &&
 		requestedAfter+1 >= earliest && requestedAfter <= latest {
 		return nil
 	}
-	recovery := uint64(0)
-	if validWindow {
+	recovery := latest
+	if requestedAfter < earliest {
 		recovery = earliest - 1
 	}
 	return &commonv1.Status{
@@ -324,9 +670,6 @@ func ValidateRunEvent(value *RunEvent) error {
 		(len(value.GetPayloadJson()) != 0 && !json.Valid(value.GetPayloadJson())) {
 		return errors.New("run event payload must be empty or bounded valid JSON")
 	}
-	if value.GetOperationId() != "" {
-		return token("operation ID", value.GetOperationId(), 128)
-	}
 	return nil
 }
 
@@ -364,6 +707,22 @@ func ValidateCancelRunRequest(request *CancelRunRequest) error {
 	return nil
 }
 
+// ValidateSuspendRunRequest validates one idempotent safe-boundary mutation.
+func ValidateSuspendRunRequest(request *SuspendRunRequest) error {
+	if request == nil {
+		return errors.New("suspend run request is required")
+	}
+	return validateRunMutation(request.GetClientId(), request.GetOwnershipEpoch(), request.GetClientOperationId(), request.GetRunId())
+}
+
+// ValidateResumeRunRequest validates one idempotent local-resume mutation.
+func ValidateResumeRunRequest(request *ResumeRunRequest) error {
+	if request == nil {
+		return errors.New("resume run request is required")
+	}
+	return validateRunMutation(request.GetClientId(), request.GetOwnershipEpoch(), request.GetClientOperationId(), request.GetRunId())
+}
+
 // ValidateInteractionResponse rejects stale ownership, wrong correlation, and
 // malformed structured input before it can reach the kernel broker.
 func ValidateInteractionResponse(
@@ -388,7 +747,6 @@ func ValidateInteractionResponse(
 		{"client operation ID", request.GetClientOperationId()},
 		{"run ID", request.GetRunId()},
 		{"interaction ID", request.GetInteractionId()},
-		{"response ID", request.GetResponseId()},
 	} {
 		if err := token(field[0], field[1], 128); err != nil {
 			return protocolStatus(commonv1.ErrorCode_ERROR_CODE_INVALID_ARGUMENT, err.Error())
@@ -397,7 +755,7 @@ func ValidateInteractionResponse(
 	if request.GetRunId() != expectedRunID || request.GetInteractionId() != expectedInteractionID {
 		return protocolStatus(commonv1.ErrorCode_ERROR_CODE_CONFLICT, "interaction correlation does not match the pending request")
 	}
-	if len(request.GetValueJson()) == 0 || len(request.GetValueJson()) > maximumJSONBytes ||
+	if len(request.GetValueJson()) == 0 || len(request.GetValueJson()) > maximumInteractionBytes ||
 		!json.Valid(request.GetValueJson()) {
 		return protocolStatus(commonv1.ErrorCode_ERROR_CODE_INVALID_ARGUMENT, "interaction response must be bounded valid JSON")
 	}
@@ -432,6 +790,15 @@ func ValidateSnapshotEnvelope(value *SnapshotEnvelope) error {
 	digest := sha256.Sum256(value.GetPayload())
 	if !slices.Equal(value.GetSha256(), digest[:]) {
 		return errors.New("snapshot SHA-256 digest does not match its payload")
+	}
+	var identity struct {
+		RunID string `json:"run_id"`
+	}
+	if err := json.Unmarshal(value.GetPayload(), &identity); err != nil {
+		return errors.New("snapshot payload must be valid v1alpha2 JSON")
+	}
+	if identity.RunID != value.GetRunId() {
+		return errors.New("snapshot envelope run ID does not match its embedded run ID")
 	}
 	return nil
 }
@@ -470,15 +837,6 @@ func ValidateImportSnapshotRequest(request *ImportSnapshotRequest) error {
 	); err != nil {
 		return err
 	}
-	for _, field := range [][2]string{
-		{"new run ID", request.GetNewRunId()},
-		{"static plan fingerprint", request.GetExpectedStaticPlanFingerprint()},
-		{"expected plan ID", request.GetExpectedPlanId()},
-	} {
-		if err := token(field[0], field[1], maximumTokenBytes); err != nil {
-			return err
-		}
-	}
 	if err := ValidateSnapshotEnvelope(request.GetSnapshot()); err != nil {
 		return err
 	}
@@ -493,6 +851,13 @@ func validateClientMutation(clientID string, epoch uint64, operationID string) e
 		return err
 	}
 	return token("client operation ID", operationID, 128)
+}
+
+func validateRunMutation(clientID string, epoch uint64, operationID, runID string) error {
+	if err := validateClientMutation(clientID, epoch, operationID); err != nil {
+		return err
+	}
+	return token("run ID", runID, 128)
 }
 
 func validateClient(clientID string, epoch uint64) error {
@@ -570,7 +935,11 @@ func validateExtensionPart(value *ContentPart_Extension) error {
 }
 
 func validateJSON(label string, value []byte) error {
-	if len(value) == 0 || len(value) > maximumJSONBytes || !json.Valid(value) {
+	return validateBoundedJSON(label, value, maximumJSONBytes)
+}
+
+func validateBoundedJSON(label string, value []byte, maximum int) error {
+	if len(value) == 0 || len(value) > maximum || !json.Valid(value) {
 		return fmt.Errorf("%s must be bounded valid JSON", label)
 	}
 	return nil

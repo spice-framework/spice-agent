@@ -57,12 +57,21 @@ may depend on public contracts; the kernel does not depend on transport, UI, or
 provider implementations.
 
 `common/v1` and `engine/v1` are the only initial Protobuf process boundary.
-They encode protocol negotiation, typed status, health, run/event replay,
-cancellation, interaction, and snapshot transfer. Handwritten validators fail
+They encode protocol negotiation, typed status, server-owned definitions,
+stable-owner reconnect, health, atomic run/event replay, complete-first pending
+interaction streams, cancellation, suspend/resume, and snapshot transfer.
+Authentication remains transport metadata. Handwritten validators fail
 closed before state mutation. The packages deliberately contain no listener,
 daemon, client lifecycle, registry, or translation into kernel internals. The
 quality gate rejects gRPC, Protobuf, and generated protocol imports from kernel
 packages.
+
+Every interaction broker call carries an immutable validated run scope. Prompt
+content and response values stay out of authoritative run events; process
+clients discover them through an atomic complete pending snapshot followed by
+revisioned opened/closed deltas. The event log exposes count-and-byte-bounded
+pages whose bounds and optional final-head tail registration are captured under
+one lock, including empty initial `[1,0]` and imported `[N+1,N]` tails.
 
 Every tool definition explicitly classifies external-state effect and replay
 safety and carries a canonically ordered capability set. Model-visible tool
