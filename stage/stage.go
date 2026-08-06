@@ -1,4 +1,3 @@
-// Package stage defines replaceable, constructor-injected execution seams.
 package stage
 
 import (
@@ -11,6 +10,13 @@ import (
 
 	"github.com/spice-framework/spice-agent/tool"
 )
+
+// Stage is one typed, constructor-injected pipeline transform. Each Input and
+// Output instantiation is a distinct exact Go interface for Spice dependency
+// resolution; it is not a runtime registry or universal middleware contract.
+type Stage[Input, Output any] interface {
+	Process(context.Context, Input) (Output, error)
+}
 
 // ToolDispatcher is the sole executable route for tool calls. Definition gives
 // decorators an immutable capability snapshot before they delegate execution.

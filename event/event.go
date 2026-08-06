@@ -1,4 +1,3 @@
-// Package event defines immutable sequenced run observations.
 package event
 
 import (

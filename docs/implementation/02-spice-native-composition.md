@@ -10,9 +10,12 @@ generation, and the repository foundation from phase 0.
 ## Public contracts
 
 - `@Stage`, `@Tool`, and `@ModelProvider` are documented agent annotation
-  descriptors with authorized Go handlers. They emit generic stereotype,
-  exact-interface binding, bean-name, qualifier, fallback/primary, and order
-  contributions; the Spice compiler contains no agent annotation-name switch.
+  descriptors with authorized Go handlers. They emit only generic provider and
+  bean-name/alias/qualifier/fallback/primary/order metadata contributions; the
+  Spice compiler contains no agent annotation-name switch. Exact
+  interface-returning factories need no interface-binding contribution. The
+  generic compiler owns `go/types` identity and alias resolution; annotation
+  handlers validate only normalized function/provider shape.
 - Every annotation has one canonical descriptor/handler Go file. Go to
   Definition opens the descriptor; Go to Implementation opens the typed handler.
 - External defaults activate only through an explicit blank import of that
@@ -20,15 +23,19 @@ generation, and the repository foundation from phase 0.
 - A default implementation is a fallback bean. A normal candidate replaces it.
   Multiple normal candidates are a deterministic error unless application code
   supplies a typed primary or qualified alias bean.
-- Ordered decorators inject `[]stage.Stage`; tools inject as `map[string]tool.Tool`
-  using canonical bean names. Names are static identities, not runtime lookup
-  keys supplied by untrusted input.
+- Typed stages use distinct `stage.Stage[Input, Output]` instantiations or
+  narrower application-owned interfaces. Tools inject as `map[string]tool.Tool`
+  using required canonical bean names. Names are static identities, not runtime
+  lookup keys supplied by untrusted input.
 - Every executable is an `@Application` target and builds from committed,
   inspectable generated Go without the Spice compiler at runtime.
 
 ## Dependency and module boundaries
 
-The kernel SPI packages are named interfaces. Annotation/tooling packages may
+The repository is one Modulith root; its supported descendant API/SPI packages
+are uniquely named interfaces. They are not competing module roots, so ordinary
+kernel imports remain intra-module and no artificial allowed-dependency
+exceptions are needed. Annotation/tooling packages may
 depend on the public SDK and SPI facts but never on provider, coding-tool, TUI,
 daemon implementation, or distribution packages. Auto-configuration packages
 may wire their own module's beans and public SPIs only.
@@ -80,7 +87,8 @@ Warm generation/check for the embedded fixture targets five seconds; generated
 application startup targets 100 ms. Exact source-to-generated-file mappings and
 selected bean reasons are retained as artifacts.
 
-Status is **in progress**. Core SPI contracts exist, but the agent annotations,
-authorized tool, generated embedded fixture, and complete DI acceptance matrix
-are not yet implemented. No later repository may introduce a substitute static
-composition mechanism while this work is pending.
+Status is **in progress**. The typed Stage SPI, three canonical descriptors, and
+authorized deterministic v1alpha2 tool now exist. The generated embedded
+fixture, auto-configuration contracts, and complete DI acceptance matrix remain
+pending. No later repository may introduce a substitute static composition
+mechanism while this work is pending.

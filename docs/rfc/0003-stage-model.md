@@ -5,8 +5,11 @@
 
 ## Decision
 
-Stages and executable tools are narrow Go interfaces resolved at generated
-construction time. Replaceable defaults are fallback beans. Application or
+Stages are generic exact transforms:
+`Stage[Input, Output].Process(context.Context, Input) (Output, error)`. Each
+instantiation is a distinct Go interface resolved at generated construction
+time, not a universal middleware type. Executable tools are likewise narrow Go
+interfaces. Replaceable defaults are fallback beans. Application or
 starter implementations are normal candidates; ambiguity requires an
 application-owned typed primary or qualifier. Decoration uses ordered typed
 collections and never mutates an existing bean registry.
@@ -25,9 +28,14 @@ support are ordered typed dispatcher decorators.
 
 ## Annotation mapping
 
-`@Stage` and `@Tool` descriptors emit existing generic Spice contributions:
-stereotype, explicit interface binding, bean name, qualifier, fallback/primary,
-and order. They do not emit an agent registry entry. Descriptor handlers are
+`@Stage`, `@Tool`, and `@ModelProvider` descriptors emit only existing generic
+Spice provider and bean metadata contributions: name, aliases, qualifiers,
+fallback/primary, and order. Exact interface-returning factories need no
+interface-binding contribution. The ordinary Go signature establishes the
+typed boundary and may use the standard optional cleanup/error provider forms;
+handlers do not guess assignability from readable type strings. The generic
+compiler remains authoritative for exact identity, aliases, cleanup, and error
+forms. They do not emit an agent registry entry. Descriptor handlers are
 typed Go functions in canonical files and the compiler consumes only generic
 contributions.
 

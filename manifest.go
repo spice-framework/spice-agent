@@ -1,5 +1,3 @@
-// Package spiceagent publishes deterministic Spice starter compatibility
-// metadata for the provider-neutral agent kernel.
 package spiceagent
 
 import "github.com/spice-framework/spice/starter"

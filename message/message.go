@@ -1,4 +1,3 @@
-// Package message defines provider-neutral immutable conversation values.
 package message
 
 import (

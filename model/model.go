@@ -1,4 +1,3 @@
-// Package model defines provider-neutral immutable model streaming contracts.
 package model
 
 import (

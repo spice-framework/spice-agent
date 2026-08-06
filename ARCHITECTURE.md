@@ -16,6 +16,14 @@ MCP, Git, indexing, TUI code, subagents, or distributed scheduling.
 Runtime plugins are the sole dynamic graph. A run leases one immutable plugin
 generation; activation never changes existing runs and never alters compiled DI.
 
+`annotation/agent` exposes `@Stage`, `@Tool`, and `@ModelProvider`. Their typed
+handlers return only Spice's generic provider and bean-metadata contributions.
+Factory signatures remain ordinary Go and the generic compiler owns exact type
+identity, aliases, cleanup, and error validation. The authorized
+`cmd/spice-agent-annotations` process is protocol dispatch only; it is not an
+application registry. Typed stages use distinct `stage.Stage[Input, Output]`
+interfaces.
+
 ## Dependency direction
 
 ```text
@@ -33,4 +41,3 @@ may depend on public contracts; the kernel does not depend on transport, UI, or
 provider implementations.
 
 See `docs/adr/0001-spice-native-composition.md` for the rejected parallel graph.
-

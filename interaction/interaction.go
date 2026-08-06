@@ -1,4 +1,3 @@
-// Package interaction defines UI-independent immutable interaction contracts.
 package interaction
 
 import (

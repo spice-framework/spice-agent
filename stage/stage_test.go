@@ -4,11 +4,27 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/spice-framework/spice-agent/stage"
 	"github.com/spice-framework/spice-agent/tool"
 )
+
+type uppercaseStage struct{}
+
+func (uppercaseStage) Process(_ context.Context, input string) (string, error) {
+	return strings.ToUpper(input), nil
+}
+
+func TestTypedStageKeepsInputAndOutputInGoTypeSystem(t *testing.T) {
+	t.Parallel()
+	var implementation stage.Stage[string, string] = uppercaseStage{}
+	output, err := implementation.Process(t.Context(), "spice")
+	if err != nil || output != "SPICE" {
+		t.Fatalf("Process = %q, %v", output, err)
+	}
+}
 
 type fakeTool struct {
 	name       string

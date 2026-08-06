@@ -7,8 +7,8 @@ Repository roadmaps link here and must not duplicate status.
 | --- | --- | --- |
 | 0 — product and repositories | In progress | repository governance, exact toolchain, offline build, quality gate |
 | 1 — Spice-native composition | In progress | annotation/DI fixture, generated graph diagnostics |
-| 2 — deterministic kernel | In progress | scripted vertical tests, race/cancellation/terminal-event proof |
-| 3 — provider and coding tools | Planned | external repositories and acceptance |
+| 2 — deterministic kernel | Complete for preview | `841edd3`; deterministic lifecycle, interaction, snapshot, race/fuzz proof |
+| 3 — provider and coding tools | In progress | generated cross-repository continuation and opt-in live acceptance |
 | 4 — daemon and TUI | Planned | local protocol and reconnect proof |
 | 5 — runtime plugins | Planned | Go/Python conformance and generation leases |
 | 6 — architecture proof | Planned | signed `v0.1.0-preview.1` distribution |
@@ -19,7 +19,7 @@ Exact commits and command output are recorded only after the corresponding gate
 has run. A phase is not complete because code exists; every exit criterion in its
 document must be green on Windows and Linux where required.
 
-## Current Phase 2 boundary
+## Phase 2 preview boundary
 
 The immutable model/tool contracts, typed provider failures, dispatcher
 capability snapshot, call/progress correlation, bounded independent event
@@ -27,12 +27,38 @@ replay, terminal durability, and engine shutdown lifecycle are implemented.
 They remain pre-1.0 contracts and will be exercised by the independent OpenAI
 provider and coding-tool repositories before stabilization.
 
-Phase 2 is still incomplete: interaction completion and snapshot import/export
-are now implemented as bounded preview contracts with deterministic round-trip,
-resume, cancellation, panic, observer-failure, and race tests. Phase 2 remains
-listed in progress until this exact tree is committed and its cross-repository
-provider/tool conformance evidence is recorded; durable SQLite recovery remains
-the Phase 7 stress proof.
+Interaction completion and snapshot import/export are bounded preview contracts
+with deterministic round-trip, resume, cancellation, panic, observer-failure,
+race, replay-gap, identifier-reuse, and tool-plan-fingerprint tests. Commit
+`841edd3` passed `make verify` in 29.9s at 86.2% repository coverage. Durable
+SQLite recovery remains the isolated Phase 7 stress proof.
+
+## Current Phase 1 boundary
+
+Canonical `@Stage`, `@Tool`, and `@ModelProvider` descriptors and their
+authorized v1alpha2 process are implemented using only generic Spice provider
+and bean-metadata contributions. This does not complete Phase 1: the generated
+consumer graph, fallback/replacement/ambiguity matrix, test overrides, and
+annotation doctor/bean-explanation evidence remain pending.
+
+## Current Phase 3 boundary
+
+The provider and coding-tool repositories are implemented and independently
+repinned, but Phase 3 is not complete. Remaining exit evidence is a generated
+cross-repository compiled tool-call continuation through the kernel and the
+opt-in live OpenAI acceptance, which has not been run because no credentials
+were supplied. Offline scripted acceptance remains the mandatory default.
+
+## Current infrastructure blocker
+
+A Windows clean-clone audit of all five repositories passed Go 1.26.5,
+`make fast`, offline vendor tests with `GOWORK=off GOPROXY=off
+GOFLAGS=-mod=vendor`, and `govulncheck`. This is not Linux or macOS evidence and
+does not close Phase 0. GitHub Actions jobs remain queued without starting;
+diagnosing organization billing/policy requires unavailable `admin:org`
+authority. Core/tools Dependabot gRPC alerts remain open and must not be
+dismissed, although their tools modules already pin v1.82.1 and local
+`govulncheck` is clean.
 
 ## Completed evidence
 
@@ -41,12 +67,9 @@ the Phase 7 stress proof.
 - Core foundation: `spice-agent` `218ffbb`.
 - Professional quality baseline: `829dd0a`; `make verify` 27.6s, 87.7% coverage.
 - Hardened deterministic kernel: `eaf1918`; `make verify` 23.9s, 88.4% coverage.
-- OpenAI provider foundation `d57447f`, implementation `62b9481`, and
-  timeout/concurrency hardening `729017d`; final `make verify` 89.3% coverage
-  with lint, security, race, offline, and vendor gates green.
-- Coding-tools foundation `707b60a` and green main implementation `9afe9e3`;
-  final `make verify` 87.6% coverage. The manifest/Windows rename follow-up
-  remains in progress and is not recorded as final head.
+- Completed preview kernel: `841edd3`; `make verify` 29.9s, 86.2% coverage.
+- OpenAI provider final repin `88c3044`; `make verify` 29.25s, 89.3% coverage.
+- Coding-tools final repin `653b405`; `make verify` 33.19s, 87.7% coverage.
 - TUI foundation through `spice-agent-tui` `28a89dc`.
 - Reference distribution through `spice-agent-coding` `2809a1a`.
 

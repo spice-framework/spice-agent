@@ -223,6 +223,7 @@ func fuzz(ctx context.Context, root string) error {
 		{"./message", "FuzzNewID"},
 		{"./tool", "FuzzToolCall"},
 		{"./agent", "FuzzParseSnapshot"},
+		{"./annotation/agent", "FuzzToolHandler"},
 	} {
 		if err := command(ctx, root, nil, "go", "test", "-run=^$", "-fuzz=^"+target.name+"$", "-fuzztime=1s", target.pkg); err != nil {
 			return err
@@ -273,14 +274,18 @@ func checkArchitecture(root string) error {
 		return err
 	}
 	for _, path := range files {
-		if strings.HasSuffix(path, "_test.go") || strings.Contains(path, string(filepath.Separator)+"internal"+string(filepath.Separator)) {
+		if strings.HasSuffix(path, "_test.go") || strings.Contains(path, string(filepath.Separator)+"internal"+string(filepath.Separator)+"qualitygate"+string(filepath.Separator)) {
 			continue
 		}
 		content, readErr := os.ReadFile(path) // #nosec G304 -- paths come from the bounded repository walk.
 		if readErr != nil {
 			return readErr
 		}
-		for _, forbidden := range []string{"type RuntimeGraph", "type ServiceLocator", "reflect.Value", "plugin.Open("} {
+		for _, forbidden := range []string{
+			"type RuntimeGraph", "type ServiceLocator", "type ExtensionRegistry",
+			"reflect.Value", "plugin.Open(", "packages.Load(",
+			"switch invocation.CanonicalName", "switch params.Descriptor.Name",
+		} {
 			if bytes.Contains(content, []byte(forbidden)) {
 				return fmt.Errorf("%s contains forbidden compiled composition mechanism %q", path, forbidden)
 			}

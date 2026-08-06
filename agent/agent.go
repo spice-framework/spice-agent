@@ -1,4 +1,3 @@
-// Package agent implements the deterministic provider-neutral execution kernel.
 package agent
 
 import (
