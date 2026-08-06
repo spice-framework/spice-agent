@@ -47,7 +47,10 @@ func TestDispatcherRejectsInvalidBeans(t *testing.T) {
 	if _, err := stage.NewDispatcher(map[string]tool.Tool{"bean": fakeTool{"other"}}); err == nil {
 		t.Fatal("mismatched name succeeded")
 	}
-	dispatcher, _ := stage.NewDispatcher(nil)
+	dispatcher, err := stage.NewDispatcher(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if result := dispatcher.Dispatch(context.Background(), tool.Call{}, nil); result.Error == "" {
 		t.Fatal("invalid call succeeded")
 	}

@@ -4,6 +4,7 @@ package stage
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -24,13 +25,19 @@ type ToolDispatchDecorator interface {
 
 // Dispatcher is an immutable named tool map constructed by Spice.
 type Dispatcher struct {
-	tools map[string]tool.Tool
+	tools map[string]toolEntry
+}
+
+type toolEntry struct {
+	definition     tool.Definition
+	implementation tool.Tool
 }
 
 // NewDispatcher validates canonical bean names and model-visible definitions.
 func NewDispatcher(tools map[string]tool.Tool) (*Dispatcher, error) {
-	result := make(map[string]tool.Tool, len(tools))
-	for name, implementation := range tools {
+	result := make(map[string]toolEntry, len(tools))
+	for _, name := range slices.Sorted(maps.Keys(tools)) {
+		implementation := tools[name]
 		if implementation == nil {
 			return nil, fmt.Errorf("tool bean %q is nil", name)
 		}
@@ -41,31 +48,37 @@ func NewDispatcher(tools map[string]tool.Tool) (*Dispatcher, error) {
 		if definition.Name() != name {
 			return nil, fmt.Errorf("tool bean %q declares model name %q", name, definition.Name())
 		}
-		result[name] = implementation
+		result[name] = toolEntry{definition: definition.Clone(), implementation: implementation}
 	}
 	return &Dispatcher{tools: result}, nil
 }
 
 // Definitions returns definitions ordered by canonical bean name.
 func (dispatcher *Dispatcher) Definitions() []tool.Definition {
+	if dispatcher == nil {
+		return []tool.Definition{}
+	}
 	names := slices.Sorted(maps.Keys(dispatcher.tools))
 	result := make([]tool.Definition, 0, len(names))
 	for _, name := range names {
-		result = append(result, dispatcher.tools[name].Definition().Clone())
+		result = append(result, dispatcher.tools[name].definition.Clone())
 	}
 	return result
 }
 
 // Dispatch validates and invokes one named tool without reflection.
 func (dispatcher *Dispatcher) Dispatch(ctx context.Context, call tool.Call, reporter tool.Reporter) tool.Result {
+	if dispatcher == nil {
+		return errorResult(call.ID, errors.New("tool dispatcher is nil"))
+	}
 	if err := call.Validate(); err != nil {
 		return errorResult(call.ID, err)
 	}
-	implementation, found := dispatcher.tools[call.Name]
+	entry, found := dispatcher.tools[call.Name]
 	if !found {
 		return errorResult(call.ID, fmt.Errorf("tool %q is not available", call.Name))
 	}
-	return implementation.Execute(ctx, call, reporter)
+	return entry.implementation.Execute(ctx, call, reporter)
 }
 
 func errorResult(callID tool.CallID, err error) tool.Result {

@@ -1,4 +1,4 @@
-# Phase 5: Daemon and TUI
+# Phase 4: Daemon and TUI
 
 **Objective:** expose the same engine through authenticated user-local IPC and a
 separate Spice-generated Bubble Tea application. The protocol supports version
@@ -9,4 +9,3 @@ Managed startup attaches to a compatible daemon or starts one; explicit serve
 and attach remain available. **Exit:** Windows named-pipe and Unix-socket tests,
 bounded reconnect, resize, version rejection, and clean shutdown. **Status:**
 planned.
-

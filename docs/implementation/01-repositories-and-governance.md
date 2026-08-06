@@ -1,4 +1,4 @@
-# Phase 1: Repositories and Governance
+# Phase 0: Repositories and Governance
 
 **Objective:** establish five independently versioned Apache-2.0 repositories.
 The core repository owns protocols and conformance; TUI, OpenAI, coding tools,
@@ -9,4 +9,3 @@ verification as the gate.
 Repositories must join the development catalog and compatibility graph. No
 committed `replace` directive is permitted. **Exit:** clean-clone/offline proof
 and catalog compatibility. **Status:** in progress.
-

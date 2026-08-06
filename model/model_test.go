@@ -50,7 +50,9 @@ func TestStreamEventValidation(t *testing.T) {
 		}
 	}
 	invalid := []model.StreamEvent{
-		{}, {Kind: model.EventTextDelta}, {Kind: model.EventToolCall},
+		{},
+		{Kind: model.EventTextDelta},
+		{Kind: model.EventToolCall},
 		{Kind: model.EventCompleted, Text: "x"},
 		{Kind: model.EventCompleted, Usage: model.Usage{InputTokens: 1, TotalTokens: 2}},
 		{Kind: model.EventFailed, Problem: model.Problem{Code: " bad", Message: "x"}},

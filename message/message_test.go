@@ -76,3 +76,14 @@ func TestToolPartsExposeMetadata(t *testing.T) {
 		t.Fatal("tool call reported as text")
 	}
 }
+
+func FuzzNewID(f *testing.F) {
+	f.Add("message-1")
+	f.Add(" bad ")
+	f.Fuzz(func(t *testing.T, value string) {
+		id, err := message.NewID(value)
+		if err == nil && string(id) != value {
+			t.Fatalf("ID = %q", id)
+		}
+	})
+}

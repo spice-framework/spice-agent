@@ -69,10 +69,14 @@ func run(ctx context.Context, root, mode string) error {
 		}
 	}
 	if mode == "verify" {
-		steps = append(steps,
+		steps = append(
+			steps,
+			step{"lint and nil safety", func() error { return lint(ctx, root) }},
+			step{"security", func() error { return security(ctx, root) }},
 			step{"race tests", func() error {
 				return command(ctx, root, nil, "go", "test", "-race", "-shuffle=on", "-count=1", "./...")
 			}},
+			step{"fuzz smoke", func() error { return fuzz(ctx, root) }},
 			step{"coverage", func() error { return coverage(ctx, root) }},
 			step{"offline vendor", func() error { return offline(ctx, root) }},
 		)
@@ -112,13 +116,18 @@ func checkFormatting(ctx context.Context, root string) error {
 	if err != nil {
 		return err
 	}
-	arguments := append([]string{"-l"}, files...)
-	output, err := capture(ctx, root, nil, "gofmt", arguments...)
-	if err != nil {
-		return err
-	}
-	if strings.TrimSpace(output) != "" {
-		return fmt.Errorf("gofmt requires formatting: %s", strings.Join(strings.Fields(output), ", "))
+	for _, name := range []string{"goimports", "gofumpt"} {
+		executable, pathErr := toolPath(ctx, root, name)
+		if pathErr != nil {
+			return pathErr
+		}
+		output, runErr := capture(ctx, root, nil, executable, append([]string{"-l"}, files...)...)
+		if runErr != nil {
+			return runErr
+		}
+		if strings.TrimSpace(output) != "" {
+			return fmt.Errorf("%s requires formatting: %s", name, strings.Join(strings.Fields(output), ", "))
+		}
 	}
 	return nil
 }
@@ -146,6 +155,9 @@ func checkModule(ctx context.Context, root string) error {
 	if err := command(ctx, root, offline, "go", "mod", "tidy", "-diff"); err != nil {
 		return err
 	}
+	if err := command(ctx, filepath.Join(root, "tools"), offline, "go", "mod", "tidy", "-diff"); err != nil {
+		return err
+	}
 	temporary, err := os.MkdirTemp("", "spice-agent-vendor-*")
 	if err != nil {
 		return fmt.Errorf("create vendor comparison directory: %w", err)
@@ -169,24 +181,78 @@ func checkModule(ctx context.Context, root string) error {
 	return nil
 }
 
+func lint(ctx context.Context, root string) error {
+	environment := map[string]string{"GOWORK": "off", "GOTOOLCHAIN": "local", "GOFLAGS": "-mod=vendor"}
+	golangci, err := toolPath(ctx, root, "golangci-lint")
+	if err != nil {
+		return err
+	}
+	if err = command(ctx, root, environment, golangci, "run", "--timeout=10m"); err != nil {
+		return err
+	}
+	nilaway, err := toolPath(ctx, root, "nilaway")
+	if err != nil {
+		return err
+	}
+	return command(ctx, root, environment, nilaway, "-include-pkgs="+modulePath, "./...")
+}
+
+func security(ctx context.Context, root string) error {
+	environment := map[string]string{"GOWORK": "off", "GOTOOLCHAIN": "local", "GOFLAGS": "-mod=vendor", "GOPROXY": "off"}
+	gosec, err := toolPath(ctx, root, "gosec")
+	if err != nil {
+		return err
+	}
+	if err = command(ctx, root, environment, gosec, "-quiet", "-exclude-generated", "./..."); err != nil {
+		return err
+	}
+	govulncheck, err := toolPath(ctx, root, "govulncheck")
+	if err != nil {
+		return err
+	}
+	return command(ctx, root, environment, govulncheck, "./...")
+}
+
+func fuzz(ctx context.Context, root string) error {
+	for _, target := range []struct{ pkg, name string }{{"./message", "FuzzNewID"}, {"./tool", "FuzzToolCall"}} {
+		if err := command(ctx, root, nil, "go", "test", "-run=^$", "-fuzz=^"+target.name+"$", "-fuzztime=1s", target.pkg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func toolPath(ctx context.Context, root, name string) (string, error) {
+	output, err := capture(ctx, root, map[string]string{"GOWORK": "off", "GOTOOLCHAIN": "local"}, "go", "-C", "tools", "tool", "-n", name)
+	if err != nil {
+		return "", err
+	}
+	path := strings.TrimSpace(output)
+	if path == "" {
+		return "", fmt.Errorf("resolve tool %q: empty path", name)
+	}
+	return path, nil
+}
+
 func treeDigests(root string) (map[string][sha256.Size]byte, error) {
+	opened, err := os.OpenRoot(root)
+	if err != nil {
+		return nil, fmt.Errorf("open tree root: %w", err)
+	}
+	defer func() { _ = opened.Close() }()
 	result := make(map[string][sha256.Size]byte)
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+	err = fs.WalkDir(opened.FS(), ".", func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
 		if entry.IsDir() {
 			return nil
 		}
-		content, err := os.ReadFile(path) // #nosec G304 -- path is bounded by the repository or temp vendor tree.
-		if err != nil {
-			return err
+		content, readErr := opened.ReadFile(path)
+		if readErr != nil {
+			return readErr
 		}
-		relative, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		result[filepath.ToSlash(relative)] = sha256.Sum256(content)
+		result[filepath.ToSlash(path)] = sha256.Sum256(content)
 		return nil
 	})
 	return result, err
@@ -229,7 +295,7 @@ func coverage(ctx context.Context, root string) (returnErr error) {
 		return err
 	}
 	packages := make([]string, 0)
-	for _, packagePath := range strings.Fields(packageOutput) {
+	for packagePath := range strings.FieldsSeq(packageOutput) {
 		if packagePath != modulePath+"/internal/qualitygate" {
 			packages = append(packages, packagePath)
 		}

@@ -318,7 +318,10 @@ func TestWaitHonorsCallerContextWithoutCancellingRun(t *testing.T) {
 }
 
 func TestBestEffortObserverDropsWithoutBlocking(t *testing.T) {
-	mailbox, _ := event.NewBestEffortObserver(1)
+	mailbox, err := event.NewBestEffortObserver(1)
+	if err != nil {
+		t.Fatal(err)
+	}
 	provider := &scriptedProvider{scripts: [][]model.StreamEvent{{{Kind: model.EventTextDelta, Text: "x"}, {Kind: model.EventCompleted}}}}
 	engine := newEngine(t, provider, nil, nil, []*event.BestEffortObserver{mailbox})
 	run := startRun(t, engine, 1)

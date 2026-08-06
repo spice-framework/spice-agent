@@ -1,4 +1,4 @@
-# Phase 2: Spice-Native Composition
+# Phase 1: Spice-Native Composition
 
 **Objective:** prove that compiled extension composition is ordinary generated
 Spice DI. `@Stage`, `@Tool`, and `@ModelProvider` emit existing stereotype,
@@ -10,4 +10,3 @@ No service locator, compiled extension registry, package scanning, or
 `/autoconfigure` blank imports. **Acceptance:** generated direct calls, ordered
 collections, named maps, ambiguity diagnostics, test override, module graph, and
 source mapping. **Status:** in progress.
-

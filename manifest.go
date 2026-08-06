@@ -9,7 +9,7 @@ import "github.com/spice-framework/spice/starter"
 var Manifest = starter.Must(starter.Spec{
 	Schema:    starter.Schema,
 	ID:        "github.com/spice-framework/spice-agent",
-	Version:   "0.1.0-preview.1",
+	Version:   "0.1.0-dev",
 	Module:    "github.com/spice-framework/spice-agent",
 	SpiceAPI:  starter.APIVersion,
 	MinimumGo: "1.26.5",

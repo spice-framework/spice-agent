@@ -37,8 +37,11 @@ func TestDefinitionRejectsInvalidCapabilities(t *testing.T) {
 		}
 	}
 	invalid := []struct{ name, description, schema string }{
-		{"", "description", `{}`}, {" bad", "description", `{}`},
-		{strings.Repeat("x", 129), "description", `{}`}, {"ok", "", `{}`}, {"ok", "description", `{`},
+		{"", "description", `{}`},
+		{" bad", "description", `{}`},
+		{strings.Repeat("x", 129), "description", `{}`},
+		{"ok", "", `{}`},
+		{"ok", "description", `{`},
 	}
 	for _, test := range invalid {
 		if _, err := tool.NewDefinition(test.name, test.description, json.RawMessage(test.schema)); err == nil {
@@ -63,4 +66,14 @@ func TestCallAndResultValidation(t *testing.T) {
 	if err := (tool.Result{CallID: "call", Content: json.RawMessage(`{`)}).Validate(); err == nil {
 		t.Fatal("invalid result succeeded")
 	}
+}
+
+func FuzzToolCall(f *testing.F) {
+	f.Add("call-1", "read", []byte(`{}`))
+	f.Fuzz(func(t *testing.T, id, name string, arguments []byte) {
+		call := tool.Call{ID: tool.CallID(id), Name: name, Arguments: json.RawMessage(arguments)}
+		if err := call.Validate(); err == nil && !json.Valid(arguments) {
+			t.Fatal("invalid JSON accepted")
+		}
+	})
 }
