@@ -173,10 +173,17 @@ The first independent gRPC security prerequisite is now implemented in
 format redaction, exact single-value Bearer metadata authentication, and
 matching unary/stream fail-closed middleware proven over `bufconn`. The
 middleware is not exported independently, preventing consumers from treating a
-partially authenticated server as supported. No OS endpoint, metadata-file
-permission handling, session negotiation, or engine RPC translation is claimed.
+partially authenticated server as supported. `grpcserver.NewServer` now owns
+mandatory middleware installation, global gRPC message bounds, a bounded
+private negotiated-session registry, and authenticated `Initialize` and
+`Health` RPC translation. Fresh allocation occurs only after pure negotiation;
+reconnect uses the daemon's epoch CAS, old owners receive typed stale facts, and
+unknown identities reveal no invented epoch. No OS endpoint, metadata-file
+permission handling, lifecycle RPCs, streams, or client adapter is claimed.
 Evidence is in
-[`evidence/phase4-grpc-authentication.md`](evidence/phase4-grpc-authentication.md).
+[`evidence/phase4-grpc-authentication.md`](evidence/phase4-grpc-authentication.md)
+and
+[`evidence/phase4-initialize-health.md`](evidence/phase4-initialize-health.md).
 The independent TUI repository now exposes an immutable UI-neutral session
 port and a public terminal shell while keeping Bubble Tea and presentation
 messages internal. Commit `82adb45` generates its renderer, theme, ordered key

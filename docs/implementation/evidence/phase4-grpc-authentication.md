@@ -18,7 +18,7 @@ transport metadata.
 | Exact metadata contract | Missing, malformed, wrong, case-changed, and duplicate authorization values receive one fixed `Unauthenticated` status before a handler is called. |
 | Unary and stream parity | Direct middleware tests and a real generated `engine/v1` service over `bufconn` prove both RPC shapes. The stream wrapper preserves the service receiver and changes only the authenticated context. |
 | No response leakage | Rejection status, unary headers/trailers, and stream trailers are checked for expected and presented credential material. |
-| Installation safety | The interceptor constructor is package-private. The later public server constructor must install unary and streaming authentication together; exposing either middleware as an optional public server assembly step is not supported. |
+| Installation safety | The interceptor constructor is package-private. Public `grpcserver.NewServer` installs unary and streaming authentication together with the generated service; exposing either middleware as an optional public assembly step is not supported. |
 | Architecture | gRPC remains in `daemon/grpcserver`; transport-independent `daemon`, kernel, and client contracts do not import it. No listener, endpoint discovery, metadata persistence, or production connection is introduced. |
 
 ## Verification
@@ -30,9 +30,9 @@ also required to pass `make verify` before this evidence is marked complete.
 
 ## Deliberate exclusions
 
-This slice does not claim a public gRPC server, negotiated sessions, RPC
-translation, message limits, deadlines, event/interaction streaming, a Unix
-socket, a Windows named pipe, user-only endpoint metadata permissions, managed
+Authentication itself does not claim OS endpoint ownership, endpoint metadata
+permissions, lifecycle RPC translation, event/interaction streaming, managed
 startup, or a client adapter. Authentication occurs after gRPC framing and
 Protobuf decode, which is the enforceable interceptor boundary, but before any
-application handler can inspect daemon state.
+application handler can inspect daemon state. The public server and first two
+RPCs are proved separately in `phase4-initialize-health.md`.

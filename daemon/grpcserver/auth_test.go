@@ -96,6 +96,24 @@ func TestEndpointTokenGenerationEncodingAndRedaction(t *testing.T) {
 	}
 }
 
+func TestEndpointTokenPublicGenerationAndDirectRedaction(t *testing.T) {
+	t.Parallel()
+	token, err := GenerateEndpointToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = token.AuthorizationValue(); err != nil {
+		t.Fatal(err)
+	}
+	if token.String() != "[REDACTED endpoint token]" || token.GoString() != "grpcserver.EndpointToken([REDACTED])" {
+		t.Fatal("direct token formatting was not redacted")
+	}
+	//nolint:staticcheck // Boundary coverage intentionally proves nil contexts fail closed.
+	if transportAuthenticated(nil) {
+		t.Fatal("nil context was authenticated")
+	}
+}
+
 func TestAuthenticationInterceptorsRejectBeforeHandlers(t *testing.T) {
 	t.Parallel()
 	if unary, stream, err := newAuthenticationInterceptors(EndpointToken{}); err == nil || unary != nil || stream != nil {

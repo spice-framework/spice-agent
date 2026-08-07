@@ -141,9 +141,15 @@ unpadded base64url representation, is accepted only as exactly one case-sensitiv
 `Bearer` metadata value, uses constant-time comparison, and redacts every
 formatting path. Authentication completes after gRPC framing and decode but
 before an application handler can inspect daemon state. The middleware
-constructor remains private until the package exposes a server constructor that
-installs both paths unconditionally. This prerequisite opens no listener,
-persists no endpoint metadata, and does not yet translate an engine RPC.
+constructor remains private; public `grpcserver.NewServer` installs both paths,
+global gRPC message bounds, and the generated engine service together. Its
+bounded private registry retains the exact `daemon.Session` and a validated
+defensive clone of each successful initialization contract. `Initialize`
+performs pure preflight before fresh allocation or reconnect CAS, while `Health`
+rechecks the exact ownership epoch and reuses `RunHost.Health`. Application
+failures stay in typed response statuses; gRPC errors are reserved for
+authentication, transport, cancellation, and deadline failures. This adapter
+opens no listener and persists no endpoint metadata.
 
 Every client epoch also owns a bounded commit and stream gate. Mutating work
 crosses an exclusive FIFO commit boundary; a reconnect intent takes priority,

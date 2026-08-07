@@ -15,10 +15,10 @@ interfaces directly.
 ## Initialization
 
 The gRPC server applies the fixed 1 MiB initialization bootstrap receive bound
-while transport framing and Protobuf decoding occur. Transport middleware then authenticates the endpoint
-token from gRPC metadata before application handling or access to daemon state;
-authentication before decoding is not a capability provided by gRPC unary
-interceptors. `Initialize` then presents protocol major/minor, client build
+while transport framing and Protobuf decoding occur. Transport middleware then
+authenticates the endpoint token from gRPC metadata before application handling
+or access to daemon state; authentication before decoding is not a capability
+provided by gRPC unary interceptors. `Initialize` then presents protocol major/minor, client build
 identity, supported capabilities, and maximum message limits. Pure negotiation
 preflight validates the complete request against both the bootstrap and selected
 message bounds and proves a worst-case successful response fits before a host
@@ -28,6 +28,14 @@ A new owner receives a stable client ID at epoch one. Reconnect supplies that
 client ID and its expected epoch; the daemon performs a compare-and-swap and
 returns the same ID at exactly the next epoch. A stale claim fails without
 changing ownership.
+
+The implemented server wrapper installs unary and streaming authentication as
+one non-optional assembly step and retains successful negotiations in a bounded
+private registry. Each entry contains the exact daemon ownership session plus a
+validated defensive response clone. Registry lookup never substitutes for
+`SessionStore`: Health rechecks the stable identity and epoch immediately before
+calling the transport-independent host. Registry shutdown clears only adapter
+state and never owns or cancels daemon session contexts.
 
 The daemon returns its build identity, supported capabilities, negotiated
 per-connection limits, global health, and one immutable generated
