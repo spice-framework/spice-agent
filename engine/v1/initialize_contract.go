@@ -118,10 +118,10 @@ func PreflightInitialize(
 	if status.GetCode() != commonv1.ErrorCode_ERROR_CODE_OK {
 		return nil, initializeStatusFailure(status)
 	}
-	if len(capabilities.GetNames()) > int(limits.GetMaxCollectionItems()) {
+	if uint64(len(capabilities.GetNames())) > uint64(limits.GetMaxCollectionItems()) {
 		return invalid("negotiated capability count exceeds negotiated collection limit")
 	}
-	if len(health.GetDegradedReasons()) > int(limits.GetMaxCollectionItems()) {
+	if uint64(len(health.GetDegradedReasons())) > uint64(limits.GetMaxCollectionItems()) {
 		return invalid("health degraded reason count exceeds negotiated collection limit")
 	}
 	if err := ValidateDefinitionSet(definitions, limits); err != nil {

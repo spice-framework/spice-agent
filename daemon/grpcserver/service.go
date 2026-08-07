@@ -59,35 +59,41 @@ func (service *engineService) Initialize(
 	}
 
 	claim := negotiation.ReconnectClaim()
-	var session daemon.Session
 	if claim == nil {
-		session, err = service.sessions.Fresh()
+		response, transactionErr := service.registry.initializeFresh(ctx, func() (
+			daemon.Session,
+			*enginev1.InitializeResponse,
+			error,
+		) {
+			fresh, freshErr := service.sessions.Fresh()
+			if freshErr != nil {
+				return daemon.Session{}, nil, freshErr
+			}
+			return fresh, enginev1.CompleteInitialize(negotiation, fresh.ClientID(), fresh.Epoch()), nil
+		})
+		if transactionErr != nil {
+			return initializeContextOrFailure(ctx, transactionErr)
+		}
+		return proto.CloneOf(response), nil
 	} else {
-		session, err = service.sessions.ReconnectContext(
-			ctx, claim.GetClientId(), claim.GetExpectedOwnershipEpoch(),
+		clientID, expectedEpoch := claim.GetClientId(), claim.GetExpectedOwnershipEpoch()
+		response := enginev1.CompleteInitialize(negotiation, clientID, expectedEpoch+1)
+		response, transactionErr := service.registry.initializeReconnect(
+			ctx, clientID, expectedEpoch, response,
+			func() (daemon.Session, error) {
+				return service.sessions.ReconnectContext(ctx, clientID, expectedEpoch)
+			},
 		)
+		if transactionErr != nil {
+			if errors.Is(transactionErr, errNegotiatedSessionUnavailable) {
+				if ownershipErr := service.sessions.Check(clientID, expectedEpoch); ownershipErr != nil {
+					transactionErr = ownershipErr
+				}
+			}
+			return initializeContextOrFailure(ctx, transactionErr)
+		}
+		return proto.CloneOf(response), nil
 	}
-	if err != nil {
-		return initializeContextOrFailure(ctx, err)
-	}
-	response := enginev1.CompleteInitialize(negotiation, session.ClientID(), session.Epoch())
-	if response.GetStatus().GetCode() != commonv1.ErrorCode_ERROR_CODE_OK ||
-		enginev1.ValidateInitializeResponseForRequest(request, response) != nil {
-		//nolint:nilerr // invalid server completion is returned as a bounded application status.
-		return initializeInternalFailure("initialize completion is invalid"), nil
-	}
-	if claim == nil {
-		err = service.registry.installFresh(session, response)
-	} else {
-		err = service.registry.replaceReconnect(
-			claim.GetClientId(), claim.GetExpectedOwnershipEpoch(), session, response,
-		)
-	}
-	if err != nil {
-		//nolint:nilerr // registry failures are returned as bounded application statuses.
-		return initializeInternalFailure("initialize ownership is unavailable"), nil
-	}
-	return proto.CloneOf(response), nil
 }
 
 func (service *engineService) Health(
@@ -195,6 +201,16 @@ func healthFailure(code commonv1.ErrorCode, message string) *enginev1.HealthResp
 }
 
 func sessionFailureStatus(err error) *commonv1.Status {
+	var negotiatedCapacity *negotiatedCapacityError
+	if errors.As(err, &negotiatedCapacity) && negotiatedCapacity.limit > 0 {
+		return &commonv1.Status{
+			Code: commonv1.ErrorCode_ERROR_CODE_RESOURCE_EXHAUSTED, Message: "client session capacity is exhausted",
+			Detail: &commonv1.Status_Overload{Overload: &commonv1.Overload{
+				Resource: negotiatedCapacity.resource, Limit: negotiatedCapacity.limit,
+				Observed: negotiatedCapacity.limit + 1,
+			}},
+		}
+	}
 	var stale *daemon.StaleSessionError
 	if errors.As(err, &stale) && stale.ExpectedEpoch() != 0 {
 		return &commonv1.Status{

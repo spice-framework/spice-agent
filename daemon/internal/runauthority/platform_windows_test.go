@@ -7,16 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	enginev1 "github.com/spice-framework/spice-agent/engine/v1"
 	"golang.org/x/sys/windows"
 )
-
-func forceStableLockCleanupFailure(lock *stableLock) error {
-	return lock.file.Close()
-}
 
 func TestWindowsRejectsIntermediateReparsePoint(t *testing.T) {
 	realDirectory := filepath.Join(authorityTestRoot(t), "real")
@@ -46,59 +41,6 @@ func TestWindowsRejectsHardLinkedAuthorityFile(t *testing.T) {
 	}
 	if _, err := Open(Config{Directory: directory}); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("hard-linked identity = %v", err)
-	}
-}
-
-func TestWindowsHandleValidationIsBoundToExpectedPath(t *testing.T) {
-	directory := filepath.Join(authorityTestRoot(t), "authority")
-	store, err := Open(Config{Directory: directory})
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(directory, "identity.key")
-	file, err := openWindowsFile(path, windows.GENERIC_READ, windows.OPEN_EXISTING)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = file.Close() }()
-	if err = validateWindowsHandle(windows.Handle(file.Fd()), filepath.Join(directory, "other.key")); !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("mismatched opened path = %v", err)
-	}
-	if err = store.Close(); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestWindowsAncestryValidationIsBoundToRetainedDirectory(t *testing.T) {
-	root := authorityTestRoot(t)
-	first, err := Open(Config{Directory: filepath.Join(root, "first")})
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := Open(Config{Directory: filepath.Join(root, "second")})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = validateWindowsAncestry(second.directoryPath, first.directory.handle); !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("mismatched ancestry identity = %v", err)
-	}
-	if err = second.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err = first.Close(); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestWindowsAncestryIncludesVolumeRoot(t *testing.T) {
-	path := filepath.Join(authorityTestRoot(t), "authority")
-	paths, err := windowsAncestryPaths(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	root := filepath.VolumeName(path) + string(filepath.Separator)
-	if len(paths) < 2 || !filepath.IsAbs(paths[0]) || !strings.EqualFold(paths[0], root) || paths[len(paths)-1] != path {
-		t.Fatalf("ancestry paths = %v", paths)
 	}
 }
 

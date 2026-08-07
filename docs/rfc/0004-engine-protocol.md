@@ -29,6 +29,14 @@ client ID and its expected epoch; the daemon performs a compare-and-swap and
 returns the same ID at exactly the next epoch. A stale claim fails without
 changing ownership.
 
+Protocol versions 1.0 through 1.2 do not identify an initialization attempt.
+Consequently, transport loss after fresh allocation or reconnect CAS has an
+uncertain outcome and is non-retryable; clients must not silently allocate a
+replacement identity or repeat the claim. A following minor-1.3 slice will add
+one caller-generated attempt identity for both fresh and reconnect requests and
+exact-response replay. Managed process startup is not loss-safe until that
+contract is implemented and proven.
+
 The implemented server wrapper installs unary and streaming authentication as
 one non-optional assembly step and retains successful negotiations in a bounded
 private registry. Each entry contains the exact daemon ownership session plus a
@@ -179,8 +187,10 @@ unknown Protobuf fields by design.
 
 ## Security boundary
 
-The initial protocol has no TCP listener. Unix sockets or Windows named pipes
-and endpoint metadata are current-user only. A random metadata token protects against
+The implementation has no TCP listener. Unix sockets or Windows named pipes and
+endpoint metadata are current-user only. Metadata is canonical and protected by
+retained directory identity, atomic replacement, stable liveness/startup locks,
+and exact stale cleanup. A random metadata token protects against
 accidental/ambient local connections but does not defend against code already
 running as the same user. Remote access requires a new threat model and protocol
 extension.
@@ -203,13 +213,14 @@ replaces the operation owner.
 
 ## Acceptance before freeze
 
-The schema-foundation acceptance covers old/new versions, unknown fields,
-capability mismatch, transport-metadata authentication separation,
+The schema, host, and local-client acceptance covers old/new versions, unknown
+fields, capability mismatch, transport-metadata authentication separation,
 deadline/cancellation fields, overload, cursor gap/recovery, stale interaction
 response, snapshot version skew, malformed input, fuzz smoke, Buf lint/breaking,
-and deterministic generation. Duplicate-operation behavior, actual transport
-authentication, reconnect, half-close, and Windows/Unix endpoint permissions
-remain acceptance requirements for the daemon host slice.
+deterministic generation, duplicate operations, authenticated unary and stream
+RPCs, reconnect fencing, and Windows/Unix endpoint permissions. Protocol-1.3
+initialization replay, managed process launch, daemon/TUI attachment, and real
+cross-platform terminal acceptance remain required before the Phase 4 freeze.
 
 The pre-host contract repair resolves interaction prompt discovery, reconnect
 ownership CAS, remote suspend/resume, imported run identity, and atomic replay

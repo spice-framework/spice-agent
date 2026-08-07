@@ -30,6 +30,14 @@ server-side mechanism to interrupt a `Send` already blocked by transport flow
 control. A deadline-bounded reconnect therefore may time out without advancing
 the epoch; after the old RPC exits, retrying the same expected epoch is safe.
 
+That statement applies only when reconnect did not reach the ownership CAS.
+Protocol versions 1.0 through 1.2 cannot distinguish that case from a response
+lost after a successful CAS, and likewise cannot replay a lost fresh-allocation
+response. The concrete gRPC adapter therefore reports ambiguous initialization
+transport loss as non-retryable. Caller-generated initialization-attempt replay
+is reserved for protocol 1.3; no current adapter hides the uncertainty with an
+automatic retry.
+
 ## Safety and fidelity
 
 All public values validate the same count, byte, token, health, replay, and

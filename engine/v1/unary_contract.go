@@ -49,7 +49,7 @@ func ValidateHealthResponse(response *HealthResponse, limits *commonv1.Limits) e
 	if err := commonv1.ValidateLimits(limits); err != nil {
 		return err
 	}
-	if len(response.GetHealth().GetDegradedReasons()) > int(limits.GetMaxCollectionItems()) {
+	if uint64(len(response.GetHealth().GetDegradedReasons())) > uint64(limits.GetMaxCollectionItems()) {
 		return errors.New("health degraded reason count exceeds the negotiated collection limit")
 	}
 	return commonv1.ValidateEncodedSize(response, limits.GetMaxMessageBytes())
@@ -269,8 +269,9 @@ func validateStatusCollections(status *commonv1.Status, limits *commonv1.Limits)
 	if detail == nil {
 		return nil
 	}
-	maximum := int(limits.GetMaxCollectionItems())
-	if len(detail.GetRequired()) > maximum || len(detail.GetAvailable()) > maximum || len(detail.GetMissing()) > maximum {
+	maximum := uint64(limits.GetMaxCollectionItems())
+	if uint64(len(detail.GetRequired())) > maximum || uint64(len(detail.GetAvailable())) > maximum ||
+		uint64(len(detail.GetMissing())) > maximum {
 		return errors.New("capability-mismatch detail exceeds the negotiated collection limit")
 	}
 	return nil

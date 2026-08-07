@@ -11,6 +11,7 @@ tool (
 )
 
 require (
+	github.com/Microsoft/go-winio v0.6.2
 	github.com/spice-framework/spice v0.1.0-preview.1.0.20260806200749-524424a04df0
 	golang.org/x/sys v0.47.0
 	google.golang.org/grpc v1.83.0

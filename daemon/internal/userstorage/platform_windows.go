@@ -1,6 +1,6 @@
 //go:build windows
 
-package runauthority
+package userstorage
 
 import (
 	"crypto/rand"
@@ -18,8 +18,6 @@ import (
 
 	"golang.org/x/sys/windows"
 )
-
-var errLockBusy = errors.New("stable lock is busy")
 
 type stableLock struct {
 	file       *os.File
@@ -307,6 +305,28 @@ func (directory *secureDirectory) writeFileAtomic(name string, value []byte) err
 	}
 	renamed = true
 	return nil
+}
+
+func (directory *secureDirectory) removeFile(name string) error {
+	if !validRelativeName(name) {
+		return ErrUnavailable
+	}
+	directory.mu.RLock()
+	defer directory.mu.RUnlock()
+	if directory.handle == windows.InvalidHandle {
+		return ErrUnavailable
+	}
+	file, err := openRelativeWindowsFile(
+		directory.handle, name, windows.FILE_GENERIC_READ|windows.DELETE, windows.FILE_OPEN,
+	)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer func() { _ = file.Close() }()
+	return deleteWindowsFile(windows.Handle(file.Fd()))
 }
 
 func openRelativeWindowsFile(

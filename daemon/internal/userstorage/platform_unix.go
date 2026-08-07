@@ -1,6 +1,6 @@
 //go:build linux || darwin
 
-package runauthority
+package userstorage
 
 import (
 	"crypto/rand"
@@ -14,8 +14,6 @@ import (
 
 	"golang.org/x/sys/unix"
 )
-
-var errLockBusy = errors.New("stable lock is busy")
 
 type stableLock struct {
 	file *os.File
@@ -207,9 +205,68 @@ func (directory *secureDirectory) writeFileAtomic(name string, value []byte) (re
 	return nil
 }
 
+func (directory *secureDirectory) removeFile(name string) error {
+	if !validRelativeName(name) {
+		return ErrUnavailable
+	}
+	directory.mu.RLock()
+	defer directory.mu.RUnlock()
+	if directory.fd < 0 {
+		return ErrUnavailable
+	}
+	fileDescriptor, err := unix.Openat(directory.fd, name, unix.O_RDONLY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
+	if errors.Is(err, unix.ENOENT) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer func() { _ = unix.Close(fileDescriptor) }()
+	if err = validateUnixFile(fileDescriptor, 0o600); err != nil {
+		return err
+	}
+	var opened, current unix.Stat_t
+	if err = unix.Fstat(fileDescriptor, &opened); err != nil {
+		return err
+	}
+	if err = unix.Fstatat(directory.fd, name, &current, unix.AT_SYMLINK_NOFOLLOW); errors.Is(err, unix.ENOENT) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	currentMode := uint32(current.Mode)
+	if opened.Dev != current.Dev || opened.Ino != current.Ino ||
+		currentMode&unix.S_IFMT != unix.S_IFREG || int(current.Uid) != os.Geteuid() ||
+		current.Nlink != 1 || currentMode&0o777 != 0o600 {
+		return ErrUnavailable
+	}
+	if err = unix.Unlinkat(directory.fd, name, 0); errors.Is(err, unix.ENOENT) {
+		return nil
+	}
+	return err
+}
+
 func bindExistingDirectory(path string) (*secureDirectory, error) {
+	if path == "" || path != filepath.Clean(path) || !filepath.IsAbs(path) {
+		return nil, ErrUnavailable
+	}
 	descriptor, err := openDirectoryNoFollow(path)
 	if err != nil {
+		return nil, err
+	}
+	var stat unix.Stat_t
+	if err = unix.Fstat(descriptor, &stat); err != nil {
+		_ = unix.Close(descriptor)
+		return nil, err
+	}
+	mode := uint32(stat.Mode)
+	if mode&unix.S_IFMT != unix.S_IFDIR || int(stat.Uid) != os.Geteuid() || mode&0o777 != 0o700 {
+		_ = unix.Close(descriptor)
+		return nil, ErrUnavailable
+	}
+	if err = validateUnixAncestry(path, descriptor); err != nil {
+		_ = unix.Close(descriptor)
 		return nil, err
 	}
 	return &secureDirectory{path: path, fd: descriptor}, nil
@@ -246,7 +303,7 @@ func openDirectoryNoFollow(path string) (int, error) {
 		next, openErr := unix.Openat(current, component, unix.O_RDONLY|unix.O_CLOEXEC|unix.O_DIRECTORY|unix.O_NOFOLLOW, 0)
 		_ = unix.Close(current)
 		if openErr != nil {
-			return -1, openErr
+			return -1, unixPathError(openErr)
 		}
 		current = next
 	}
@@ -285,12 +342,19 @@ func createDirectoryNoFollow(path string) (int, bool, error) {
 		}
 		_ = unix.Close(current)
 		if openErr != nil {
-			return -1, false, openErr
+			return -1, false, unixPathError(openErr)
 		}
 		current = next
 		componentIndex++
 	}
 	return current, leafCreated, nil
+}
+
+func unixPathError(err error) error {
+	if errors.Is(err, unix.ELOOP) || errors.Is(err, unix.ENOTDIR) {
+		return ErrUnavailable
+	}
+	return err
 }
 
 func validateUnixAncestry(path string, expected int) error {

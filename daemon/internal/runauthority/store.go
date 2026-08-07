@@ -353,11 +353,6 @@ func runName(runID string) string {
 	return "run-" + hex.EncodeToString(digest[:])
 }
 
-func validRelativeName(name string) bool {
-	return name != "" && name != "." && name != ".." && filepath.Base(name) == name &&
-		filepath.VolumeName(name) == "" && !strings.ContainsRune(name, 0)
-}
-
 func (store *Store) writeRecord(ctx context.Context, runID string, value record) (bool, error) {
 	if err := contextError(ctx); err != nil {
 		return false, err

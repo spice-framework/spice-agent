@@ -96,6 +96,12 @@ func TestServerInitializeHealthAndReconnectOverAuthenticatedGRPC(t *testing.T) {
 	if reconnected.GetClientId() != clientID || reconnected.GetOwnershipEpoch() != epoch+1 {
 		t.Fatalf("reconnected ownership = %q/%d", reconnected.GetClientId(), reconnected.GetOwnershipEpoch())
 	}
+	staleReconnect, err := clientAPI.Initialize(ctx, reconnect)
+	if err != nil || staleReconnect.GetStatus().GetCode() != commonv1.ErrorCode_ERROR_CODE_STALE_CLIENT ||
+		staleReconnect.GetStatus().GetStaleClient().GetExpectedEpoch() != epoch+1 ||
+		staleReconnect.GetStatus().GetStaleClient().GetObservedEpoch() != epoch {
+		t.Fatalf("stale reconnect response = %#v, %v", staleReconnect, err)
+	}
 
 	stale, err := clientAPI.Health(ctx, &enginev1.HealthRequest{ClientId: clientID, OwnershipEpoch: epoch})
 	if err != nil {
@@ -156,9 +162,80 @@ func TestServerInitializationFailuresDoNotAllocateOrExposeState(t *testing.T) {
 		t.Fatalf("valid initialize after preflight failure = %#v, %v", initialized, err)
 	}
 	capacity, err := api.Initialize(ctx, valid)
-	if err != nil || capacity.GetStatus().GetCode() == commonv1.ErrorCode_ERROR_CODE_OK ||
-		capacity.GetClientId() != "" {
+	if err != nil || capacity.GetStatus().GetCode() != commonv1.ErrorCode_ERROR_CODE_RESOURCE_EXHAUSTED ||
+		capacity.GetStatus().GetOverload().GetResource() != "negotiated sessions" ||
+		capacity.GetStatus().GetOverload().GetLimit() != 1 ||
+		capacity.GetStatus().GetOverload().GetObserved() != 2 || capacity.GetClientId() != "" {
 		t.Fatalf("capacity initialize = %#v, %v", capacity, err)
+	}
+}
+
+func TestServerReconnectWaiterCapacityReturnsOverloadFacts(t *testing.T) {
+	t.Parallel()
+	root, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	build, limits, health, definitions := wireFixtureValues(t)
+	description, err := daemon.NewRunHostDescription(definitions, health)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessions, err := daemon.NewSessionStore(root, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sessions.Shutdown(context.Background()) })
+	token := endpointTokenFixture(t, 18)
+	server, err := newServer(serverDependencies{
+		root: root, token: token, host: &grpcFixtureHost{description: description, health: health},
+		sessions: sessions, build: build, capabilities: []string{"events"}, maximumSessions: 2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	connection := serveGRPCFixture(t, server)
+	api := enginev1.NewEngineServiceClient(connection)
+	authorization, _ := token.AuthorizationValue()
+	ctx := metadata.NewOutgoingContext(t.Context(), metadata.Pairs(AuthenticationMetadataKey, authorization))
+	initialized, err := api.Initialize(ctx, grpcInitializeRequest(limits))
+	if err != nil || initialized.GetStatus().GetCode() != commonv1.ErrorCode_ERROR_CODE_OK {
+		t.Fatalf("fresh initialize = %#v, %v", initialized, err)
+	}
+
+	server.registry.mu.Lock()
+	entry := server.registry.entries[initialized.GetClientId()]
+	server.registry.mu.Unlock()
+	<-entry.gate.token
+	t.Cleanup(func() {
+		select {
+		case entry.gate.token <- struct{}{}:
+		default:
+		}
+	})
+	waitContext, cancelWaiters := context.WithCancel(ctx)
+	waiterDone := make(chan error, maximumReconnectWaitersPerClient)
+	reconnect := grpcInitializeRequest(limits)
+	reconnect.ReconnectClaim = &enginev1.ReconnectClaim{
+		ClientId: initialized.GetClientId(), ExpectedOwnershipEpoch: initialized.GetOwnershipEpoch(),
+	}
+	for range maximumReconnectWaitersPerClient {
+		go func() {
+			_, initializeErr := api.Initialize(waitContext, reconnect)
+			waiterDone <- initializeErr
+		}()
+	}
+	waitForReconnectWaiters(t, server.registry, initialized.GetClientId(), maximumReconnectWaitersPerClient)
+	overflow, err := api.Initialize(ctx, reconnect)
+	if err != nil || overflow.GetStatus().GetCode() != commonv1.ErrorCode_ERROR_CODE_RESOURCE_EXHAUSTED ||
+		overflow.GetStatus().GetOverload().GetResource() != "reconnect initialization waiters" ||
+		overflow.GetStatus().GetOverload().GetLimit() != maximumReconnectWaitersPerClient ||
+		overflow.GetStatus().GetOverload().GetObserved() != maximumReconnectWaitersPerClient+1 {
+		t.Fatalf("overflow reconnect = %#v, %v", overflow, err)
+	}
+	cancelWaiters()
+	for range maximumReconnectWaitersPerClient {
+		if waiterErr := <-waiterDone; status.Code(waiterErr) != codes.Canceled {
+			t.Fatalf("canceled reconnect waiter = %v", waiterErr)
+		}
 	}
 }
 

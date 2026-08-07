@@ -141,7 +141,7 @@ func ValidateInitializeResponse(response *InitializeResponse) error {
 	if err := commonv1.ValidateLimits(response.GetLimits()); err != nil {
 		return err
 	}
-	if len(response.GetCapabilities().GetNames()) > int(response.GetLimits().GetMaxCollectionItems()) {
+	if uint64(len(response.GetCapabilities().GetNames())) > uint64(response.GetLimits().GetMaxCollectionItems()) {
 		return errors.New("initialize capability count exceeds the negotiated collection limit")
 	}
 	if err := commonv1.ValidateHealth(response.GetHealth()); err != nil {
@@ -152,7 +152,7 @@ func ValidateInitializeResponse(response *InitializeResponse) error {
 	); err != nil {
 		return err
 	}
-	if len(response.GetHealth().GetDegradedReasons()) > int(response.GetLimits().GetMaxCollectionItems()) {
+	if uint64(len(response.GetHealth().GetDegradedReasons())) > uint64(response.GetLimits().GetMaxCollectionItems()) {
 		return errors.New("initialize health reason count exceeds the negotiated collection limit")
 	}
 	if err := token("client ID", response.GetClientId(), 128); err != nil {
@@ -206,7 +206,7 @@ func ValidateDefinitionSet(value *DefinitionSet, limits *commonv1.Limits) error 
 	if err := commonv1.ValidateLimits(limits); err != nil {
 		return err
 	}
-	if len(value.GetDefinitions()) == 0 || len(value.GetDefinitions()) > int(limits.GetMaxCollectionItems()) {
+	if len(value.GetDefinitions()) == 0 || uint64(len(value.GetDefinitions())) > uint64(limits.GetMaxCollectionItems()) {
 		return fmt.Errorf("definition count must be between 1 and %d", limits.GetMaxCollectionItems())
 	}
 	previous := ""
@@ -351,7 +351,7 @@ func ValidateStartRunRequest(request *StartRunRequest, limits *commonv1.Limits) 
 	if request.GetInput().GetRole() != MessageRole_MESSAGE_ROLE_USER {
 		return errors.New("initial message must have the user role")
 	}
-	if len(request.GetInput().GetParts()) > int(limits.GetMaxCollectionItems()) {
+	if uint64(len(request.GetInput().GetParts())) > uint64(limits.GetMaxCollectionItems()) {
 		return fmt.Errorf("initial message part count exceeds %d", limits.GetMaxCollectionItems())
 	}
 	return commonv1.ValidateEncodedSize(request, limits.GetMaxMessageBytes())
@@ -541,7 +541,7 @@ func ValidateInteractionSnapshot(value *InteractionSnapshot, limits *commonv1.Li
 	if err := commonv1.ValidateLimits(limits); err != nil {
 		return err
 	}
-	if len(value.GetPending()) > int(limits.GetMaxCollectionItems()) {
+	if uint64(len(value.GetPending())) > uint64(limits.GetMaxCollectionItems()) {
 		return fmt.Errorf("pending interaction count exceeds %d", limits.GetMaxCollectionItems())
 	}
 	previous := ""
@@ -698,7 +698,7 @@ func (validator *InteractionTailValidator) Accept(frame *StreamInteractionsRespo
 		if exists {
 			return errors.New("interaction delta opens an already-pending interaction")
 		}
-		if len(validator.pending) >= int(validator.limits.GetMaxCollectionItems()) {
+		if uint64(len(validator.pending)) >= uint64(validator.limits.GetMaxCollectionItems()) {
 			return errors.New("interaction delta exceeds the negotiated pending count")
 		}
 		next[key] = proto.CloneOf(delta.GetInteraction())
@@ -802,7 +802,7 @@ func ValidateEventBatch(
 	if err := commonv1.ValidateLimits(limits); err != nil {
 		return err
 	}
-	if len(events) > int(limits.GetMaxReplayEvents()) {
+	if uint64(len(events)) > uint64(limits.GetMaxReplayEvents()) {
 		return fmt.Errorf("event count %d exceeds %d", len(events), limits.GetMaxReplayEvents())
 	}
 	expected := afterSequence

@@ -3,6 +3,7 @@ package grpcserver
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/iotest"
 
 	enginev1 "github.com/spice-framework/spice-agent/engine/v1"
 	"google.golang.org/grpc"
@@ -88,6 +90,11 @@ func TestEndpointTokenGenerationEncodingAndRedaction(t *testing.T) {
 	if _, err = generateEndpointToken(bytes.NewReader(nil)); err == nil {
 		t.Fatal("short token randomness was accepted")
 	}
+	const entropySecret = "grpc-entropy-error-secret-canary"
+	if _, err = generateEndpointToken(iotest.ErrReader(errors.New(entropySecret))); err == nil ||
+		strings.Contains(err.Error(), entropySecret) {
+		t.Fatalf("token entropy failure was not safely redacted: %v", err)
+	}
 	if _, err = generateEndpointToken(bytes.NewReader(make([]byte, endpointTokenBytes*endpointTokenAttempts))); err == nil {
 		t.Fatal("all-zero token randomness was accepted")
 	}
@@ -105,7 +112,7 @@ func TestEndpointTokenPublicGenerationAndDirectRedaction(t *testing.T) {
 	if _, err = token.AuthorizationValue(); err != nil {
 		t.Fatal(err)
 	}
-	if token.String() != "[REDACTED endpoint token]" || token.GoString() != "grpcserver.EndpointToken([REDACTED])" {
+	if token.String() != "[REDACTED endpoint token]" || token.GoString() != "endpoint.Token([REDACTED])" {
 		t.Fatal("direct token formatting was not redacted")
 	}
 	//nolint:staticcheck // Boundary coverage intentionally proves nil contexts fail closed.
@@ -295,14 +302,7 @@ func endpointTokenFixture(t *testing.T, seed byte) EndpointToken {
 }
 
 func base64TokenLength() int {
-	value, _ := endpointTokenFixtureValue().AuthorizationValue()
-	return len(strings.TrimPrefix(value, endpointBearerPrefix))
-}
-
-func endpointTokenFixtureValue() EndpointToken {
-	token := EndpointToken{state: &endpointTokenState{}}
-	token.state.value[0] = 1
-	return token
+	return base64.RawURLEncoding.EncodedLen(endpointTokenBytes)
 }
 
 func authorizationValues(tokens ...EndpointToken) []string {

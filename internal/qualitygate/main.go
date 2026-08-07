@@ -450,6 +450,7 @@ func fuzz(ctx context.Context, root string, environment map[string]string) error
 		{"./annotation/agent", "FuzzToolHandler"},
 		{"./common/v1", "FuzzCommonEnvelope"},
 		{"./engine/v1", "FuzzEngineEnvelope"},
+		{"./daemon/endpoint", "FuzzDecodeMetadata"},
 	} {
 		if err := command(ctx, root, environment, "go", "test", "-run=^$", "-fuzz=^"+target.name+"$", "-fuzztime=1s", target.pkg); err != nil {
 			return err

@@ -203,6 +203,14 @@ Lifecycle unary evidence is in
 [`evidence/phase4-lifecycle-unary.md`](evidence/phase4-lifecycle-unary.md).
 Authenticated streaming evidence is in
 [`evidence/phase4-streaming-rpc.md`](evidence/phase4-streaming-rpc.md).
+The authenticated local-client slice now adds strict current-user endpoint
+metadata, bounded daemon publication and discovery, Unix-socket/Windows-pipe
+transport, the complete public gRPC adapter, attach-or-start policy, and their
+local bridge. Startup is authorized only by an exact proven-absence result;
+malformed or untrusted state fails hard. Legacy protocol initialization loss is
+explicitly non-retryable because versions 1.0 through 1.2 have no attempt
+identity. Evidence and the remaining process-launch/TUI exclusions are in
+[`evidence/phase4-local-client.md`](evidence/phase4-local-client.md).
 The snapshot-import contract now also exposes a complete unkeyed structural
 validator for the transport boundary. It accounts for compatible unknown
 Protobuf fields in the negotiated size and deliberately accepts an untrusted

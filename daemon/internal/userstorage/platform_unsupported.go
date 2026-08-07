@@ -1,12 +1,6 @@
 //go:build !windows && !linux && !darwin
 
-package runauthority
-
-import (
-	"errors"
-)
-
-var errLockBusy = errors.New("stable lock is busy")
+package userstorage
 
 type (
 	stableLock      struct{}
@@ -25,6 +19,7 @@ func (*secureDirectory) acquireInitializationLock(string) (*stableLock, error) {
 }
 func (*secureDirectory) readFile(string, int) ([]byte, error) { return nil, ErrUnavailable }
 func (*secureDirectory) writeFileAtomic(string, []byte) error { return ErrUnavailable }
+func (*secureDirectory) removeFile(string) error              { return ErrUnavailable }
 func (*secureDirectory) close() error                         { return nil }
 func readSecureFile(string, int) ([]byte, error)              { return nil, ErrUnavailable }
 func writeSecureFileAtomic(string, []byte) error              { return ErrUnavailable }

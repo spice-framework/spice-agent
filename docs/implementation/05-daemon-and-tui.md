@@ -203,6 +203,15 @@ fences until their senders exit. Bounded server shutdown cancels adapter-owned
 observations and force-stops gRPC at the caller deadline. This slice has no OS listener, endpoint
 metadata file, discovery, or public client adapter; those remain pending.
 
+The following local-client slice supplies those previously excluded pieces.
+`daemon/endpoint` owns strict current-user metadata, stable publication and
+startup locks, liveness probing, and stale cleanup. `daemon/localipc` supports
+only private Unix sockets and current-user Windows named pipes. The public gRPC
+adapter translates and validates the complete session protocol, and the managed
+adapter launches only after exact proven absence. Their local bridge owns each
+channel and disables transport retry and every nonlocal resolution path. See
+[`evidence/phase4-local-client.md`](evidence/phase4-local-client.md).
+
 The lifecycle-adapter prerequisite now separates snapshot-import structure
 from authority. `ValidateImportSnapshotRequestStructure` checks the complete
 client mutation, negotiated encoded size (including compatible unknown fields),
@@ -216,11 +225,11 @@ The TUI composition half of slice 4 is implemented independently at
 types, Spice generates the renderer/theme/binding/I/O/shell graph, cancellation
 has an independent control lane, and external acceptance executes the actual
 injected terminal shell through explicit application start and stop. Its full
-gate passed in 158.4 seconds at 90.1% product coverage. The high-level daemon
-client adapter and real terminal process workflow remain pending.
-The remainder of slices 2 through 6 stays pending, including OS transport,
-managed startup, the
-daemon-to-TUI bridge, and real Windows/Linux reconnect acceptance. See
+gate passed in 158.4 seconds at 90.1% product coverage. Distribution-owned
+process launch, daemon attachment, reconnect, and the real terminal workflow
+remain pending. The remainder of slices 2 through 6 includes protocol-1.3
+initialization replay, managed process launch, the daemon-to-TUI bridge, and
+real Windows/Linux reconnect acceptance. See
 [`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
 Foundation-specific evidence is in
 [`evidence/phase4-host-foundation.md`](evidence/phase4-host-foundation.md).
