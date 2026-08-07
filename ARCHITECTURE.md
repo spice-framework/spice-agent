@@ -90,6 +90,42 @@ per-client run, prompt, observer, and queue budgets bound retained state, and
 shutdown joins delivery while releasing every binding. These primitives contain
 no gRPC, Protobuf translation, listener, endpoint, or OS IPC behavior.
 
+`daemon.RunHost` composes those primitives into the transport-independent run
+lifecycle. Its typed API owns Start, Import, Suspend, Resume, Cancel, Respond,
+Export, Health, and Shutdown; an adapter supplies only an authenticated,
+epoch-bound `Session` and translates the result. Start and import reserve host
+capacity and bind pending interactions before registering an inert kernel run.
+The session's mutation-commit gate then fences the durable authority change.
+Only after authority is durably `ACTIVE` may the host activate the kernel, so no
+provider, stage, tool, observer, event, or interaction can run first. Local
+resume likewise invalidates the signed suspended authority state before
+releasing kernel execution.
+
+The per-run lifecycle gate is context-aware: request or session cancellation
+stops waiters without mutating the run, while the host-owned terminal monitor
+retains its cleanup wait. Pre-commit setup observes request, stable-client
+session, and daemon lifetimes together so reconnect and shutdown fence work
+before durable or visible boundaries.
+
+Mutation operation IDs are deduplicated by the bounded per-client ledger.
+Failures proved to occur before any visible or durable boundary abandon their
+ledger entry, allowing the same operation ID to retry; committed failures and
+uncertain outcomes remain replayable and may not be guessed or replayed as new
+work. Run ownership deliberately makes an unknown run and another client's run
+indistinguishable. Completed runs retain authority-issued envelopes in a
+deterministic count-and-byte-bounded cache, and fixed secret-safe degradation
+reasons make authority, snapshot, and cleanup failures visible through Health.
+RunHost capacity, terminal-envelope retention, pending interactions, sessions,
+and idempotency are bounded. The kernel's internal service-lifetime seen-run
+identity tombstones are still unbounded; terminal-cache eviction does not bound
+that identity history, and a later lifecycle policy must address it before a
+long-lived daemon contract is frozen.
+
+RunHost contains no gRPC server, Protobuf/RPC translation, event or interaction
+stream adapter, listener, endpoint authentication, Unix socket, Windows named
+pipe, discovery, or managed-startup implementation. Those remain the next
+Phase 4 transport slices.
+
 Every client epoch also owns a bounded commit and stream gate. Mutating work
 crosses an exclusive FIFO commit boundary; a reconnect intent takes priority,
 waits for the active commit, cancels old stream contexts, and cannot publish the

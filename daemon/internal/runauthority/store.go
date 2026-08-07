@@ -240,8 +240,13 @@ func (store *Store) Start(ctx context.Context, runID string) (*Active, error) {
 		return nil, ErrUnavailable
 	}
 	value := store.baseRecord(runID, 1, PhaseActive)
-	if _, err = store.writeRecord(ctx, runID, value); err != nil {
+	attempted, err := store.writeRecord(ctx, runID, value)
+	if err != nil {
 		_ = lock.close()
+		if attempted {
+			store.markUncertain(runID)
+			return nil, ErrUncertain
+		}
 		return nil, err
 	}
 	releaseLease = false

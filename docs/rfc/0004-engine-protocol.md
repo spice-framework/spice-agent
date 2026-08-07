@@ -51,7 +51,12 @@ policy from wire data. Its stable client store derives every ownership epoch
 context from the daemon root and performs reconnect as an exact one-winner CAS.
 Mutating RPC adapters will use the bounded idempotency ledger keyed by stable
 client identity plus operation identity; an epoch change fences execution but
-does not erase committed operation outcomes.
+does not erase committed operation outcomes. An executor may explicitly abandon
+an operation identity only after proving that no externally visible or durable
+commit boundary was reached. This removes the pending entry and permits one
+live duplicate or later caller to retry through normal bounded admission.
+Arbitrary errors, panics, ambiguous writes, wrapped abandonment markers, and
+abandonment returned with a result remain committed uncertain outcomes.
 
 ## Operations
 

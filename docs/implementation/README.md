@@ -147,6 +147,22 @@ byte-identical suspended retries, persists terminal tombstones, and keeps
 cancellation, uncertainty, and post-commit cleanup failures distinct without
 exposing signer internals. Evidence is in
 [`evidence/phase4-run-authority.md`](evidence/phase4-run-authority.md).
+The transport-independent `daemon.RunHost` now composes definitions, kernel,
+authority, sessions, idempotency, and pending interactions behind typed Start,
+Import, Suspend, Resume, Cancel, Respond, Export, Health, and Shutdown methods.
+It registers starts and imports inertly, commits durable authority while holding
+the stable client's mutation gate, and only then releases kernel execution.
+Pre-boundary failures abandon their operation-ledger entry; committed and
+uncertain results remain deterministic. Per-run transition waits honor caller
+and session cancellation, and setup observes request, session, and host
+lifetimes before a commit boundary. Active capacity and terminal envelopes are
+bounded, terminal eviction follows completion order, owner lookup is
+non-disclosing, and fixed safe degradation reasons are reported by Health.
+The kernel's service-lifetime seen-run identity tombstones remain unbounded even
+when RunHost evicts a terminal envelope. No gRPC/Protobuf adapter, IPC listener,
+stream bridge, endpoint authentication, discovery, or managed startup is
+claimed. Focused evidence and remaining exclusions are recorded in
+[`evidence/phase4-run-host.md`](evidence/phase4-run-host.md).
 The independent TUI repository now exposes an immutable UI-neutral session
 port and a public terminal shell while keeping Bubble Tea and presentation
 messages internal. Commit `82adb45` generates its renderer, theme, ordered key

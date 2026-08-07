@@ -45,23 +45,47 @@ func TestOpenContainsAtomicPersistenceFailure(t *testing.T) {
 	}
 }
 
-func TestStartContainsInjectedStatePersistenceFailure(t *testing.T) {
+func TestStartContainsInjectedStatePersistenceUncertainty(t *testing.T) {
 	directory := filepath.Join(authorityTestRoot(t), "state-write-failure")
 	store, err := Open(Config{Directory: directory})
 	if err != nil {
 		t.Fatal(err)
 	}
 	store.writeFile = func(string, []byte) error { return errors.New("secret state write detail") }
-	if _, err = store.Start(t.Context(), "run"); !errors.Is(err, ErrUnavailable) || strings.Contains(err.Error(), "secret") {
+	if _, err = store.Start(t.Context(), "run"); !errors.Is(err, ErrUncertain) || strings.Contains(err.Error(), "secret") {
 		t.Fatalf("state persistence failure = %v", err)
 	}
 	store.writeFile = store.directory.writeFileAtomic
-	active, err := store.Start(t.Context(), "run")
-	if err != nil {
-		t.Fatalf("retry before durable transition = %v", err)
+	if _, err = store.Start(t.Context(), "run"); !errors.Is(err, ErrUncertain) {
+		t.Fatalf("retry after attempted transition = %v", err)
 	}
-	if err = active.Close(); err != nil {
+	if err = store.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestStartMarksAttemptedPersistenceFailureUncertain(t *testing.T) {
+	directory := filepath.Join(authorityTestRoot(t), "state-write-uncertain")
+	store, err := Open(Config{Directory: directory})
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalWriter := store.directory.writeFileAtomic
+	store.writeFile = func(name string, value []byte) error {
+		if writeErr := originalWriter(name, value); writeErr != nil {
+			return writeErr
+		}
+		return errors.New("failure after durable write")
+	}
+	if _, err = store.Start(t.Context(), "run"); !errors.Is(err, ErrUncertain) {
+		t.Fatalf("attempted start = %v", err)
+	}
+	if !store.isUncertain("run") {
+		t.Fatal("attempted start did not poison the process-local run identity")
+	}
+	store.writeFile = originalWriter
+	if _, err = store.Start(t.Context(), "run"); !errors.Is(err, ErrUncertain) {
+		t.Fatalf("retry after uncertain start = %v", err)
 	}
 	if err = store.Close(); err != nil {
 		t.Fatal(err)

@@ -56,9 +56,10 @@ portable semantic views and namespaced data; they never load executable UI code.
 ## Implementation slices
 
 1. Freeze common/engine schemas and generate deterministic Go code.
-2. Implement the transport-independent host primitives, then authenticated
-   local listeners, client/session translation, negotiation, replay,
-   cancellation, interaction, snapshot, and health.
+2. Implement the transport-independent host primitives and typed run lifecycle,
+   then authenticated local listeners, client/session translation,
+   negotiation, replay, cancellation, interaction streams, snapshot, and
+   health translation.
 3. Add user-scoped endpoint discovery and managed start coordination.
 4. Implement the Bubble Tea shell with injected presentation components and
    terminal-size-independent semantic models.
@@ -125,13 +126,41 @@ state. `CommitPaused` reserves the engine identity and leased plan while
 withholding all events and extension work; the host may durably activate
 authority and only then release execution through an exactly-once gate. Root
 cancellation cannot guess that external decision, and abort performs bounded
-zero-event cleanup. This closes the kernel publication gap but is not yet a
-daemon `RunHost`.
+zero-event cleanup.
 Locally suspended runs additionally expose an inert prepared-resume boundary.
 The host can reserve the exact next event sequence, durably invalidate the old
 snapshot through `RunAuthority`, and only then release kernel execution.
 Cancellation and shutdown latch behind that decision; abort restores the exact
 suspended snapshot.
+The transport-independent `daemon.RunHost` now closes the lifecycle-composition
+part of slice 2. It owns typed Start, Import, Suspend, Resume, Cancel, Respond,
+Export, Health, and Shutdown behavior using the generated `DefinitionSet`,
+kernel, run authority, stable-client sessions, idempotency ledger, and pending
+interaction hub. Start and import bind ownership and register an inert kernel
+run before taking the session mutation-commit gate; durable `ACTIVE` authority
+always precedes kernel activation. Suspend reaches a kernel safe boundary
+before issuing an authority envelope, and resume durably invalidates that
+envelope before work continues. Accepted pending interactions remain
+respondable through terminal drain.
+
+The host abandons an idempotency entry only for a failure proved to precede any
+visible or durable boundary. Committed errors and uncertain transitions remain
+stable outcomes. Active reservations are separately bounded from a
+count-and-byte-bounded terminal-envelope cache, whose eviction follows terminal
+completion order. Ownership lookup does not distinguish unknown runs from runs
+owned by another client. Health reports immutable configured limits and fixed
+secret-safe degraded reasons. Shutdown synchronously fences admission, aborts
+inert candidates, cancels kernel work, drains accepted operations and pending
+bindings, joins finalizers, and closes authority last; cleanup continues even
+if an individual caller stops waiting.
+
+This lifecycle core does not include gRPC, Protobuf/RPC translation, event or
+interaction stream delivery, endpoint authentication, Unix sockets, Windows
+named pipes, endpoint discovery, or managed daemon startup. Although RunHost
+bounds retained terminal envelopes, `agent.Engine` still retains unbounded
+service-lifetime seen-run identity tombstones. That limitation is explicit and
+must be resolved or accepted by a bounded-lifetime daemon policy before the
+Phase 4 contract freezes.
 The TUI composition half of slice 4 is implemented independently at
 `spice-agent-tui` commit `82adb45`: public APIs contain no Bubble Tea or daemon
 types, Spice generates the renderer/theme/binding/I/O/shell graph, cancellation
@@ -139,9 +168,9 @@ has an independent control lane, and external acceptance executes the actual
 injected terminal shell through explicit application start and stop. Its full
 gate passed in 158.4 seconds at 90.1% product coverage. The high-level daemon
 client adapter and real terminal process workflow remain pending.
-The remainder of slices 2 through 6 stays pending,
-including OS transport, authentication, run hosting/translation, managed
-startup, the daemon-to-TUI bridge, and real Windows/Linux reconnect acceptance. See
+The remainder of slices 2 through 6 stays pending, including RPC translation,
+event and interaction streams, OS transport, authentication, managed startup,
+the daemon-to-TUI bridge, and real Windows/Linux reconnect acceptance. See
 [`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
 Foundation-specific evidence is in
 [`evidence/phase4-host-foundation.md`](evidence/phase4-host-foundation.md).
@@ -159,6 +188,8 @@ Protocol prerequisite evidence is in
 [`evidence/phase4-protocol-prerequisites.md`](evidence/phase4-protocol-prerequisites.md).
 Kernel activation-gate evidence is in
 [`evidence/phase4-kernel-activation-gate.md`](evidence/phase4-kernel-activation-gate.md).
+RunHost lifecycle-core evidence is in
+[`evidence/phase4-run-host.md`](evidence/phase4-run-host.md).
 
 The baseline remains intentionally provisional. The pre-host repair closes the
 schema and kernel seams for interaction discovery/run identity, reconnect CAS,
