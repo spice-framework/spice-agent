@@ -269,8 +269,104 @@ func TestLedgerCancellationAndCapacityAreOwnershipSafe(t *testing.T) {
 	}
 }
 
+type pendingTestHub struct {
+	*daemon.PendingHub
+	mu       sync.Mutex
+	bindings map[string]*daemon.RunBinding
+}
+
+func newPendingHub(maxPending, maxObservers, observerQueue int) (*pendingTestHub, error) {
+	hub, err := daemon.NewPendingHub(daemon.PendingLimits{
+		Clients: 64, Runs: 64, RunsPerClient: 64,
+		Pending: maxPending, PendingPerClient: maxPending,
+		PendingBytes: 16 << 20, PendingBytesPerClient: 16 << 20,
+		Observers: maxObservers, ObserversPerClient: maxObservers,
+		ObserverQueueEntries: observerQueue, ObserverQueueBytes: 4 << 20,
+		ReservedQueueEntries:          maxObservers * observerQueue,
+		ReservedQueueEntriesPerClient: maxObservers * observerQueue,
+		ReservedQueueBytes:            maxObservers * (4 << 20),
+		ReservedQueueBytesPerClient:   maxObservers * (4 << 20),
+		QueuedEntries:                 maxObservers * observerQueue,
+		QueuedEntriesPerClient:        maxObservers * observerQueue,
+		QueuedBytes:                   maxObservers * (4 << 20),
+		QueuedBytesPerClient:          maxObservers * (4 << 20),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if hub == nil {
+		return nil, errors.New("pending hub constructor returned nil")
+	}
+	return &pendingTestHub{PendingHub: hub, bindings: make(map[string]*daemon.RunBinding)}, nil
+}
+
+func mustNewPendingHub(t *testing.T, maxPending, maxObservers, observerQueue int) *pendingTestHub {
+	t.Helper()
+	hub, err := newPendingHub(maxPending, maxObservers, observerQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hub == nil {
+		t.Fatal("pending test hub is nil")
+	}
+	return hub
+}
+
+func (hub *pendingTestHub) ensureBound(scope interaction.Scope) error {
+	if hub == nil || hub.PendingHub == nil {
+		return daemon.ErrPendingHubClosed
+	}
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+	if hub.bindings[scope.RunID()] != nil {
+		return nil
+	}
+	binding, err := hub.BindRun("client", scope)
+	if err != nil {
+		return err
+	}
+	hub.bindings[scope.RunID()] = binding
+	return nil
+}
+
+func (hub *pendingTestHub) Request(ctx context.Context, scope interaction.Scope, request interaction.Request) (interaction.Response, error) {
+	if hub == nil || hub.PendingHub == nil {
+		return interaction.Response{}, daemon.ErrPendingHubClosed
+	}
+	if ctx == nil {
+		return interaction.Response{}, errors.New("pending interaction context is nil")
+	}
+	if err := ctx.Err(); err != nil {
+		return interaction.Response{}, err
+	}
+	if err := hub.ensureBound(scope); err != nil {
+		return interaction.Response{}, err
+	}
+	return hub.PendingHub.Request(ctx, scope, request)
+}
+
+func (hub *pendingTestHub) Respond(scope interaction.Scope, response interaction.Response) error {
+	if hub == nil || hub.PendingHub == nil {
+		return daemon.ErrPendingHubClosed
+	}
+	return hub.PendingHub.Respond("client", scope, response)
+}
+
+func (hub *pendingTestHub) Subscribe(ctx context.Context) (*daemon.PendingSubscription, error) {
+	if hub == nil || hub.PendingHub == nil {
+		return nil, daemon.ErrPendingHubClosed
+	}
+	return hub.PendingHub.Subscribe(ctx, "client")
+}
+
+func (hub *pendingTestHub) Close() {
+	if hub != nil && hub.PendingHub != nil {
+		hub.PendingHub.Close()
+	}
+}
+
 func TestPendingSubscriptionIsCompleteFirstAndGapFree(t *testing.T) {
-	broker, _ := daemon.NewPendingBroker(4, 4, 4)
+	broker := mustNewPendingHub(t, 4, 4, 4)
 	scope := mustScope(t, "run")
 	requestA := mustRequest(t, "a")
 	requestB := mustRequest(t, "b")
@@ -308,7 +404,7 @@ func TestPendingSubscriptionIsCompleteFirstAndGapFree(t *testing.T) {
 }
 
 func TestPendingSnapshotIsSortedAndDefensivelyCopied(t *testing.T) {
-	broker, _ := daemon.NewPendingBroker(4, 2, 8)
+	broker := mustNewPendingHub(t, 4, 2, 8)
 	observer, _ := broker.Subscribe(t.Context())
 	contexts := make([]context.CancelFunc, 0, 3)
 	for _, pair := range []struct{ run, id string }{{"z", "a"}, {"a", "z"}, {"a", "a"}} {
@@ -340,7 +436,7 @@ func TestPendingSnapshotIsSortedAndDefensivelyCopied(t *testing.T) {
 }
 
 func TestPendingCompositeIdentityDoesNotAlias(t *testing.T) {
-	broker, _ := daemon.NewPendingBroker(2, 2, 4)
+	broker := mustNewPendingHub(t, 2, 2, 4)
 	observer, _ := broker.Subscribe(t.Context())
 	firstContext, cancelFirst := context.WithCancel(t.Context())
 	defer cancelFirst()
@@ -361,7 +457,7 @@ func TestPendingCompositeIdentityDoesNotAlias(t *testing.T) {
 }
 
 func TestPendingRejectsCanceledWorkWithoutPublishing(t *testing.T) {
-	broker, _ := daemon.NewPendingBroker(1, 1, 1)
+	broker := mustNewPendingHub(t, 1, 1, 1)
 	cancelled, cancel := context.WithCancel(t.Context())
 	cancel()
 	if _, err := broker.Request(cancelled, mustScope(t, "run"), mustRequest(t, "prompt")); !errors.Is(err, context.Canceled) {
@@ -378,25 +474,25 @@ func TestPendingRejectsCanceledWorkWithoutPublishing(t *testing.T) {
 		t.Fatalf("cancelled request was published: %#v", snapshot)
 	}
 	broker.Close()
-	if err = broker.Respond(mustScope(t, "run"), mustResponse(t, "prompt")); !errors.Is(err, daemon.ErrBrokerClosed) {
+	if err = broker.Respond(mustScope(t, "run"), mustResponse(t, "prompt")); !errors.Is(err, daemon.ErrPendingHubClosed) {
 		t.Fatalf("response after close = %v", err)
 	}
-	if _, err = daemon.NewPendingBroker(4097, 1, 1); err == nil {
+	if _, err = newPendingHub(4097, 1, 1); err == nil {
 		t.Fatal("oversized pending bound succeeded")
 	}
-	if _, err = daemon.NewPendingBroker(1, 1025, 1); err == nil {
+	if _, err = newPendingHub(1, 1025, 1); err == nil {
 		t.Fatal("oversized observer bound succeeded")
 	}
-	if _, err = daemon.NewPendingBroker(1, 1, 1025); err == nil {
+	if _, err = newPendingHub(1, 1, 1025); err == nil {
 		t.Fatal("oversized queue bound succeeded")
 	}
-	if _, err = daemon.NewPendingBroker(1, 65, 1); err == nil {
+	if _, err = newPendingHub(1, 65, 1); err == nil {
 		t.Fatal("oversized aggregate observer budget succeeded")
 	}
 }
 
 func TestPendingDuplicatePrecedesCapacityAndObserversAreBounded(t *testing.T) {
-	broker, _ := daemon.NewPendingBroker(1, 1, 1)
+	broker := mustNewPendingHub(t, 1, 1, 1)
 	subscription, _ := broker.Subscribe(t.Context())
 	scope := mustScope(t, "run")
 	request := mustRequest(t, "prompt")
@@ -411,14 +507,14 @@ func TestPendingDuplicatePrecedesCapacityAndObserversAreBounded(t *testing.T) {
 	broker.Close()
 	for range subscription.Deltas() {
 	}
-	if err := <-done; !errors.Is(err, daemon.ErrBrokerClosed) {
+	if err := <-done; !errors.Is(err, daemon.ErrPendingHubClosed) {
 		t.Fatalf("closed request = %v", err)
 	}
 }
 
 func TestPendingRetainedAndObserverBytesAreBounded(t *testing.T) {
 	large := largeRequest(t)
-	broker, _ := daemon.NewPendingBroker(20, 1, 8)
+	broker := mustNewPendingHub(t, 20, 1, 8)
 	subscription, _ := broker.Subscribe(t.Context())
 	contexts := make([]context.CancelFunc, 0, 20)
 	accepted := 0
@@ -453,7 +549,7 @@ retainedBounded:
 	}
 	broker.Close()
 
-	observerBroker, _ := daemon.NewPendingBroker(8, 1, 8)
+	observerBroker := mustNewPendingHub(t, 8, 1, 8)
 	slow, _ := observerBroker.Subscribe(t.Context())
 	observerContexts := make([]context.CancelFunc, 0, 4)
 	for index := range 4 {
@@ -478,7 +574,7 @@ retainedBounded:
 
 func TestPendingAcceptedResponseWinsCancellationAndClose(t *testing.T) {
 	for iteration := range 100 {
-		broker, _ := daemon.NewPendingBroker(1, 1, 2)
+		broker := mustNewPendingHub(t, 1, 1, 2)
 		scope := mustScope(t, fmt.Sprintf("run-%d", iteration))
 		request := mustRequest(t, "prompt")
 		requestContext, cancel := context.WithCancel(t.Context())
@@ -500,7 +596,7 @@ func TestPendingAcceptedResponseWinsCancellationAndClose(t *testing.T) {
 		broker.Close()
 	}
 
-	broker, _ := daemon.NewPendingBroker(1, 1, 2)
+	broker := mustNewPendingHub(t, 1, 1, 2)
 	scope := mustScope(t, "close-race")
 	observer, _ := broker.Subscribe(t.Context())
 	done := startPending(t, broker, t.Context(), scope, mustRequest(t, "prompt"))
@@ -519,13 +615,13 @@ func TestPendingAcceptedResponseWinsCancellationAndClose(t *testing.T) {
 	if responseErr == nil && requestErr != nil {
 		t.Fatalf("accepted response lost to close: %v", requestErr)
 	}
-	if responseErr != nil && !errors.Is(requestErr, daemon.ErrBrokerClosed) {
+	if responseErr != nil && !errors.Is(requestErr, daemon.ErrPendingHubClosed) {
 		t.Fatalf("close winner = response %v, request %v", responseErr, requestErr)
 	}
 }
 
 func TestPendingSlowSubscriberReportsExactLastDelivered(t *testing.T) {
-	broker, _ := daemon.NewPendingBroker(4, 1, 1)
+	broker := mustNewPendingHub(t, 4, 1, 1)
 	subscription, _ := broker.Subscribe(t.Context())
 	contexts := make([]context.CancelFunc, 0, 4)
 	for index := range 4 {
@@ -554,60 +650,61 @@ func TestPendingSlowSubscriberReportsExactLastDelivered(t *testing.T) {
 }
 
 func TestPendingCloseUnblocksRequestsAndSubscriptions(t *testing.T) {
-	broker, _ := daemon.NewPendingBroker(2, 1, 2)
+	broker := mustNewPendingHub(t, 2, 1, 2)
 	subscription, _ := broker.Subscribe(t.Context())
 	done := startPending(t, broker, t.Context(), mustScope(t, "run"), mustRequest(t, "prompt"))
 	_ = receiveDelta(t, subscription)
 	broker.Close()
-	if err := <-done; !errors.Is(err, daemon.ErrBrokerClosed) {
+	if err := <-done; !errors.Is(err, daemon.ErrPendingHubClosed) {
 		t.Fatalf("request close = %v", err)
 	}
 	for range subscription.Deltas() {
 	}
-	if err := subscription.Wait(t.Context()); !errors.Is(err, daemon.ErrBrokerClosed) {
+	if err := subscription.Wait(t.Context()); !errors.Is(err, daemon.ErrPendingHubClosed) {
 		t.Fatalf("subscription close = %v", err)
 	}
-	if _, err := broker.Subscribe(t.Context()); !errors.Is(err, daemon.ErrBrokerClosed) {
+	if _, err := broker.Subscribe(t.Context()); !errors.Is(err, daemon.ErrPendingHubClosed) {
 		t.Fatalf("subscribe after close = %v", err)
 	}
 }
 
-func TestPendingClosePublishesSortedTerminalDeltas(t *testing.T) {
-	broker, _ := daemon.NewPendingBroker(3, 1, 8)
+func TestPendingCloseStopsUnreadObserverAndReleasesEveryCall(t *testing.T) {
+	broker := mustNewPendingHub(t, 3, 1, 8)
 	subscription, _ := broker.Subscribe(t.Context())
 	done := make([]<-chan error, 0, 3)
 	for _, value := range []struct{ run, id string }{{"z", "a"}, {"a", "z"}, {"a", "a"}} {
 		done = append(done, startPending(t, broker, t.Context(), mustScope(t, value.run), mustRequest(t, value.id)))
-		_ = receiveDelta(t, subscription)
 	}
-	broker.Close()
-	var closed []string
-	for delta := range subscription.Deltas() {
-		if delta.Kind == daemon.DeltaClosed {
-			closed = append(closed, delta.Pending.Scope.RunID()+"/"+string(delta.Pending.Request.ID()))
-		}
+	closed := make(chan struct{})
+	go func() {
+		broker.Close()
+		close(closed)
+	}()
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("close blocked on unread observer")
 	}
-	if !slices.Equal(closed, []string{"a/a", "a/z", "z/a"}) {
-		t.Fatalf("close order = %v", closed)
+	for range subscription.Deltas() {
 	}
 	for _, result := range done {
-		if err := <-result; !errors.Is(err, daemon.ErrBrokerClosed) {
+		if err := <-result; !errors.Is(err, daemon.ErrPendingHubClosed) {
 			t.Fatalf("closed request = %v", err)
 		}
 	}
 }
 
 func TestPendingNilReceiversFailClosed(t *testing.T) {
-	var broker *daemon.PendingBroker
+	var broker *pendingTestHub
 	scope := mustScope(t, "run")
 	request := mustRequest(t, "prompt")
-	if _, err := broker.Request(t.Context(), scope, request); !errors.Is(err, daemon.ErrBrokerClosed) {
+	if _, err := broker.Request(t.Context(), scope, request); !errors.Is(err, daemon.ErrPendingHubClosed) {
 		t.Fatalf("nil broker request = %v", err)
 	}
-	if err := broker.Respond(scope, mustResponse(t, "prompt")); !errors.Is(err, daemon.ErrBrokerClosed) {
+	if err := broker.Respond(scope, mustResponse(t, "prompt")); !errors.Is(err, daemon.ErrPendingHubClosed) {
 		t.Fatalf("nil broker response = %v", err)
 	}
-	if _, err := broker.Subscribe(t.Context()); !errors.Is(err, daemon.ErrBrokerClosed) {
+	if _, err := broker.Subscribe(t.Context()); !errors.Is(err, daemon.ErrPendingHubClosed) {
 		t.Fatalf("nil broker subscribe = %v", err)
 	}
 	broker.Close()
@@ -628,7 +725,7 @@ func TestPendingNilReceiversFailClosed(t *testing.T) {
 
 func panicExecutor(context.Context) (daemon.Outcome, error) { panic("duplicate executed") }
 
-func startPending(t *testing.T, broker *daemon.PendingBroker, ctx context.Context, scope interaction.Scope, request interaction.Request) <-chan error {
+func startPending(t *testing.T, broker *pendingTestHub, ctx context.Context, scope interaction.Scope, request interaction.Request) <-chan error {
 	t.Helper()
 	done := make(chan error, 1)
 	go func() {
@@ -693,7 +790,7 @@ func mustResponse(t *testing.T, id string) interaction.Response {
 	return response
 }
 
-func respond(t *testing.T, broker *daemon.PendingBroker, scope interaction.Scope, id string) {
+func respond(t *testing.T, broker *pendingTestHub, scope interaction.Scope, id string) {
 	t.Helper()
 	if err := broker.Respond(scope, mustResponse(t, id)); err != nil {
 		t.Fatal(err)

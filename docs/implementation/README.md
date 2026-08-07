@@ -93,7 +93,10 @@ key store or daemon-host implementation.
 The first host-foundation slice now implements the transport-independent
 `daemon` named interface: exact immutable definition catalogs, root-owned
 stable-client reconnect CAS, bounded per-client idempotency with panic-safe
-uncertain outcomes, and an atomic complete-first pending-interaction broker.
+uncertain outcomes, and a stable-client-partitioned `PendingHub`. Explicit run
+bindings preserve accepted prompts through run-terminal races; per-client
+complete-first revisions, reconnect fencing, explicit global/per-client
+budgets, and joined observer shutdown keep discovery isolated and bounded.
 Its deterministic concurrency, shutdown, overflow, aliasing, capacity, and
 secret-containment evidence is recorded in
 [`evidence/phase4-host-foundation.md`](evidence/phase4-host-foundation.md).

@@ -5,14 +5,37 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"sync"
 
 	"github.com/spice-framework/spice-agent/interaction"
 )
 
-// ErrBrokerClosed rejects requests after daemon broker shutdown.
-var ErrBrokerClosed = errors.New("pending interaction broker is closed")
+var (
+	// ErrPendingHubClosed rejects work after daemon-root shutdown.
+	ErrPendingHubClosed = errors.New("pending interaction hub is closed")
+	// ErrRunNotBound rejects interaction work for a run without an active or
+	// draining client binding.
+	ErrRunNotBound = errors.New("interaction run is not bound to a client")
+	// ErrObserverFenced terminates discovery streams owned by a superseded
+	// client connection. Pending interactions remain available to reconnect.
+	ErrObserverFenced = errors.New("pending interaction observers were fenced")
+	// ErrRunAlreadyBound rejects duplicate stable ownership of one run.
+	ErrRunAlreadyBound = errors.New("interaction run is already bound")
+	// ErrRunBindingCapacity rejects a run lease beyond configured bounds.
+	ErrRunBindingCapacity = errors.New("pending run binding capacity exhausted")
+	// ErrPendingCapacity rejects a pending interaction beyond configured count
+	// or byte bounds.
+	ErrPendingCapacity = errors.New("pending interaction capacity exhausted")
+	// ErrObserverCapacity rejects a discovery stream beyond configured observer
+	// or queue-reservation bounds.
+	ErrObserverCapacity = errors.New("pending observer capacity exhausted")
+	// ErrInteractionNotPending rejects a response without a matching open call.
+	ErrInteractionNotPending = errors.New("interaction is not pending")
+)
+
+var errPendingClientCapacity = errors.New("pending client capacity exhausted")
 
 var closedDeltaStream = func() <-chan Delta {
 	stream := make(chan Delta)
@@ -21,18 +44,71 @@ var closedDeltaStream = func() <-chan Delta {
 }()
 
 const (
+	maximumPendingClients      = 4096
+	maximumPendingRuns         = 16384
 	maximumPendingInteractions = 4096
 	maximumPendingObservers    = 1024
 	maximumObserverQueue       = 1024
+	maximumObserverEntries     = maximumPendingObservers * maximumObserverQueue
 	maximumObserverQueuedBytes = 4 << 20
 	maximumPendingBytes        = 16 << 20
 	maximumObserverBytes       = 64 << 20
 	maximumPendingDeltaBytes   = 2*interaction.MaximumPayloadBytes + 512
 )
 
+// PendingLimits bounds both the whole hub and every stable client partition.
+// A subscription reserves its entire queue budget until it terminates.
+type PendingLimits struct {
+	Clients                       int
+	Runs                          int
+	RunsPerClient                 int
+	Pending                       int
+	PendingPerClient              int
+	PendingBytes                  int
+	PendingBytesPerClient         int
+	Observers                     int
+	ObserversPerClient            int
+	ObserverQueueEntries          int
+	ObserverQueueBytes            int
+	ReservedQueueEntries          int
+	ReservedQueueEntriesPerClient int
+	ReservedQueueBytes            int
+	ReservedQueueBytesPerClient   int
+	QueuedEntries                 int
+	QueuedEntriesPerClient        int
+	QueuedBytes                   int
+	QueuedBytesPerClient          int
+}
+
+// DefaultPendingLimits returns conservative production defaults. Every
+// observer can retain the largest valid delta, and aggregate actual queue caps
+// cover all capacity reserved when subscriptions are admitted.
+func DefaultPendingLimits() PendingLimits {
+	const (
+		observers          = 32
+		observersPerClient = 4
+		queueEntries       = 64
+	)
+	return PendingLimits{
+		Clients: 1024, Runs: 4096, RunsPerClient: 256,
+		Pending: 1024, PendingPerClient: 128,
+		PendingBytes: maximumPendingBytes, PendingBytesPerClient: 4 << 20,
+		Observers: observers, ObserversPerClient: observersPerClient,
+		ObserverQueueEntries: queueEntries, ObserverQueueBytes: maximumPendingDeltaBytes,
+		ReservedQueueEntries:          observers * queueEntries,
+		ReservedQueueEntriesPerClient: observersPerClient * queueEntries,
+		ReservedQueueBytes:            observers * maximumPendingDeltaBytes,
+		ReservedQueueBytesPerClient:   observersPerClient * maximumPendingDeltaBytes,
+		QueuedEntries:                 observers * queueEntries,
+		QueuedEntriesPerClient:        observersPerClient * queueEntries,
+		QueuedBytes:                   observers * maximumPendingDeltaBytes,
+		QueuedBytesPerClient:          observersPerClient * maximumPendingDeltaBytes,
+	}
+}
+
 // ObserverExhaustedError reports the exact last revision delivered to a slow
-// subscriber. Recovery always creates a new subscription and consumes its
-// mandatory complete snapshot; deltas alone are never a discovery mechanism.
+// subscriber. Recovery creates a new client-scoped subscription and consumes
+// its mandatory complete snapshot.
 type ObserverExhaustedError struct{ LastDelivered uint64 }
 
 func (failure *ObserverExhaustedError) Error() string {
@@ -55,14 +131,14 @@ const (
 	DeltaClosed DeltaKind = "closed"
 )
 
-// Delta is one revision-contiguous mutation following a subscription snapshot.
+// Delta is one revision-contiguous mutation within one stable client.
 type Delta struct {
 	Revision uint64
 	Kind     DeltaKind
 	Pending  Pending
 }
 
-// PendingSnapshot is the mandatory complete first view for every subscription.
+// PendingSnapshot is the mandatory complete first client-scoped view.
 type PendingSnapshot struct {
 	Revision uint64
 	Pending  []Pending
@@ -79,32 +155,60 @@ type pendingResult struct {
 }
 
 type pendingCall struct {
-	value  Pending
-	done   chan struct{}
-	result pendingResult
+	value   Pending
+	binding *runBindingState
+	done    chan struct{}
+	result  pendingResult
+}
+
+type runBindingState struct {
+	clientID  string
+	runID     string
+	accepting bool
+	active    int
+	released  chan struct{}
+}
+
+type pendingPartition struct {
+	revision        uint64
+	nextWatcher     uint64
+	pendingBytes    int
+	queuedBytes     int
+	reservedBytes   int
+	boundRuns       int
+	queuedEntries   int
+	reservedEntries int
+	pending         map[pendingKey]*pendingCall
+	watchers        map[uint64]*pendingWatcher
+	stopping        map[*pendingWatcher]struct{}
+}
+
+type queuedDelta struct {
+	delta Delta
+	bytes int
 }
 
 type pendingWatcher struct {
-	queue        chan Delta
-	out          chan Delta
-	stop         chan struct{}
-	done         chan struct{}
-	terminalOnce sync.Once
-	stopOnce     sync.Once
-	queueOnce    sync.Once
-
-	mu            sync.Mutex
+	hub           *PendingHub
+	partition     *pendingPartition
+	id            uint64
+	queue         chan queuedDelta
+	out           chan Delta
+	stop          chan struct{}
+	done          chan struct{}
+	active        bool
 	err           error
 	exhausted     bool
 	lastDelivered uint64
+	queuedCount   int
 	queuedBytes   int
+	stopContext   func() bool
 }
 
-// PendingSubscription atomically couples a complete snapshot with a live tail
-// registered at exactly that snapshot revision.
+// PendingSubscription atomically couples a complete client snapshot with a
+// live tail registered at exactly that partition revision.
 type PendingSubscription struct {
-	broker   *PendingBroker
-	id       uint64
+	hub      *PendingHub
 	snapshot PendingSnapshot
 	watcher  *pendingWatcher
 }
@@ -125,18 +229,19 @@ func (subscription *PendingSubscription) Deltas() <-chan Delta {
 	return subscription.watcher.out
 }
 
-// LastDelivered returns the exact revision whose delta was most recently sent
-// to the consumer, or the snapshot revision before the first delta.
+// LastDelivered returns the exact revision most recently sent to the consumer,
+// or the snapshot revision before the first delta.
 func (subscription *PendingSubscription) LastDelivered() uint64 {
-	if subscription == nil || subscription.watcher == nil {
+	if subscription == nil || subscription.hub == nil || subscription.watcher == nil {
 		return 0
 	}
-	subscription.watcher.mu.Lock()
-	defer subscription.watcher.mu.Unlock()
+	subscription.hub.mu.Lock()
+	defer subscription.hub.mu.Unlock()
 	return subscription.watcher.lastDelivered
 }
 
-// Wait reports broker shutdown, subscriber cancellation, or typed exhaustion.
+// Wait reports hub shutdown, subscriber cancellation, reconnect fencing, or
+// typed queue exhaustion.
 func (subscription *PendingSubscription) Wait(ctx context.Context) error {
 	if subscription == nil || subscription.watcher == nil {
 		return errors.New("pending subscription is nil")
@@ -148,54 +253,279 @@ func (subscription *PendingSubscription) Wait(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-subscription.watcher.done:
-		return subscription.watcher.terminalError()
+		return subscription.terminalError()
 	}
 }
 
-// PendingBroker implements interaction.Broker and bounded, complete-first
-// interaction discovery for daemon clients.
-type PendingBroker struct {
-	mu                                  sync.Mutex
-	maxPending, maxObservers, queueSize int
-	pendingBytes                        int
-	revision, nextWatcher               uint64
-	pending                             map[pendingKey]*pendingCall
-	watchers                            map[uint64]*pendingWatcher
-	closed                              bool
+func (subscription *PendingSubscription) terminalError() error {
+	subscription.hub.mu.Lock()
+	defer subscription.hub.mu.Unlock()
+	if subscription.watcher.exhausted {
+		return &ObserverExhaustedError{LastDelivered: subscription.watcher.lastDelivered}
+	}
+	return subscription.watcher.err
 }
 
-// NewPendingBroker constructs a broker with explicit pending, subscriber, and
-// per-subscriber queue bounds.
-func NewPendingBroker(maxPending, maxObservers, observerQueue int) (*PendingBroker, error) {
-	if maxPending < 1 || maxPending > maximumPendingInteractions ||
-		maxObservers < 1 || maxObservers > maximumPendingObservers ||
-		observerQueue < 1 || observerQueue > maximumObserverQueue {
-		return nil, fmt.Errorf(
-			"pending broker bounds must be within pending=[1,%d] observers=[1,%d] queue=[1,%d]",
-			maximumPendingInteractions, maximumPendingObservers, maximumObserverQueue,
-		)
+// RunBinding is the exclusive stable-client ownership lease for one run. Its
+// release stops new requests but deliberately leaves accepted requests
+// respondable until they finish, preventing a run-terminal race.
+type RunBinding struct {
+	hub   *PendingHub
+	state *runBindingState
+	once  sync.Once
+}
+
+// Release prevents new requests. Capacity is reclaimed after every already
+// accepted interaction reaches its own terminal result.
+func (binding *RunBinding) Release() {
+	if binding == nil || binding.hub == nil || binding.state == nil {
+		return
 	}
-	perObserverBytes := maximumObserverQueuedBytes
-	if observerQueue <= maximumObserverQueuedBytes/maximumPendingDeltaBytes {
-		perObserverBytes = observerQueue * maximumPendingDeltaBytes
+	binding.once.Do(func() {
+		binding.hub.mu.Lock()
+		binding.state.accepting = false
+		binding.hub.removeReleasedBindingLocked(binding.state)
+		binding.hub.mu.Unlock()
+	})
+}
+
+// ClientID returns the stable client identity owning the lease.
+func (binding *RunBinding) ClientID() string {
+	if binding == nil || binding.state == nil {
+		return ""
 	}
-	if maxObservers > maximumObserverBytes/perObserverBytes {
-		return nil, fmt.Errorf("pending observer aggregate byte budget exceeds %d", maximumObserverBytes)
+	return binding.state.clientID
+}
+
+// RunID returns the bound run identity.
+func (binding *RunBinding) RunID() string {
+	if binding == nil || binding.state == nil {
+		return ""
 	}
-	return &PendingBroker{
-		maxPending: maxPending, maxObservers: maxObservers, queueSize: observerQueue,
-		pending: make(map[pendingKey]*pendingCall), watchers: make(map[uint64]*pendingWatcher),
+	return binding.state.runID
+}
+
+// WaitReleased waits until Release has stopped admission and all interactions
+// accepted before that point have reached a terminal result.
+func (binding *RunBinding) WaitReleased(ctx context.Context) error {
+	if binding == nil || binding.state == nil {
+		return errors.New("pending run binding is nil")
+	}
+	if ctx == nil {
+		return errors.New("pending run binding wait context is nil")
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-binding.state.released:
+		return nil
+	}
+}
+
+// PendingHub implements interaction.Broker while partitioning discovery by
+// stable client identity. One lock owns routing, revisions, caps, queue
+// reservations, and accounting.
+type PendingHub struct {
+	mu              sync.Mutex
+	limits          PendingLimits
+	pendingCount    int
+	pendingBytes    int
+	observerCount   int
+	queuedEntries   int
+	queuedBytes     int
+	reservedEntries int
+	reservedBytes   int
+	partitions      map[string]*pendingPartition
+	runs            map[string]*runBindingState
+	watcherWG       sync.WaitGroup
+	closeDone       chan struct{}
+	closed          bool
+}
+
+var _ interaction.Broker = (*PendingHub)(nil)
+
+// NewPendingHub constructs a bounded, client-partitioned interaction hub.
+func NewPendingHub(limits PendingLimits) (*PendingHub, error) {
+	if err := validatePendingLimits(limits); err != nil {
+		return nil, err
+	}
+	return &PendingHub{
+		limits:     limits,
+		partitions: make(map[string]*pendingPartition), runs: make(map[string]*runBindingState),
+		closeDone: make(chan struct{}),
 	}, nil
+}
+
+func validatePendingLimits(limits PendingLimits) error {
+	if err := validatePendingCountLimits(limits); err != nil {
+		return err
+	}
+	if err := validatePendingByteLimits(limits); err != nil {
+		return err
+	}
+	return validatePendingReservationFunding(limits)
+}
+
+func validatePendingCountLimits(limits PendingLimits) error {
+	if limits.Clients < 1 || limits.Clients > maximumPendingClients {
+		return fmt.Errorf("pending clients must be within [1,%d]", maximumPendingClients)
+	}
+	for _, bound := range []struct {
+		label     string
+		global    int
+		perClient int
+		maximum   int
+	}{
+		{"runs", limits.Runs, limits.RunsPerClient, maximumPendingRuns},
+		{"interactions", limits.Pending, limits.PendingPerClient, maximumPendingInteractions},
+		{"observers", limits.Observers, limits.ObserversPerClient, maximumPendingObservers},
+	} {
+		if err := validateGlobalClientBound(bound.label, bound.global, bound.perClient, bound.maximum); err != nil {
+			return err
+		}
+	}
+	if limits.ObserverQueueEntries < 1 || limits.ObserverQueueEntries > maximumObserverQueue {
+		return fmt.Errorf("pending observer queue entries must be within [1,%d]", maximumObserverQueue)
+	}
+	if err := validateGlobalClientBound(
+		"reserved queue entries", limits.ReservedQueueEntries,
+		limits.ReservedQueueEntriesPerClient, maximumObserverEntries,
+	); err != nil {
+		return err
+	}
+	if err := validateGlobalClientBound(
+		"actual queue entries", limits.QueuedEntries,
+		limits.QueuedEntriesPerClient, maximumObserverEntries,
+	); err != nil {
+		return err
+	}
+	if limits.ReservedQueueEntries < limits.ObserverQueueEntries ||
+		limits.ReservedQueueEntriesPerClient < limits.ObserverQueueEntries {
+		return errors.New("pending reserved queue entries must cover one observer queue")
+	}
+	if limits.QueuedEntries < limits.ReservedQueueEntries ||
+		limits.QueuedEntriesPerClient < limits.ReservedQueueEntriesPerClient {
+		return errors.New("pending actual queue entries must cover reserved queue entries")
+	}
+	return nil
+}
+
+func validatePendingByteLimits(limits PendingLimits) error {
+	if err := validateGlobalClientBound(
+		"pending bytes", limits.PendingBytes, limits.PendingBytesPerClient, maximumPendingBytes,
+	); err != nil {
+		return err
+	}
+	if limits.ObserverQueueBytes < 1 || limits.ObserverQueueBytes > maximumObserverQueuedBytes {
+		return fmt.Errorf("pending observer queue bytes must be within [1,%d]", maximumObserverQueuedBytes)
+	}
+	if err := validateGlobalClientBound(
+		"reserved queue bytes", limits.ReservedQueueBytes,
+		limits.ReservedQueueBytesPerClient, maximumObserverBytes,
+	); err != nil {
+		return err
+	}
+	if err := validateGlobalClientBound(
+		"actual queue bytes", limits.QueuedBytes, limits.QueuedBytesPerClient, maximumObserverBytes,
+	); err != nil {
+		return err
+	}
+	if limits.ReservedQueueBytes < limits.ObserverQueueBytes ||
+		limits.ReservedQueueBytesPerClient < limits.ObserverQueueBytes {
+		return errors.New("pending reserved queue bytes must cover one observer queue")
+	}
+	if limits.QueuedBytes < limits.ReservedQueueBytes ||
+		limits.QueuedBytesPerClient < limits.ReservedQueueBytesPerClient {
+		return errors.New("pending actual queue bytes must cover reserved queue bytes")
+	}
+	return nil
+}
+
+func validateGlobalClientBound(label string, global, perClient, maximum int) error {
+	if global < 1 || global > maximum || perClient < 1 || perClient > global {
+		return fmt.Errorf("pending %s must be within [1,%d] with per-client no greater than global", label, maximum)
+	}
+	return nil
+}
+
+func validatePendingReservationFunding(limits PendingLimits) error {
+	if limits.ReservedQueueEntries/limits.ObserverQueueEntries < limits.Observers ||
+		limits.ReservedQueueEntriesPerClient/limits.ObserverQueueEntries < limits.ObserversPerClient ||
+		limits.ReservedQueueBytes/limits.ObserverQueueBytes < limits.Observers ||
+		limits.ReservedQueueBytesPerClient/limits.ObserverQueueBytes < limits.ObserversPerClient {
+		return errors.New("pending global queue reservations cannot cover the configured observer bound")
+	}
+	return nil
+}
+
+// BindRun exclusively assigns a run to one stable client. The returned lease
+// must be released after the run terminates.
+func (hub *PendingHub) BindRun(clientID string, scope interaction.Scope) (*RunBinding, error) {
+	if hub == nil {
+		return nil, ErrPendingHubClosed
+	}
+	if err := boundedToken("client ID", clientID); err != nil {
+		return nil, err
+	}
+	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+	if hub.closed {
+		return nil, ErrPendingHubClosed
+	}
+	if _, exists := hub.runs[scope.RunID()]; exists {
+		return nil, fmt.Errorf("%w: %s", ErrRunAlreadyBound, scope.RunID())
+	}
+	if len(hub.runs) >= hub.limits.Runs {
+		return nil, ErrRunBindingCapacity
+	}
+	partition, err := hub.partitionLocked(clientID, true)
+	if err != nil {
+		if errors.Is(err, errPendingClientCapacity) {
+			return nil, fmt.Errorf("%w: client partitions", ErrRunBindingCapacity)
+		}
+		return nil, err
+	}
+	if partition == nil {
+		return nil, fmt.Errorf("%w: client partition unavailable", ErrRunBindingCapacity)
+	}
+	if partition.boundRuns >= hub.limits.RunsPerClient {
+		return nil, ErrRunBindingCapacity
+	}
+	state := &runBindingState{
+		clientID: clientID, runID: scope.RunID(), accepting: true, released: make(chan struct{}),
+	}
+	hub.runs[state.runID] = state
+	partition.boundRuns++
+	return &RunBinding{hub: hub, state: state}, nil
+}
+
+func (hub *PendingHub) partitionLocked(clientID string, create bool) (*pendingPartition, error) {
+	partition := hub.partitions[clientID]
+	if partition != nil || !create {
+		return partition, nil
+	}
+	if len(hub.partitions) >= hub.limits.Clients {
+		return nil, errPendingClientCapacity
+	}
+	partition = &pendingPartition{
+		pending:  make(map[pendingKey]*pendingCall),
+		watchers: make(map[uint64]*pendingWatcher), stopping: make(map[*pendingWatcher]struct{}),
+	}
+	hub.partitions[clientID] = partition
+	return partition, nil
 }
 
 func makePendingKey(scope interaction.Scope, id interaction.ID) pendingKey {
 	return pendingKey{runID: scope.RunID(), interactionID: id}
 }
 
-// Request publishes and awaits one run-scoped interaction.
-func (broker *PendingBroker) Request(ctx context.Context, scope interaction.Scope, request interaction.Request) (interaction.Response, error) {
-	if broker == nil {
-		return interaction.Response{}, ErrBrokerClosed
+// Request publishes and awaits one interaction in its bound client partition.
+func (hub *PendingHub) Request(ctx context.Context, scope interaction.Scope, request interaction.Request) (interaction.Response, error) {
+	if hub == nil {
+		return interaction.Response{}, ErrPendingHubClosed
 	}
 	if ctx == nil {
 		return interaction.Response{}, errors.New("pending interaction context is nil")
@@ -210,46 +540,72 @@ func (broker *PendingBroker) Request(ctx context.Context, scope interaction.Scop
 		return interaction.Response{}, err
 	}
 	key := makePendingKey(scope, request.ID())
-	call := &pendingCall{value: clonePending(Pending{Scope: scope, Request: request}), done: make(chan struct{})}
-	broker.mu.Lock()
-	if broker.closed {
-		broker.mu.Unlock()
-		return interaction.Response{}, ErrBrokerClosed
+	hub.mu.Lock()
+	if hub.closed {
+		hub.mu.Unlock()
+		return interaction.Response{}, ErrPendingHubClosed
 	}
-	if _, exists := broker.pending[key]; exists {
-		broker.mu.Unlock()
+	binding := hub.runs[scope.RunID()]
+	if binding == nil || !binding.accepting {
+		hub.mu.Unlock()
+		return interaction.Response{}, ErrRunNotBound
+	}
+	partition := hub.partitions[binding.clientID]
+	if partition == nil {
+		hub.mu.Unlock()
+		return interaction.Response{}, ErrRunNotBound
+	}
+	if _, exists := partition.pending[key]; exists {
+		hub.mu.Unlock()
 		return interaction.Response{}, errors.New("interaction is already pending")
 	}
-	pendingBytes := pendingValueBytes(call.value)
-	if len(broker.pending) >= broker.maxPending || pendingBytes > maximumPendingBytes ||
-		broker.pendingBytes > maximumPendingBytes-pendingBytes {
-		broker.mu.Unlock()
-		return interaction.Response{}, errors.New("pending interaction capacity exhausted")
+	size := pendingValueBytes(Pending{Scope: scope, Request: request})
+	if !hub.hasPendingCapacity(partition, size) {
+		hub.mu.Unlock()
+		return interaction.Response{}, ErrPendingCapacity
 	}
-	requiredRevisions := uint64(len(broker.pending)) + 2 // open plus one reserved close for every pending call.
-	if broker.revision > math.MaxUint64-requiredRevisions {
-		broker.mu.Unlock()
-		return interaction.Response{}, errors.New("pending interaction revision capacity exhausted")
+	required := uint64(len(partition.pending)) + 2
+	if partition.revision > math.MaxUint64-required {
+		hub.mu.Unlock()
+		return interaction.Response{}, fmt.Errorf("%w: revision exhausted", ErrPendingCapacity)
 	}
-	broker.pending[key] = call
-	broker.pendingBytes += pendingBytes
-	broker.publishLocked(DeltaOpened, call.value)
-	broker.mu.Unlock()
+	call := &pendingCall{
+		value: clonePending(Pending{Scope: scope, Request: request}), binding: binding, done: make(chan struct{}),
+	}
+	partition.pending[key] = call
+	partition.pendingBytes += size
+	hub.pendingCount++
+	hub.pendingBytes += size
+	binding.active++
+	hub.publishLocked(partition, DeltaOpened, call.value)
+	hub.mu.Unlock()
 
 	select {
 	case <-call.done:
 		return cloneResponse(call.result.response), call.result.err
 	case <-ctx.Done():
-		result := broker.complete(key, call, pendingResult{err: ctx.Err()})
+		result, completed := hub.complete(key, call, pendingResult{err: ctx.Err()})
+		if !completed {
+			<-call.done
+		}
 		return cloneResponse(result.response), result.err
 	}
 }
 
-// Respond atomically commits the only response. Once it succeeds, cancellation
-// or broker shutdown cannot replace the accepted response.
-func (broker *PendingBroker) Respond(scope interaction.Scope, response interaction.Response) error {
-	if broker == nil {
-		return ErrBrokerClosed
+func (hub *PendingHub) hasPendingCapacity(partition *pendingPartition, size int) bool {
+	return hub.pendingCount < hub.limits.Pending && len(partition.pending) < hub.limits.PendingPerClient &&
+		size <= hub.limits.PendingBytes && hub.pendingBytes <= hub.limits.PendingBytes-size &&
+		size <= hub.limits.PendingBytesPerClient && partition.pendingBytes <= hub.limits.PendingBytesPerClient-size
+}
+
+// Respond completes only an interaction owned by clientID. A wrong client
+// cannot discover or answer another client's request.
+func (hub *PendingHub) Respond(clientID string, scope interaction.Scope, response interaction.Response) error {
+	if hub == nil {
+		return ErrPendingHubClosed
+	}
+	if err := boundedToken("client ID", clientID); err != nil {
+		return err
 	}
 	if err := scope.Validate(); err != nil {
 		return err
@@ -257,49 +613,78 @@ func (broker *PendingBroker) Respond(scope interaction.Scope, response interacti
 	if err := response.Validate(); err != nil {
 		return err
 	}
+	hub.mu.Lock()
+	if hub.closed {
+		hub.mu.Unlock()
+		return ErrPendingHubClosed
+	}
+	binding := hub.runs[scope.RunID()]
+	if binding == nil || binding.clientID != clientID {
+		hub.mu.Unlock()
+		return ErrRunNotBound
+	}
+	partition := hub.partitions[clientID]
+	if partition == nil {
+		hub.mu.Unlock()
+		return ErrRunNotBound
+	}
 	key := makePendingKey(scope, response.ID())
-	broker.mu.Lock()
-	if broker.closed {
-		broker.mu.Unlock()
-		return ErrBrokerClosed
+	call := partition.pending[key]
+	if call == nil {
+		hub.mu.Unlock()
+		return ErrInteractionNotPending
 	}
-	call, exists := broker.pending[key]
-	if !exists {
-		broker.mu.Unlock()
-		return errors.New("interaction is not pending")
-	}
-	delete(broker.pending, key)
-	broker.pendingBytes -= pendingValueBytes(call.value)
-	call.result = pendingResult{response: response.Clone()}
-	broker.publishLocked(DeltaClosed, call.value)
-	broker.mu.Unlock()
+	hub.finishCallLocked(partition, key, call, pendingResult{response: response.Clone()})
+	hub.mu.Unlock()
 	close(call.done)
 	return nil
 }
 
-func (broker *PendingBroker) complete(key pendingKey, call *pendingCall, proposed pendingResult) pendingResult {
-	broker.mu.Lock()
-	current, exists := broker.pending[key]
-	if exists && current == call {
-		delete(broker.pending, key)
-		broker.pendingBytes -= pendingValueBytes(call.value)
-		call.result = proposed
-		broker.publishLocked(DeltaClosed, call.value)
-		broker.mu.Unlock()
+func (hub *PendingHub) complete(key pendingKey, call *pendingCall, proposed pendingResult) (pendingResult, bool) {
+	hub.mu.Lock()
+	partition := hub.partitions[call.binding.clientID]
+	if partition != nil && partition.pending[key] == call {
+		hub.finishCallLocked(partition, key, call, proposed)
+		hub.mu.Unlock()
 		close(call.done)
-		return proposed
+		return proposed, true
 	}
 	result := call.result
-	broker.mu.Unlock()
-	<-call.done
-	return result
+	hub.mu.Unlock()
+	return result, false
 }
 
-// Subscribe atomically captures the complete sorted pending set and registers
-// its tail before releasing the broker lock. There is no snapshot-to-tail gap.
-func (broker *PendingBroker) Subscribe(ctx context.Context) (*PendingSubscription, error) {
-	if broker == nil {
-		return nil, ErrBrokerClosed
+func (hub *PendingHub) finishCallLocked(partition *pendingPartition, key pendingKey, call *pendingCall, result pendingResult) {
+	delete(partition.pending, key)
+	size := pendingValueBytes(call.value)
+	partition.pendingBytes -= size
+	hub.pendingCount--
+	hub.pendingBytes -= size
+	call.result = result
+	call.binding.active--
+	hub.publishLocked(partition, DeltaClosed, call.value)
+	hub.removeReleasedBindingLocked(call.binding)
+}
+
+func (hub *PendingHub) removeReleasedBindingLocked(binding *runBindingState) {
+	if binding == nil || binding.accepting || binding.active != 0 {
+		return
+	}
+	if hub.runs[binding.runID] == binding {
+		delete(hub.runs, binding.runID)
+		partition := hub.partitions[binding.clientID]
+		if partition != nil {
+			partition.boundRuns--
+		}
+		close(binding.released)
+	}
+}
+
+// Subscribe atomically captures one stable client's complete sorted pending
+// set and registers its tail before releasing the hub lock.
+func (hub *PendingHub) Subscribe(ctx context.Context, clientID string) (*PendingSubscription, error) {
+	if hub == nil {
+		return nil, ErrPendingHubClosed
 	}
 	if ctx == nil {
 		return nil, errors.New("pending subscription context is nil")
@@ -307,44 +692,75 @@ func (broker *PendingBroker) Subscribe(ctx context.Context) (*PendingSubscriptio
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	broker.mu.Lock()
-	if broker.closed {
-		broker.mu.Unlock()
-		return nil, ErrBrokerClosed
+	if err := boundedToken("client ID", clientID); err != nil {
+		return nil, err
 	}
-	if len(broker.watchers) >= broker.maxObservers {
-		broker.mu.Unlock()
-		return nil, errors.New("pending observer capacity exhausted")
+	hub.mu.Lock()
+	if hub.closed {
+		hub.mu.Unlock()
+		return nil, ErrPendingHubClosed
 	}
-	if broker.nextWatcher == math.MaxUint64 {
-		broker.mu.Unlock()
-		return nil, errors.New("pending observer identity capacity exhausted")
+	partition, err := hub.partitionLocked(clientID, true)
+	if err != nil {
+		hub.mu.Unlock()
+		if errors.Is(err, errPendingClientCapacity) {
+			return nil, fmt.Errorf("%w: client partitions", ErrObserverCapacity)
+		}
+		return nil, err
 	}
-	snapshot := broker.snapshotLocked()
-	broker.nextWatcher++
+	if partition == nil {
+		hub.mu.Unlock()
+		return nil, fmt.Errorf("%w: client partition unavailable", ErrObserverCapacity)
+	}
+	if hub.observerCount >= hub.limits.Observers || len(partition.watchers) >= hub.limits.ObserversPerClient {
+		hub.mu.Unlock()
+		return nil, ErrObserverCapacity
+	}
+	if partition.nextWatcher == math.MaxUint64 {
+		hub.mu.Unlock()
+		return nil, fmt.Errorf("%w: identity exhausted", ErrObserverCapacity)
+	}
+	if hub.reservedEntries > hub.limits.ReservedQueueEntries-hub.limits.ObserverQueueEntries ||
+		partition.reservedEntries > hub.limits.ReservedQueueEntriesPerClient-hub.limits.ObserverQueueEntries ||
+		hub.reservedBytes > hub.limits.ReservedQueueBytes-hub.limits.ObserverQueueBytes ||
+		partition.reservedBytes > hub.limits.ReservedQueueBytesPerClient-hub.limits.ObserverQueueBytes {
+		hub.mu.Unlock()
+		return nil, fmt.Errorf("%w: queue reservation", ErrObserverCapacity)
+	}
+	snapshot := hub.snapshotLocked(partition)
+	partition.nextWatcher++
+	id := partition.nextWatcher
 	watcher := &pendingWatcher{
-		queue: make(chan Delta, broker.queueSize), out: make(chan Delta),
-		stop: make(chan struct{}), done: make(chan struct{}), lastDelivered: snapshot.Revision,
+		hub: hub, partition: partition, id: id,
+		queue: make(chan queuedDelta, hub.limits.ObserverQueueEntries), out: make(chan Delta),
+		stop: make(chan struct{}), done: make(chan struct{}), active: true,
+		lastDelivered: snapshot.Revision,
 	}
-	id := broker.nextWatcher
-	broker.watchers[id] = watcher
-	subscription := &PendingSubscription{broker: broker, id: id, snapshot: snapshot, watcher: watcher}
-	broker.mu.Unlock()
+	partition.watchers[id] = watcher
+	hub.observerCount++
+	hub.reservedEntries += hub.limits.ObserverQueueEntries
+	partition.reservedEntries += hub.limits.ObserverQueueEntries
+	hub.reservedBytes += hub.limits.ObserverQueueBytes
+	partition.reservedBytes += hub.limits.ObserverQueueBytes
+	subscription := &PendingSubscription{hub: hub, snapshot: snapshot, watcher: watcher}
+	hub.watcherWG.Add(1)
+	hub.mu.Unlock()
 
 	go watcher.deliver()
-	go func() {
-		select {
-		case <-ctx.Done():
-			broker.detachWatcher(id, watcher, ctx.Err(), false)
-		case <-watcher.done:
-		}
-	}()
+	stopContext := context.AfterFunc(ctx, func() { hub.detachWatcher(watcher, ctx.Err(), false) })
+	hub.mu.Lock()
+	if watcher.active {
+		watcher.stopContext = stopContext
+	} else {
+		stopContext()
+	}
+	hub.mu.Unlock()
 	return subscription, nil
 }
 
-func (broker *PendingBroker) snapshotLocked() PendingSnapshot {
-	values := make([]Pending, 0, len(broker.pending))
-	for _, call := range broker.pending {
+func (hub *PendingHub) snapshotLocked(partition *pendingPartition) PendingSnapshot {
+	values := make([]Pending, 0, len(partition.pending))
+	for _, call := range partition.pending {
 		values = append(values, clonePending(call.value))
 	}
 	sort.Slice(values, func(first, second int) bool {
@@ -354,148 +770,265 @@ func (broker *PendingBroker) snapshotLocked() PendingSnapshot {
 		}
 		return values[first].Request.ID() < values[second].Request.ID()
 	})
-	return PendingSnapshot{Revision: broker.revision, Pending: values}
+	return PendingSnapshot{Revision: partition.revision, Pending: values}
 }
 
-func (broker *PendingBroker) publishLocked(kind DeltaKind, pending Pending) {
-	broker.revision++
-	delta := Delta{Revision: broker.revision, Kind: kind, Pending: clonePending(pending)}
-	for id, watcher := range broker.watchers {
-		if !watcher.enqueue(delta) {
-			delete(broker.watchers, id)
-			watcher.finishImmediate(nil, true)
+func (hub *PendingHub) publishLocked(partition *pendingPartition, kind DeltaKind, pending Pending) {
+	partition.revision++
+	delta := Delta{Revision: partition.revision, Kind: kind, Pending: clonePending(pending)}
+	ids := sortedWatcherIDs(partition.watchers)
+	for _, id := range ids {
+		watcher := partition.watchers[id]
+		if watcher != nil && !hub.enqueueLocked(watcher, delta) {
+			hub.finishWatcherLocked(watcher, nil, true)
 		}
 	}
 }
 
-func (broker *PendingBroker) detachWatcher(id uint64, expected *pendingWatcher, err error, exhausted bool) {
-	broker.mu.Lock()
-	watcher, exists := broker.watchers[id]
-	if exists && watcher == expected {
-		delete(broker.watchers, id)
+func (hub *PendingHub) enqueueLocked(watcher *pendingWatcher, delta Delta) bool {
+	if !watcher.active || watcher.queuedCount >= hub.limits.ObserverQueueEntries {
+		return false
 	}
-	broker.mu.Unlock()
-	if !exists {
-		expected.finishImmediate(err, exhausted)
-	} else if watcher == expected {
-		watcher.finishImmediate(err, exhausted)
+	size := pendingDeltaBytes(delta)
+	if size > hub.limits.ObserverQueueBytes || watcher.queuedBytes > hub.limits.ObserverQueueBytes-size ||
+		hub.queuedEntries >= hub.limits.QueuedEntries ||
+		watcher.partition.queuedEntries >= hub.limits.QueuedEntriesPerClient ||
+		size > hub.limits.QueuedBytes || hub.queuedBytes > hub.limits.QueuedBytes-size ||
+		size > hub.limits.QueuedBytesPerClient ||
+		watcher.partition.queuedBytes > hub.limits.QueuedBytesPerClient-size {
+		return false
+	}
+	item := queuedDelta{delta: cloneDelta(delta), bytes: size}
+	select {
+	case watcher.queue <- item:
+		watcher.queuedCount++
+		watcher.queuedBytes += size
+		watcher.partition.queuedEntries++
+		watcher.partition.queuedBytes += size
+		hub.queuedEntries++
+		hub.queuedBytes += size
+		return true
+	default:
+		return false
 	}
 }
 
 func (watcher *pendingWatcher) deliver() {
-	defer close(watcher.out)
-	defer close(watcher.done)
+	defer func() {
+		watcher.discardQueued()
+		close(watcher.out)
+		close(watcher.done)
+		watcher.hub.watcherStopped(watcher)
+		watcher.hub.watcherWG.Done()
+	}()
 	for {
 		select {
 		case <-watcher.stop:
 			return
-		case delta, open := <-watcher.queue:
-			if !open {
-				return
-			}
+		case item := <-watcher.queue:
 			select {
 			case <-watcher.stop:
 				return
-			case watcher.out <- cloneDelta(delta):
-				watcher.mu.Lock()
-				watcher.lastDelivered = delta.Revision
-				watcher.queuedBytes -= pendingDeltaBytes(delta)
-				watcher.mu.Unlock()
+			case watcher.out <- cloneDelta(item.delta):
+				watcher.hub.delivered(watcher, item)
 			}
 		}
 	}
 }
 
-func (watcher *pendingWatcher) enqueue(delta Delta) bool {
-	size := pendingDeltaBytes(delta)
-	watcher.mu.Lock()
-	defer watcher.mu.Unlock()
-	if size > maximumObserverQueuedBytes || watcher.queuedBytes > maximumObserverQueuedBytes-size {
-		return false
-	}
-	watcher.queuedBytes += size
-	select {
-	case watcher.queue <- delta:
-		return true
-	default:
-		watcher.queuedBytes -= size
-		return false
+func (watcher *pendingWatcher) discardQueued() {
+	for {
+		select {
+		case <-watcher.queue:
+		default:
+			return
+		}
 	}
 }
 
-func (watcher *pendingWatcher) finishImmediate(err error, exhausted bool) {
-	watcher.setTerminal(err, exhausted)
-	watcher.stopOnce.Do(func() { close(watcher.stop) })
+func (hub *PendingHub) delivered(watcher *pendingWatcher, item queuedDelta) {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+	if item.delta.Revision > watcher.lastDelivered {
+		watcher.lastDelivered = item.delta.Revision
+	}
+	if !watcher.active {
+		return
+	}
+	watcher.queuedCount--
+	watcher.queuedBytes -= item.bytes
+	watcher.partition.queuedEntries--
+	watcher.partition.queuedBytes -= item.bytes
+	hub.queuedEntries--
+	hub.queuedBytes -= item.bytes
 }
 
-func (watcher *pendingWatcher) finishDraining(err error) {
-	watcher.setTerminal(err, false)
-	watcher.queueOnce.Do(func() { close(watcher.queue) })
+func (hub *PendingHub) detachWatcher(watcher *pendingWatcher, err error, exhausted bool) {
+	hub.mu.Lock()
+	hub.finishWatcherLocked(watcher, err, exhausted)
+	hub.mu.Unlock()
 }
 
-func (watcher *pendingWatcher) setTerminal(err error, exhausted bool) {
-	watcher.terminalOnce.Do(func() {
-		watcher.mu.Lock()
-		watcher.err = err
-		watcher.exhausted = exhausted
-		watcher.mu.Unlock()
+func (hub *PendingHub) finishWatcherLocked(watcher *pendingWatcher, err error, exhausted bool) {
+	if watcher == nil || !watcher.active {
+		return
+	}
+	watcher.active = false
+	watcher.err = err
+	watcher.exhausted = exhausted
+	delete(watcher.partition.watchers, watcher.id)
+	watcher.partition.stopping[watcher] = struct{}{}
+	hub.observerCount--
+	hub.queuedEntries -= watcher.queuedCount
+	hub.queuedBytes -= watcher.queuedBytes
+	watcher.partition.queuedEntries -= watcher.queuedCount
+	watcher.partition.queuedBytes -= watcher.queuedBytes
+	watcher.queuedBytes = 0
+	watcher.queuedCount = 0
+	hub.reservedEntries -= hub.limits.ObserverQueueEntries
+	watcher.partition.reservedEntries -= hub.limits.ObserverQueueEntries
+	hub.reservedBytes -= hub.limits.ObserverQueueBytes
+	watcher.partition.reservedBytes -= hub.limits.ObserverQueueBytes
+	if watcher.stopContext != nil {
+		watcher.stopContext()
+		watcher.stopContext = nil
+	}
+	close(watcher.stop)
+}
+
+func (hub *PendingHub) watcherStopped(watcher *pendingWatcher) {
+	hub.mu.Lock()
+	delete(watcher.partition.stopping, watcher)
+	hub.mu.Unlock()
+}
+
+// FenceObservers immediately terminates a stable client's current discovery
+// streams. It preserves that client's revision and pending calls for a new
+// complete-first subscription after reconnect.
+func (hub *PendingHub) FenceObservers(clientID string) error {
+	if hub == nil {
+		return ErrPendingHubClosed
+	}
+	if err := boundedToken("client ID", clientID); err != nil {
+		return err
+	}
+	hub.mu.Lock()
+	if hub.closed {
+		done := hub.closeDone
+		hub.mu.Unlock()
+		<-done
+		return ErrPendingHubClosed
+	}
+	partition := hub.partitions[clientID]
+	if partition == nil {
+		hub.mu.Unlock()
+		return nil
+	}
+	watchers := make([]*pendingWatcher, 0, len(partition.watchers)+len(partition.stopping))
+	for watcher := range partition.stopping {
+		watchers = append(watchers, watcher)
+	}
+	for _, id := range sortedWatcherIDs(partition.watchers) {
+		watcher := partition.watchers[id]
+		watchers = append(watchers, watcher)
+		hub.finishWatcherLocked(watcher, ErrObserverFenced, false)
+	}
+	sort.Slice(watchers, func(first, second int) bool { return watchers[first].id < watchers[second].id })
+	hub.mu.Unlock()
+	for _, watcher := range watchers {
+		<-watcher.done
+	}
+	return nil
+}
+
+func sortedWatcherIDs(watchers map[uint64]*pendingWatcher) []uint64 {
+	ids := make([]uint64, 0, len(watchers))
+	for id := range watchers {
+		ids = append(ids, id)
+	}
+	slices.Sort(ids)
+	return ids
+}
+
+// Close releases pending callers, immediately stops every observer without
+// waiting for clients to read queued deltas, and joins their delivery loops.
+func (hub *PendingHub) Close() {
+	if hub == nil {
+		return
+	}
+	hub.mu.Lock()
+	if hub.closed {
+		done := hub.closeDone
+		hub.mu.Unlock()
+		<-done
+		return
+	}
+	hub.closed = true
+	bindings := make([]*runBindingState, 0, len(hub.runs))
+	for _, binding := range hub.runs {
+		bindings = append(bindings, binding)
+	}
+	sort.Slice(bindings, func(first, second int) bool {
+		if bindings[first].clientID != bindings[second].clientID {
+			return bindings[first].clientID < bindings[second].clientID
+		}
+		return bindings[first].runID < bindings[second].runID
 	})
-}
-
-func (watcher *pendingWatcher) terminalError() error {
-	watcher.mu.Lock()
-	defer watcher.mu.Unlock()
-	if watcher.exhausted {
-		return &ObserverExhaustedError{LastDelivered: watcher.lastDelivered}
+	for _, binding := range bindings {
+		binding.accepting = false
 	}
-	return watcher.err
-}
-
-// Close commits broker shutdown without blocking on clients. Requests are
-// released immediately; each subscription drains its already-bounded queue.
-func (broker *PendingBroker) Close() {
-	if broker == nil {
-		return
-	}
-	broker.mu.Lock()
-	if broker.closed {
-		broker.mu.Unlock()
-		return
-	}
-	broker.closed = true
 	type keyedCall struct {
-		key  pendingKey
-		call *pendingCall
+		clientID string
+		key      pendingKey
+		call     *pendingCall
 	}
-	calls := make([]keyedCall, 0, len(broker.pending))
-	for key, call := range broker.pending {
-		calls = append(calls, keyedCall{key: key, call: call})
+	calls := make([]keyedCall, 0, hub.pendingCount)
+	for clientID, partition := range hub.partitions {
+		for key, call := range partition.pending {
+			calls = append(calls, keyedCall{clientID: clientID, key: key, call: call})
+		}
 	}
 	sort.Slice(calls, func(first, second int) bool {
+		if calls[first].clientID != calls[second].clientID {
+			return calls[first].clientID < calls[second].clientID
+		}
 		if calls[first].key.runID != calls[second].key.runID {
 			return calls[first].key.runID < calls[second].key.runID
 		}
 		return calls[first].key.interactionID < calls[second].key.interactionID
 	})
 	for _, value := range calls {
-		delete(broker.pending, value.key)
-		call := value.call
-		broker.pendingBytes -= pendingValueBytes(call.value)
-		call.result = pendingResult{err: ErrBrokerClosed}
-		broker.publishLocked(DeltaClosed, call.value)
+		partition := hub.partitions[value.clientID]
+		if partition == nil {
+			value.call.result = pendingResult{err: ErrPendingHubClosed}
+			value.call.binding.active--
+			continue
+		}
+		hub.finishCallLocked(partition, value.key, value.call, pendingResult{err: ErrPendingHubClosed})
 	}
-	watchers := make([]*pendingWatcher, 0, len(broker.watchers))
-	for id, watcher := range broker.watchers {
-		delete(broker.watchers, id)
-		watchers = append(watchers, watcher)
+	for _, binding := range bindings {
+		hub.removeReleasedBindingLocked(binding)
 	}
-	broker.mu.Unlock()
+	clientIDs := make([]string, 0, len(hub.partitions))
+	for clientID := range hub.partitions {
+		clientIDs = append(clientIDs, clientID)
+	}
+	sort.Strings(clientIDs)
+	for _, clientID := range clientIDs {
+		partition := hub.partitions[clientID]
+		if partition == nil {
+			continue
+		}
+		for _, id := range sortedWatcherIDs(partition.watchers) {
+			hub.finishWatcherLocked(partition.watchers[id], ErrPendingHubClosed, false)
+		}
+	}
+	hub.mu.Unlock()
 	for _, value := range calls {
 		close(value.call.done)
 	}
-	for _, watcher := range watchers {
-		watcher.finishDraining(ErrBrokerClosed)
-	}
+	hub.watcherWG.Wait()
+	close(hub.closeDone)
 }
 
 func clonePending(value Pending) Pending {

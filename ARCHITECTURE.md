@@ -71,11 +71,14 @@ The public `daemon` package is the transport-independent host seam. A generated
 server-side model/turn policy. Stable cryptographic client identities use
 compare-and-swap ownership epochs derived from the daemon root context. A
 bounded per-client idempotency ledger commits canonical success, business
-failure, or secret-safe uncertain outcomes. `PendingBroker` is both the kernel
-interaction broker and the complete-first discovery source: a subscription
-atomically captures a sorted snapshot and its gap-free revisioned tail. These
-primitives contain no gRPC, Protobuf translation, listener, endpoint, or OS IPC
-behavior.
+failure, or secret-safe uncertain outcomes. `PendingHub` is both the kernel
+interaction broker and the stable-client-partitioned discovery source. Explicit
+run bindings route accepted prompts to one client; each subscription atomically
+captures that client's sorted complete snapshot and gap-free revisioned tail.
+Reconnect fencing joins old observer delivery before returning. Global and
+per-client run, prompt, observer, and queue budgets bound retained state, and
+shutdown joins delivery while releasing every binding. These primitives contain
+no gRPC, Protobuf translation, listener, endpoint, or OS IPC behavior.
 
 `common/v1` and `engine/v1` are the only initial Protobuf process boundary.
 They encode protocol negotiation, typed status, server-owned definitions,

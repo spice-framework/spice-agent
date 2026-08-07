@@ -96,8 +96,10 @@ generated Go, handwritten boundary validation, compatibility/freshness gate,
 protocol tests, and fuzz smoke are green. This is intentionally not a daemon.
 The transport-independent foundation of slice 2 is also implemented: immutable
 server definitions, root-owned reconnect CAS sessions, bounded per-client
-idempotency, and an atomic complete-first pending-interaction broker. It adds no
-listener or RPC adapter. The kernel now also exposes transactional prepared
+idempotency, and a stable-client-partitioned pending-interaction hub with
+explicit run-binding leases, independent complete-first revisions, reconnect
+fencing, global/per-client retention budgets, and joined observer shutdown. It
+adds no listener or RPC adapter. The kernel now also exposes transactional prepared
 start/resume handles: preparation yields a stable run ID and exact leased plan
 without registration or execution, then commit accepts the separately owned run
 root. This is the authority-acquisition seam, not an authority implementation.
