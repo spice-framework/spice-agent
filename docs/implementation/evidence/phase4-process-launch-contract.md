@@ -43,6 +43,12 @@ three process fuzz targets passed two-second smoke runs; `make fast` passed in 6
 and the final `make check` passed in 61.3 seconds with repository architecture,
 formatting, module/vendor, Protobuf, vet, and test gates green.
 
+Commit `5d2fd63` passed the exact repository `make verify` gate in 152.5
+seconds at 85.2% handwritten-product coverage. The gate included all three
+process fuzz targets, shuffled and race-enabled tests, zero lint findings, no
+reachable vulnerabilities, and vendor-offline execution under Go 1.26.5 on
+Windows/amd64.
+
 ## Explicit exclusions
 
 Core contains no `os/exec` launcher, process registry, reflective construction,

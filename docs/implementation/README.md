@@ -257,6 +257,20 @@ actual injected shell, and stops it on normal exit. Full verification passed in
 freshness, shuffled/race tests, and vendor-offline execution. This proves the
 compiled presentation boundary; it does not yet claim distribution-managed
 process startup, reconnect, or a real Windows/Linux terminal workflow.
+The reference distribution now commits a second generated Spice application,
+`spice-agentd`, at `spice-agent-coding` commit `4c13deb`. The target constructs
+the authenticated local gRPC service, endpoint publication, run host, provider,
+compiled tools, lifecycle hooks, and current-user root registry through the
+generated bean graph. Its managed launcher attaches Windows children to a Job
+Object before resume and uses a gated process-root protocol plus explicit
+descendant registration on Unix; root outcome and containment/resource joining
+remain separate ownership facts. `make verify` passed in 99.9 seconds at 89.5%
+handwritten-product coverage with generated freshness, shuffled and race tests,
+zero lint findings, no reachable vulnerabilities, and vendor-offline proof.
+Focused Windows process tests and WSL2 Linux process/race tests passed, and the
+platform sources compile for Darwin amd64/arm64. The Unix implementation
+deliberately does not claim universal containment of arbitrary daemonizing
+binaries.
 Transactional `PrepareStart` and `PrepareResumeSnapshot` handles now provide the
 kernel seam required for authority-before-publish hosting. They acquire and
 validate the exact execution resources without engine registration, events, or
@@ -264,11 +278,12 @@ execution; one commit supplies the run-root context, while abort releases once.
 See
 [`evidence/phase4-kernel-preparation.md`](evidence/phase4-kernel-preparation.md).
 The schema is not the final Phase 4 freeze. The host, authenticated local IPC,
-and managed-candidate libraries now prove those repaired contracts, but the
-distribution must still supply real daemon process ownership and generated
-daemon/TUI application wiring, exercise one-command and explicit attach through
-installed Windows/Linux processes and terminals, and resolve or bound the
-engine's service-lifetime run-identity tombstones.
+managed-candidate libraries, and generated explicit-serve daemon now prove
+those repaired contracts. The distribution must still route every compiled
+coding-tool process through its injected resolver/launcher, generate the
+managed-client/TUI application, exercise one-command and explicit attach
+through installed Windows/Linux processes and terminals, and resolve or bound
+the engine's service-lifetime run-identity tombstones.
 
 ## Phase 5.0A execution prerequisite
 
@@ -341,6 +356,10 @@ and runtime acceptance still requires a macOS runner.
 - Current Phase 3 distribution proof: `spice-agent-coding` `4cfd19a` (provider
   `4beed383`, coding tools `17cbef3b`);
   `make verify` 73.8s, 86.4% coverage.
+- Process lookup/launch ownership contracts: `spice-agent` `5d2fd63`;
+  `make verify` 152.5s, 85.2% coverage.
+- Generated explicit-serve daemon and managed process boundary:
+  `spice-agent-coding` `4c13deb`; `make verify` 99.9s, 89.5% coverage.
 
 Active follow-up slices are not recorded as completed evidence until their
 repositories publish green commits.
