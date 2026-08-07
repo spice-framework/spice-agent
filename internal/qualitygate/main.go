@@ -78,6 +78,12 @@ func run(ctx context.Context, root, mode string) error {
 	tests := step{"tests", func() error {
 		return command(ctx, root, productEnvironment, "go", "test", "-shuffle=on", "-count=1", "./...")
 	}}
+	acceptanceScope := step{"acceptance endpoint scope", func() error {
+		return command(
+			ctx, root, productEnvironment,
+			"go", "test", "-tags=spice_acceptance", "-shuffle=on", "-count=1", "./daemon/endpoint",
+		)
+	}}
 	steps := []step{identity, diffHygiene, tests}
 	if mode == "coverage" {
 		steps = []step{identity, diffHygiene, {"coverage", func() error {
@@ -94,6 +100,7 @@ func run(ctx context.Context, root, mode string) error {
 			{"architecture", func() error { return checkArchitecture(root) }},
 			{"go vet", func() error { return command(ctx, root, productEnvironment, "go", "vet", "./...") }},
 			tests,
+			acceptanceScope,
 		}
 	}
 	if mode == "verify" {
@@ -103,6 +110,12 @@ func run(ctx context.Context, root, mode string) error {
 			step{"security", func() error { return security(ctx, root) }},
 			step{"race tests", func() error {
 				return command(ctx, root, productEnvironment, "go", "test", "-race", "-shuffle=on", "-count=1", "./...")
+			}},
+			step{"acceptance endpoint scope race", func() error {
+				return command(
+					ctx, root, productEnvironment,
+					"go", "test", "-race", "-tags=spice_acceptance", "-shuffle=on", "-count=1", "./daemon/endpoint",
+				)
 			}},
 			step{"fuzz smoke", func() error { return fuzz(ctx, root, productEnvironment) }},
 			step{"coverage", func() error { return coverage(ctx, root, productEnvironment) }},
