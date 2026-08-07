@@ -11,14 +11,15 @@ import (
 )
 
 type Active struct {
-	mu            sync.Mutex
-	store         *Store
-	lock          *stableLock
-	runID         string
-	runGeneration uint64
-	suspended     *snapshotRecord
-	uncertain     bool
-	closed        bool
+	mu               sync.Mutex
+	store            *Store
+	lock             *stableLock
+	runID            string
+	runGeneration    uint64
+	suspended        *snapshotRecord
+	uncertain        bool
+	snapshotIssueErr error
+	closed           bool
 }
 
 func (active *Active) RunGeneration() uint64 {
@@ -28,6 +29,44 @@ func (active *Active) RunGeneration() uint64 {
 	active.mu.Lock()
 	defer active.mu.Unlock()
 	return active.runGeneration
+}
+
+// SnapshotIssueError classifies the last failed snapshot issuance without
+// exposing platform, key, or signer details. It is safe to call after a
+// concurrent signing attempt completes.
+func (active *Active) SnapshotIssueError() error {
+	if active == nil {
+		return ErrState
+	}
+	active.mu.Lock()
+	defer active.mu.Unlock()
+	if active.uncertain {
+		return ErrUncertain
+	}
+	if active.snapshotIssueErr != nil {
+		return active.snapshotIssueErr
+	}
+	return ErrState
+}
+
+// SnapshotIssuePreflight rejects an invalid run identity or a lease that is
+// already unable to issue before a caller's context can mask that state.
+func (active *Active) SnapshotIssuePreflight(runID string) error {
+	if active == nil {
+		return ErrState
+	}
+	active.mu.Lock()
+	defer active.mu.Unlock()
+	if active.uncertain {
+		return ErrUncertain
+	}
+	if active.snapshotIssueErr != nil {
+		return active.snapshotIssueErr
+	}
+	if active.closed || active.lock == nil || runID != active.runID {
+		return ErrState
+	}
+	return nil
 }
 
 func (active *Active) SignSnapshot(
@@ -77,6 +116,7 @@ func (active *Active) SignSnapshot(
 	if err != nil {
 		if attempted {
 			active.uncertain = true
+			active.snapshotIssueErr = ErrUncertain
 			active.store.markUncertain(active.runID)
 			return nil, enginev1.ErrSnapshotAuthoritySigning
 		}
@@ -168,13 +208,11 @@ func (active *Active) Close() error {
 		return nil
 	}
 	uncertain := active.uncertain
-	if err := active.finish(); err != nil {
-		return err
-	}
+	finishErr := active.finish()
 	if uncertain {
 		return ErrUncertain
 	}
-	return nil
+	return finishErr
 }
 
 func (active *Active) finish() error {
@@ -186,6 +224,9 @@ func (active *Active) finish() error {
 	active.closed = true
 	leaseErr := active.store.endLease()
 	if lockErr != nil || leaseErr != nil {
+		if !active.uncertain {
+			active.snapshotIssueErr = ErrUnavailable
+		}
 		return ErrUnavailable
 	}
 	return nil

@@ -160,7 +160,7 @@ func TestSnapshotAuthoritySignerVerifierFailureAndCancellationAreContained(t *te
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
+	t.Cleanup(cancel)
 	_, err := enginev1.NewSnapshotEnvelope(
 		timeoutCtx,
 		snapshotSignerFunc(func(ctx context.Context, _ enginev1.SnapshotAuthorityInput) (*enginev1.SnapshotAuthority, error) {
@@ -175,10 +175,13 @@ func TestSnapshotAuthoritySignerVerifierFailureAndCancellationAreContained(t *te
 
 	ignoringSignerStarted := make(chan struct{})
 	ignoringSignerRelease := make(chan struct{})
-	ignoringSignerResult := make(chan error, 1)
+	ignoringSignerResult := make(chan struct {
+		snapshot *enginev1.SnapshotEnvelope
+		err      error
+	}, 1)
 	ignoringSignerCtx, ignoringSignerCancel := context.WithCancel(context.Background())
 	go func() {
-		_, signingErr := enginev1.NewSnapshotEnvelope(
+		result, signingErr := enginev1.NewSnapshotEnvelope(
 			ignoringSignerCtx,
 			snapshotSignerFunc(func(_ context.Context, input enginev1.SnapshotAuthorityInput) (*enginev1.SnapshotAuthority, error) {
 				close(ignoringSignerStarted)
@@ -187,13 +190,62 @@ func TestSnapshotAuthoritySignerVerifierFailureAndCancellationAreContained(t *te
 			}),
 			"run-1", 42, enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED, []byte(snapshotPayload),
 		)
-		ignoringSignerResult <- signingErr
+		ignoringSignerResult <- struct {
+			snapshot *enginev1.SnapshotEnvelope
+			err      error
+		}{snapshot: result, err: signingErr}
 	}()
 	<-ignoringSignerStarted
 	ignoringSignerCancel()
 	close(ignoringSignerRelease)
-	if err = <-ignoringSignerResult; !errors.Is(err, context.Canceled) {
-		t.Fatalf("context-ignoring signer error = %v", err)
+	ignoringResult := <-ignoringSignerResult
+	if ignoringResult.err != nil || enginev1.ValidateSnapshotEnvelope(ignoringResult.snapshot) != nil {
+		t.Fatalf("context-ignoring successful signer = %#v, %v", ignoringResult.snapshot, ignoringResult.err)
+	}
+
+	for name, test := range map[string]struct {
+		signerErr error
+		wantErr   error
+	}{
+		"wrapped cancellation": {
+			signerErr: fmt.Errorf("signing cancelled: %w", context.Canceled),
+			wantErr:   context.Canceled,
+		},
+		"wrapped deadline": {
+			signerErr: fmt.Errorf("signing deadline: %w", context.DeadlineExceeded),
+			wantErr:   context.DeadlineExceeded,
+		},
+		"non-context failure during cancellation": {
+			signerErr: errors.New("signing-secret"),
+			wantErr:   enginev1.ErrSnapshotAuthoritySigning,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			cancelled, cancelNow := context.WithCancel(context.Background())
+			signerStarted := make(chan struct{})
+			signerRelease := make(chan struct{})
+			result := make(chan error, 1)
+			go func() {
+				_, signingErr := enginev1.NewSnapshotEnvelope(
+					cancelled,
+					snapshotSignerFunc(func(context.Context, enginev1.SnapshotAuthorityInput) (*enginev1.SnapshotAuthority, error) {
+						close(signerStarted)
+						<-signerRelease
+						return nil, test.signerErr
+					}),
+					"run-1", 42, enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED, []byte(snapshotPayload),
+				)
+				result <- signingErr
+			}()
+			<-signerStarted
+			cancelNow()
+			close(signerRelease)
+			signingErr := <-result
+			if !errors.Is(signingErr, test.wantErr) || strings.Contains(signingErr.Error(), "secret") {
+				t.Fatalf("signer error = %v, want %v", signingErr, test.wantErr)
+			}
+		})
 	}
 
 	snapshot, err := enginev1.NewSnapshotEnvelope(
@@ -222,7 +274,7 @@ func TestSnapshotAuthoritySignerVerifierFailureAndCancellationAreContained(t *te
 	}
 
 	verifyCtx, verifyCancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer verifyCancel()
+	t.Cleanup(verifyCancel)
 	err = enginev1.ValidateImportSnapshotRequest(
 		verifyCtx,
 		request,

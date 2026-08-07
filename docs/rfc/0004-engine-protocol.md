@@ -86,6 +86,11 @@ does not erase committed operation outcomes.
   rename an imported run or assert a replacement plan. Export requires a trusted
   signer and import requires keyed HMAC verification before state mutation; an
   unkeyed structural check is never import authority.
+  Export uses the daemon authority's typed `agent.Snapshot` issuer; wire run
+  identity, sequence, lifecycle, and payload are derived from that single
+  validated value. A successful durable signing result wins late cancellation,
+  while uncertainty or post-tombstone cleanup failure wins over cancellation
+  and is never automatically retried.
 
 The daemon adapter must use the kernel's transactional preparation boundary for
 both `StartRun` and `ImportSnapshot`. A new run prepares the execution, uses its

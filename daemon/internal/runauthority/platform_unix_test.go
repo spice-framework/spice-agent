@@ -11,6 +11,10 @@ import (
 	enginev1 "github.com/spice-framework/spice-agent/engine/v1"
 )
 
+func forceStableLockCleanupFailure(lock *stableLock) error {
+	return lock.file.Close()
+}
+
 func TestUnixRejectsIntermediateSymlink(t *testing.T) {
 	realDirectory := filepath.Join(t.TempDir(), "real")
 	if err := os.Mkdir(realDirectory, 0o700); err != nil {

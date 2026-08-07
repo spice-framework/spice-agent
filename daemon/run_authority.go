@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/spice-framework/spice-agent/agent"
 	"github.com/spice-framework/spice-agent/daemon/internal/runauthority"
 	enginev1 "github.com/spice-framework/spice-agent/engine/v1"
 )
@@ -81,9 +82,10 @@ func (authority *RunAuthority) Close() error {
 }
 
 // ActiveRun is an opaque exclusive lease for one active or locally suspended
-// run. It implements enginev1.SnapshotAuthoritySigner. Signing atomically
-// persists SUSPENDED while retaining exclusive ownership; terminal signing
-// persists a tombstone before releasing the stable lock.
+// run. Typed snapshot issuance atomically persists SUSPENDED while retaining
+// exclusive ownership; terminal issuance persists a tombstone before releasing
+// the stable lock. The raw authority signer remains package-internal so callers
+// cannot supply parallel snapshot metadata.
 type ActiveRun struct {
 	value *runauthority.Active
 }
@@ -122,17 +124,105 @@ func (active *ActiveRun) Resume(ctx context.Context) error {
 	return publicAuthorityError(active.value.Resume(ctx))
 }
 
-// SignSnapshot implements enginev1.SnapshotAuthoritySigner. An identical
-// suspended export is idempotent. A differing export at the same suspension is
-// rejected rather than silently replacing its signed claim.
-func (active *ActiveRun) SignSnapshot(
+// IssueSnapshotEnvelope validates and deterministically encodes one kernel
+// snapshot, then signs it at the active run's durable lifecycle boundary. A
+// successful signer result wins cancellation observed after the persistence
+// boundary. Uncertain and unavailable durable outcomes are never retried or
+// replaced with context cancellation.
+func (active *ActiveRun) IssueSnapshotEnvelope(
 	ctx context.Context,
-	input enginev1.SnapshotAuthorityInput,
-) (*enginev1.SnapshotAuthority, error) {
+	snapshot agent.Snapshot,
+) (*enginev1.SnapshotEnvelope, error) {
 	if active == nil || active.value == nil {
-		return nil, enginev1.ErrSnapshotAuthoritySigning
+		return nil, ErrRunAuthorityState
 	}
-	return active.value.SignSnapshot(ctx, input)
+	return issueSnapshotEnvelope(ctx, snapshot, active.value)
+}
+
+type snapshotEnvelopeAuthority interface {
+	enginev1.SnapshotAuthoritySigner
+	SnapshotIssuePreflight(string) error
+	SnapshotIssueError() error
+}
+
+func issueSnapshotEnvelope(
+	ctx context.Context,
+	snapshot agent.Snapshot,
+	authority snapshotEnvelopeAuthority,
+) (*enginev1.SnapshotEnvelope, error) {
+	if authority == nil {
+		return nil, ErrRunAuthorityState
+	}
+	if err := snapshot.Validate(); err != nil {
+		return nil, ErrRunAuthorityState
+	}
+	switch preflightErr := authority.SnapshotIssuePreflight(snapshot.RunID()); {
+	case errors.Is(preflightErr, runauthority.ErrUncertain):
+		return nil, ErrRunAuthorityUncertain
+	case errors.Is(preflightErr, runauthority.ErrUnavailable):
+		return nil, ErrRunAuthorityUnavailable
+	case preflightErr != nil:
+		return nil, ErrRunAuthorityState
+	}
+	lifecycle, ok := snapshotLifecycle(snapshot.Status())
+	if !ok {
+		return nil, ErrRunAuthorityState
+	}
+	payload, err := snapshot.MarshalBinary()
+	if err != nil {
+		return nil, ErrRunAuthorityState
+	}
+	envelope, err := enginev1.NewSnapshotEnvelope(
+		ctx,
+		authority,
+		snapshot.RunID(),
+		snapshot.LastSequence(),
+		lifecycle,
+		payload,
+	)
+	if err == nil {
+		return envelope, nil
+	}
+	switch issueErr := authority.SnapshotIssueError(); {
+	case errors.Is(issueErr, runauthority.ErrUncertain):
+		return nil, ErrRunAuthorityUncertain
+	case errors.Is(issueErr, runauthority.ErrUnavailable):
+		return nil, ErrRunAuthorityUnavailable
+	}
+	switch postflightErr := authority.SnapshotIssuePreflight(snapshot.RunID()); {
+	case errors.Is(postflightErr, runauthority.ErrUncertain):
+		return nil, ErrRunAuthorityUncertain
+	case errors.Is(postflightErr, runauthority.ErrUnavailable):
+		return nil, ErrRunAuthorityUnavailable
+	case postflightErr != nil:
+		return nil, ErrRunAuthorityState
+	}
+	if cause := authorityContextCause(ctx); cause != nil && errors.Is(err, cause) {
+		return nil, cause
+	}
+	return nil, ErrRunAuthorityState
+}
+
+func snapshotLifecycle(status agent.LifecycleStatus) (enginev1.SnapshotLifecycle, bool) {
+	switch status {
+	case agent.LifecycleSuspended:
+		return enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED, true
+	case agent.LifecycleCompleted:
+		return enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_COMPLETED, true
+	case agent.LifecycleFailed:
+		return enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_FAILED, true
+	case agent.LifecycleCancelled:
+		return enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_CANCELLED, true
+	default:
+		return enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_UNSPECIFIED, false
+	}
+}
+
+func authorityContextCause(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	return context.Cause(ctx)
 }
 
 // TerminalPhase is a durable non-resumable run tombstone.
@@ -271,7 +361,4 @@ func publicAuthorityError(err error) error {
 	}
 }
 
-var (
-	_ enginev1.SnapshotAuthoritySigner   = (*ActiveRun)(nil)
-	_ enginev1.SnapshotAuthorityVerifier = (*RunImport)(nil)
-)
+var _ enginev1.SnapshotAuthorityVerifier = (*RunImport)(nil)

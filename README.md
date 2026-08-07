@@ -40,6 +40,11 @@ transition to complete before any event, provider, tool, observer, or
 interaction becomes visible. Cancellation is latched until the host explicitly
 activates or aborts that gate.
 
+Snapshot publication is likewise typed and fail closed: the daemon accepts one
+validated kernel snapshot and derives every signed envelope field from it.
+Callers cannot supply competing run, sequence, lifecycle, or payload metadata,
+and ambiguous durable outcomes are never automatically replayed.
+
 Tool contracts fail closed: each definition declares `read_only` or `mutating`
 effect, replay safety, and a canonical capability set. Tools return ordinary
 model-visible results separately from bounded, call-correlated infrastructure

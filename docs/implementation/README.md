@@ -141,6 +141,12 @@ Prepared starts and imported resumes can now be registered behind an inert
 kernel activation gate. Only a successful durable daemon authority transition
 may release execution; abort remains event- and extension-free. Evidence is in
 [`evidence/phase4-kernel-activation-gate.md`](evidence/phase4-kernel-activation-gate.md).
+The daemon now also exposes one typed kernel-snapshot issuer. It derives all
+wire identity and lifecycle data from a validated `agent.Snapshot`, provides
+byte-identical suspended retries, persists terminal tombstones, and keeps
+cancellation, uncertainty, and post-commit cleanup failures distinct without
+exposing signer internals. Evidence is in
+[`evidence/phase4-run-authority.md`](evidence/phase4-run-authority.md).
 The independent TUI repository now exposes an immutable UI-neutral session
 port and a public terminal shell while keeping Bubble Tea and presentation
 messages internal. Commit `82adb45` generates its renderer, theme, ordered key

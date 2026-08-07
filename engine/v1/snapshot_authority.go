@@ -388,13 +388,13 @@ func callSnapshotSigner(
 	}()
 	authority, err := signer.SignSnapshot(ctx, input)
 	if err != nil {
-		if cause := contextCause(ctx); cause != nil {
-			return nil, cause
+		switch {
+		case errors.Is(err, context.Canceled):
+			return nil, context.Canceled
+		case errors.Is(err, context.DeadlineExceeded):
+			return nil, context.DeadlineExceeded
 		}
 		return nil, ErrSnapshotAuthoritySigning
-	}
-	if cause := contextCause(ctx); cause != nil {
-		return nil, cause
 	}
 	return authority, nil
 }

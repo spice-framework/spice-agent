@@ -47,6 +47,11 @@ record reads, lock acquisition, or atomic replacement to another directory.
    export is idempotent; a differing export at the same suspension is rejected.
    A maximum-generation run cannot issue a resumable snapshot. Signing a
    terminal envelope persists a tombstone and releases ownership.
+   `ActiveRun.IssueSnapshotEnvelope` is the typed daemon boundary: it validates
+   and deterministically encodes an `agent.Snapshot`, derives identity,
+   sequence, and lifecycle from that value, and returns only a fully validated
+   signed envelope. `ActiveRun` does not expose raw signing or implement the
+   public signer interface, so callers cannot provide parallel wire metadata.
 3. Local Resume first persists `ACTIVE` at the next run generation while the
    kernel remains suspended, invalidating the prior snapshot and retaining the
    lock. Only after that succeeds may the host resume kernel execution. If the
@@ -90,6 +95,18 @@ does not change owner state and Resume/Terminal may be retried; once invocation
 begins, any returned failure is uncertain because replacement or its durability
 barrier may already have committed.
 
+Snapshot issuance uses commit-wins cancellation. Proven pre-write cancellation
+of a valid active run remains retryable and returns the canonical context
+sentinel. Cancellation cannot mask a wrong-run or closed-lease state, an
+ambiguous write, or a post-tombstone cleanup failure. Once a signer returns a
+valid claim, cancellation observed afterward cannot discard that durable
+result. Signer failures are secret-safe: only canonical context cancellation
+returned by the signer is propagated; every other signer detail is replaced by
+the generic signing sentinel. The daemon then maps the authority's race-safe
+classification to `ErrRunAuthorityState`, `ErrRunAuthorityUncertain`, or
+`ErrRunAuthorityUnavailable`. Uncertainty has precedence over cleanup failure
+and is never retried automatically.
+
 ## Verification scope
 
 Tests cover persistence, distinct secret material, secret-safe failures,
@@ -101,7 +118,11 @@ close/reopen rollback through unsafe ancestry, close/drain concurrency,
 non-mutating rejection of an existing Unix leaf with unsafe permissions,
 idempotent/differing suspension, local-resume invalidation and generation,
 pre-write cancellation recovery, uncertain first-close reporting, in-memory
-key clearing, injected randomness and atomic-write failures, and helper-process crashes while
+key clearing, typed kernel-snapshot envelope issuance, byte-identical concurrent
+suspended retries, terminal lifecycle mapping, cancellation/state races,
+uncertain and unavailable issuance classification, post-tombstone cleanup
+failure, secret containment, public API rejection of raw signing, injected
+randomness and atomic-write failures, and helper-process crashes while
 suspended, before activation, and after activation. Exact gate
 commands and timings are recorded with the commit that accepts this slice; this
 document does not claim unexecuted macOS runtime evidence.

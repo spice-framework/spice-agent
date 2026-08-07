@@ -126,15 +126,26 @@ the unkeyed validator checks structure and payload integrity only. Authority
 keys are not IPC authentication tokens and remain outside Protobuf, snapshots,
 events, logs, and errors.
 
-`daemon.RunAuthority` implements that signer/verifier seam with a distinct
-current-user persistent key and scope, signed lifecycle records, and stable
-per-run OS locks. It retains the validated authority-directory object for its
-whole lifetime: Unix child operations are descriptor-relative and Windows
+`daemon.RunAuthority` owns that trusted signing seam internally and exposes
+only typed issuance; prepared imports expose the keyed verifier needed by the
+protocol validator. The authority uses a distinct current-user persistent key
+and scope, signed lifecycle records, and stable per-run OS locks. It retains
+the validated authority-directory object for its whole lifetime: Unix child
+operations are descriptor-relative and Windows
 child operations are handle-relative. Store shutdown rejects new leases and
 drains existing run/import leases before closing the bound directory. Import
 is deliberately transactional—verify, persist `IMPORTING`, commit the prepared
 kernel run, then persist `ACTIVE`—and any ambiguous persistence attempt makes
 that transaction terminally uncertain until it releases its lock.
+
+`ActiveRun.IssueSnapshotEnvelope` is the only daemon boundary that turns a
+kernel `agent.Snapshot` into a signed wire envelope. It derives the run
+identity, event sequence, lifecycle, and deterministic payload from that one
+validated value. `ActiveRun` deliberately does not implement the public raw
+snapshot-signer interface. A successful durable signing result wins late
+cancellation; wrong-owner state, uncertain persistence, and post-tombstone
+cleanup failure remain distinguishable and cannot be hidden by cancellation or
+signer details.
 
 Local resume has the inverse publication order needed to prevent snapshot
 replay without releasing execution early: `Run.PrepareLocalResume` reserves the

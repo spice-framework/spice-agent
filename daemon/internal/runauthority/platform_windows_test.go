@@ -14,6 +14,10 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+func forceStableLockCleanupFailure(lock *stableLock) error {
+	return lock.file.Close()
+}
+
 func TestWindowsRejectsIntermediateReparsePoint(t *testing.T) {
 	realDirectory := filepath.Join(authorityTestRoot(t), "real")
 	if err := os.Mkdir(realDirectory, 0o700); err != nil {

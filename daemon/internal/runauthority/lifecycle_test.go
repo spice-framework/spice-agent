@@ -327,6 +327,9 @@ func TestActivePrewriteCancellationRemainsUsable(t *testing.T) {
 	); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled suspended signing = %v", err)
 	}
+	if issueErr := active.SnapshotIssueError(); !errors.Is(issueErr, ErrState) {
+		t.Fatalf("cancelled suspended signing classification = %v", issueErr)
+	}
 	if _, err = enginev1.NewSnapshotEnvelope(
 		t.Context(), active, "resume-cancellation", 1,
 		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED,
@@ -408,12 +411,71 @@ func TestSuspendedTerminalAndSigningFailuresAreUncertain(t *testing.T) {
 	); !errors.Is(err, enginev1.ErrSnapshotAuthoritySigning) {
 		t.Fatalf("failed suspended signing = %v", err)
 	}
+	if issueErr := signer.SnapshotIssueError(); !errors.Is(issueErr, ErrUncertain) {
+		t.Fatalf("failed suspended signing classification = %v", issueErr)
+	}
 	store.writeFile = store.directory.writeFileAtomic
 	if err = signer.Terminal(t.Context(), PhaseFailed); !errors.Is(err, ErrUncertain) {
 		t.Fatalf("terminal after uncertain signing = %v", err)
 	}
 	if err = signer.Close(); !errors.Is(err, ErrUncertain) {
 		t.Fatalf("close after uncertain signing = %v", err)
+	}
+}
+
+func TestTerminalSnapshotCleanupFailureIsClassifiedUnavailable(t *testing.T) {
+	store := openTestStore(t, filepath.Join(authorityTestRoot(t), "authority"))
+	active, err := store.Start(t.Context(), "terminal-cleanup-failure")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = forceStableLockCleanupFailure(active.lock); err != nil {
+		t.Fatal(err)
+	}
+	_, err = enginev1.NewSnapshotEnvelope(
+		t.Context(), active, "terminal-cleanup-failure", 1,
+		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_COMPLETED,
+		[]byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"terminal-cleanup-failure"}`),
+	)
+	if !errors.Is(err, enginev1.ErrSnapshotAuthoritySigning) {
+		t.Fatalf("terminal snapshot cleanup error = %v", err)
+	}
+	if issueErr := active.SnapshotIssueError(); !errors.Is(issueErr, ErrUnavailable) {
+		t.Fatalf("terminal snapshot cleanup classification = %v", issueErr)
+	}
+	terminalRecord, err := store.readRecord("terminal-cleanup-failure")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if terminalRecord.Phase != PhaseCompleted {
+		t.Fatalf("terminal snapshot phase = %s", terminalRecord.Phase)
+	}
+	if err = active.Close(); err != nil {
+		t.Fatalf("close after terminal cleanup failure = %v", err)
+	}
+
+	uncertain, err := store.Start(t.Context(), "uncertain-cleanup-failure")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.writeFile = func(string, []byte) error { return errors.New("snapshot-issuer-secret") }
+	_, err = enginev1.NewSnapshotEnvelope(
+		t.Context(), uncertain, "uncertain-cleanup-failure", 1,
+		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED,
+		[]byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"uncertain-cleanup-failure"}`),
+	)
+	if !errors.Is(err, enginev1.ErrSnapshotAuthoritySigning) || strings.Contains(err.Error(), "secret") {
+		t.Fatalf("uncertain signing error = %v", err)
+	}
+	store.writeFile = store.directory.writeFileAtomic
+	if err = forceStableLockCleanupFailure(uncertain.lock); err != nil {
+		t.Fatal(err)
+	}
+	if err = uncertain.Close(); !errors.Is(err, ErrUncertain) {
+		t.Fatalf("uncertain cleanup close = %v", err)
+	}
+	if issueErr := uncertain.SnapshotIssueError(); !errors.Is(issueErr, ErrUncertain) {
+		t.Fatalf("uncertain cleanup classification = %v", issueErr)
 	}
 }
 

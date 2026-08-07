@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spice-framework/spice-agent/agent"
 	commonv1 "github.com/spice-framework/spice-agent/common/v1"
 	"github.com/spice-framework/spice-agent/daemon"
 	enginev1 "github.com/spice-framework/spice-agent/engine/v1"
@@ -23,6 +24,14 @@ func authorityProtocolLimits() *commonv1.Limits {
 		MaxMessageBytes:    uint64(enginev1.MaximumSnapshotEnvelopeBytes + 1024),
 		MaxCollectionItems: 1, MaxReplayEvents: 1, MaxReplayBytes: 1,
 		MaxConcurrentStreams: 1, MaxActiveRuns: 1,
+	}
+}
+
+func TestActiveRunDoesNotExposeRawSnapshotSigner(t *testing.T) {
+	t.Parallel()
+	var active any = (*daemon.ActiveRun)(nil)
+	if _, exposed := active.(enginev1.SnapshotAuthoritySigner); exposed {
+		t.Fatal("daemon.ActiveRun exposes raw snapshot signing")
 	}
 }
 
@@ -124,11 +133,8 @@ func TestRunAuthoritySuspendedOwnershipLocalResumeAndIdempotentExport(t *testing
 	if !proto.Equal(first, repeated) {
 		t.Fatal("identical suspended export changed its claim")
 	}
-	differentPayload := []byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"local-resume","different":true}`)
-	if _, err = enginev1.NewSnapshotEnvelope(
-		t.Context(), active, "local-resume", 2,
-		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED, differentPayload,
-	); !errors.Is(err, enginev1.ErrSnapshotAuthoritySigning) {
+	different := kernelSnapshotWith(t, "local-resume", agent.LifecycleSuspended, 8, "different")
+	if _, err = active.IssueSnapshotEnvelope(t.Context(), different); !errors.Is(err, daemon.ErrRunAuthorityState) {
 		t.Fatalf("differing suspended export = %v", err)
 	}
 	if _, err = contender.PrepareImport(t.Context(), first); !errors.Is(err, daemon.ErrRunAuthorityBusy) {
@@ -337,10 +343,9 @@ func TestRunAuthoritySuspendedOwnerCrashMakesSnapshotImportable(t *testing.T) {
 		if err != nil {
 			os.Exit(52)
 		}
-		payload := []byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"crashed-suspended"}`)
-		snapshot, err := enginev1.NewSnapshotEnvelope(
-			context.Background(), active, "crashed-suspended", 1,
-			enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED, payload,
+		snapshot, err := active.IssueSnapshotEnvelope(
+			context.Background(),
+			kernelSnapshot(t, "crashed-suspended", agent.LifecycleSuspended),
 		)
 		if err != nil {
 			os.Exit(53)
@@ -499,13 +504,25 @@ func newRunAuthority(t *testing.T, directory string) *daemon.RunAuthority {
 
 func signedSnapshot(
 	t *testing.T,
-	signer enginev1.SnapshotAuthoritySigner,
+	active *daemon.ActiveRun,
 	runID string,
 	lifecycle enginev1.SnapshotLifecycle,
 ) *enginev1.SnapshotEnvelope {
 	t.Helper()
-	payload := []byte(fmt.Sprintf(`{"version":"spice.agent.snapshot/v1alpha2","run_id":%q}`, runID))
-	snapshot, err := enginev1.NewSnapshotEnvelope(t.Context(), signer, runID, 1, lifecycle, payload)
+	var status agent.LifecycleStatus
+	switch lifecycle {
+	case enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED:
+		status = agent.LifecycleSuspended
+	case enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_COMPLETED:
+		status = agent.LifecycleCompleted
+	case enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_FAILED:
+		status = agent.LifecycleFailed
+	case enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_CANCELLED:
+		status = agent.LifecycleCancelled
+	default:
+		t.Fatalf("unsupported test snapshot lifecycle %s", lifecycle)
+	}
+	snapshot, err := active.IssueSnapshotEnvelope(t.Context(), kernelSnapshot(t, runID, status))
 	if err != nil {
 		t.Fatal(err)
 	}
