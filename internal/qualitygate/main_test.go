@@ -127,6 +127,23 @@ func TestSelectedGoExecutableName(t *testing.T) {
 	}
 }
 
+func TestProcessFuzzContractsRemainInTheReleaseGate(t *testing.T) {
+	t.Parallel()
+	seen := make(map[fuzzTarget]int)
+	for _, target := range fuzzTargets() {
+		seen[target]++
+	}
+	for _, target := range []fuzzTarget{
+		{"./process", "FuzzSpecValidation"},
+		{"./process", "FuzzExitedOutcome"},
+		{"./process", "FuzzLookupValidation"},
+	} {
+		if seen[target] != 1 {
+			t.Fatalf("fuzz target %#v occurs %d times", target, seen[target])
+		}
+	}
+}
+
 func writeGateFile(t *testing.T, root, name, content string) {
 	t.Helper()
 	path := filepath.Join(root, filepath.FromSlash(name))

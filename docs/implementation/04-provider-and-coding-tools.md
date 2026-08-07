@@ -45,6 +45,11 @@ provider errors, capability-aware dispatch, and phase 1 auto-configuration.
   bean. Immutable specifications preserve exact argv/environment/streams and
   declared capabilities for later permission decorators; no coding tool may
   expose or construct `*exec.Cmd` as its public boundary.
+- Natural names such as `go` and `git`, workspace-relative executables, and
+  absolute paths first use an injected `process.ExecutableResolver`. Its
+  immutable lookup contains only the request, canonical workdir, and explicit
+  child environment; the resolver must return the final absolute canonical
+  executable before launch policy observes the `process.Spec`.
 - Shell output is count/byte bounded, binary-safe, cancellable, and time bounded.
   Unix process groups and Windows kill-on-close Job Objects are used; inability
   to confirm tree termination is surfaced.

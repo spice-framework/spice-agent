@@ -47,6 +47,21 @@ func FuzzExitedOutcome(f *testing.F) {
 	})
 }
 
+func FuzzLookupValidation(f *testing.F) {
+	root := filepath.Clean(f.TempDir())
+	f.Add("git", root, "PATH=value")
+	f.Add("\x00", "relative", "MALFORMED")
+	f.Fuzz(func(t *testing.T, requested, workdir, environment string) {
+		lookup, err := process.NewLookup(requested, workdir, []string{environment})
+		if err != nil {
+			return
+		}
+		if err = lookup.Validate(); err != nil {
+			t.Fatalf("accepted lookup failed validation: %v", err)
+		}
+	})
+}
+
 type emptyReader struct{}
 
 func (emptyReader) Read([]byte) (int, error) { return 0, io.EOF }

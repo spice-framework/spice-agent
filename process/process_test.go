@@ -73,6 +73,12 @@ func TestFailureIsTypedRedactedAndPreservesCancellationIdentity(t *testing.T) {
 	if process.NewFailure(process.OperationWait, nil) != nil {
 		t.Fatal("nil cause produced a failure")
 	}
+	resolved := process.NewFailure(process.OperationResolve, fmt.Errorf("resolver private detail: %w", secret))
+	resolvedFailure := typedFailure(t, resolved)
+	if resolvedFailure.Operation() != process.OperationResolve || !errors.Is(resolved, secret) ||
+		strings.Contains(resolved.Error(), "private") {
+		t.Fatalf("resolve failure was not typed and redacted: %v", resolved)
+	}
 	unknown := process.NewFailure("private-operation", secret)
 	if !errors.As(unknown, &typed) || typed.Operation() != "" || strings.Contains(unknown.Error(), "private") {
 		t.Fatalf("unknown operation was not redacted: %v", unknown)

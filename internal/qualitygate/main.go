@@ -443,20 +443,29 @@ func security(ctx context.Context, root string) error {
 }
 
 func fuzz(ctx context.Context, root string, environment map[string]string) error {
-	for _, target := range []struct{ pkg, name string }{
-		{"./message", "FuzzNewID"},
-		{"./tool", "FuzzToolCall"},
-		{"./agent", "FuzzParseSnapshot"},
-		{"./annotation/agent", "FuzzToolHandler"},
-		{"./common/v1", "FuzzCommonEnvelope"},
-		{"./engine/v1", "FuzzEngineEnvelope"},
-		{"./daemon/endpoint", "FuzzDecodeMetadata"},
-	} {
+	for _, target := range fuzzTargets() {
 		if err := command(ctx, root, environment, "go", "test", "-run=^$", "-fuzz=^"+target.name+"$", "-fuzztime=1s", target.pkg); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+type fuzzTarget struct{ pkg, name string }
+
+func fuzzTargets() []fuzzTarget {
+	return []fuzzTarget{
+		{"./message", "FuzzNewID"},
+		{"./tool", "FuzzToolCall"},
+		{"./process", "FuzzSpecValidation"},
+		{"./process", "FuzzExitedOutcome"},
+		{"./process", "FuzzLookupValidation"},
+		{"./agent", "FuzzParseSnapshot"},
+		{"./annotation/agent", "FuzzToolHandler"},
+		{"./common/v1", "FuzzCommonEnvelope"},
+		{"./engine/v1", "FuzzEngineEnvelope"},
+		{"./daemon/endpoint", "FuzzDecodeMetadata"},
+	}
 }
 
 func toolPath(ctx context.Context, root, name string) (string, error) {

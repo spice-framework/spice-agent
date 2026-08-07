@@ -10,6 +10,13 @@ sorted capability set containing `process.execute`. It performs no filesystem
 or network access. Values are bounded, immutable through public APIs, and
 redacted from formatting and JSON.
 
+Natural names and relative workspace executables remain supported through the
+separate `ExecutableResolver` seam. Its immutable redacted `Lookup` carries the
+unmodified request, canonical absolute workdir, and exact copied environment.
+The resolver uses no ambient state or network access and returns the canonical
+absolute path that is subsequently validated by `Spec`. Core contains no
+platform or filesystem implementation.
+
 `Launcher.Start` is bounded only by its launch context. A returned `Process`
 owns the independent lifetime even when Start also reports an error. `Done` and
 typed `Outcome` describe only the root process. `Wait` separately proves that
@@ -25,13 +32,14 @@ cancellation identity while all ordinary formatting remains secret-safe.
 
 ## Verification scope
 
-Tests cover immutable copies, environment/capability ordering, redaction,
+Tests cover immutable lookup/spec copies, name/relative/absolute requests,
+environment/capability ordering, redaction,
 required streams and capabilities, malformed and oversized values, exit-code
 boundaries, launch-context independence, root/join separation, retryable and
 terminal containment failures, and dependency direction. Fuzz targets exercise
-specification and outcome validation. On Windows/amd64 with Go 1.26.5, focused
-tests, race tests, and vet passed for `./process ./client/managed`; both process
-fuzz targets passed two-second smoke runs; `make fast` passed in 68.4 seconds;
+lookup, specification, and outcome validation. On Windows/amd64 with Go 1.26.5,
+focused tests, race tests, and vet passed for `./process ./client/managed`; all
+three process fuzz targets passed two-second smoke runs; `make fast` passed in 68.4 seconds;
 and the final `make check` passed in 61.3 seconds with repository architecture,
 formatting, module/vendor, Protobuf, vet, and test gates green.
 

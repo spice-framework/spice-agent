@@ -14,6 +14,7 @@ type Operation string
 
 const (
 	OperationLaunch      Operation = "launch"
+	OperationResolve     Operation = "resolve"
 	OperationResult      Operation = "result"
 	OperationRequestStop Operation = "request_stop"
 	OperationForceKill   Operation = "force_kill"
@@ -146,7 +147,7 @@ func (failure *Failure) MarshalJSON() ([]byte, error) {
 
 func validOperation(operation Operation) bool {
 	switch operation {
-	case OperationLaunch, OperationResult, OperationRequestStop, OperationForceKill, OperationWait:
+	case OperationLaunch, OperationResolve, OperationResult, OperationRequestStop, OperationForceKill, OperationWait:
 		return true
 	default:
 		return false

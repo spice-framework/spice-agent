@@ -205,15 +205,21 @@ ordinary local discovery adapter remains responsible for constructing the lazy
 authenticated gRPC connection over `daemon/localipc`.
 
 The public provider-neutral `process` package is the mandatory construction
-seam for daemon and coding-tool processes. Its immutable `Spec` carries a
+seam for daemon and coding-tool processes. Natural executable names and
+relative paths first pass through an injected `ExecutableResolver` with an
+immutable, redacted `Lookup` containing only the requested value, canonical
+working directory, and explicit copied environment. Resolution uses no ambient
+state or hidden network access and returns the canonical absolute path required
+by `Spec`. Core supplies no filesystem or platform resolver. Its immutable
+`Spec` carries a
 canonical absolute executable and working directory, discrete arguments, an
 exact copied environment, explicit streams, and declared tool capabilities.
 An injected `Launcher` may be decorated by permissions without a registry or
 reflection. Its launch context bounds launch only. Root termination produces a
 typed portable `Outcome`; a separate context-bounded `Wait` proves whether all
 implementation-owned descendants and containment resources are safe to
-release. Core deliberately contains no `os/exec` implementation and makes no
-universal containment claim.
+release. Core deliberately contains no executable-resolution or `os/exec`
+implementation and makes no universal containment claim.
 
 `client/managed` owns attach-or-start policy rather than process construction.
 Only the exact unwrapped absence sentinel authorizes the serialized

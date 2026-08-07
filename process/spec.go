@@ -186,29 +186,44 @@ func (Spec) MarshalJSON() ([]byte, error) {
 }
 
 func validatePath(field, value string) error {
+	return validatePathWith(field, value, specFailure)
+}
+
+type validationFailure func(string, int, SpecProblem) error
+
+func validatePathWith(field, value string, fail validationFailure) error {
 	if value == "" {
-		return specFailure(field, -1, ProblemRequired)
+		return fail(field, -1, ProblemRequired)
 	}
-	if err := validateValue(field, -1, value); err != nil {
+	if err := validateValueWith(field, -1, value, fail); err != nil {
 		return err
 	}
 	if !filepath.IsAbs(value) {
-		return specFailure(field, -1, ProblemNotAbsolute)
+		return fail(field, -1, ProblemNotAbsolute)
 	}
 	if filepath.Clean(value) != value {
-		return specFailure(field, -1, ProblemNotCanonical)
+		return fail(field, -1, ProblemNotCanonical)
 	}
 	return nil
 }
 
 func copyValues(field string, values []string, maximum int) ([]string, int, error) {
+	return copyValuesWith(field, values, maximum, specFailure)
+}
+
+func copyValuesWith(
+	field string,
+	values []string,
+	maximum int,
+	fail validationFailure,
+) ([]string, int, error) {
 	if len(values) > maximum {
-		return nil, 0, specFailure(field, -1, ProblemTooMany)
+		return nil, 0, fail(field, -1, ProblemTooMany)
 	}
 	result := slices.Clone(values)
 	total := 0
 	for index, value := range result {
-		if err := validateValue(field, index, value); err != nil {
+		if err := validateValueWith(field, index, value, fail); err != nil {
 			return nil, 0, err
 		}
 		total += len(value)
@@ -217,7 +232,11 @@ func copyValues(field string, values []string, maximum int) ([]string, int, erro
 }
 
 func copyEnvironment(values []string) ([]string, int, error) {
-	result, total, err := copyValues("environment", values, MaximumEnvironment)
+	return copyEnvironmentWith(values, specFailure)
+}
+
+func copyEnvironmentWith(values []string, fail validationFailure) ([]string, int, error) {
+	result, total, err := copyValuesWith("environment", values, MaximumEnvironment, fail)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -225,11 +244,11 @@ func copyEnvironment(values []string) ([]string, int, error) {
 	for index, value := range result {
 		separator := strings.IndexByte(value, '=')
 		if separator <= 0 {
-			return nil, 0, specFailure("environment", index, ProblemMalformed)
+			return nil, 0, fail("environment", index, ProblemMalformed)
 		}
 		name := strings.ToUpper(value[:separator])
 		if _, duplicate := seen[name]; duplicate {
-			return nil, 0, specFailure("environment", index, ProblemDuplicate)
+			return nil, 0, fail("environment", index, ProblemDuplicate)
 		}
 		seen[name] = struct{}{}
 	}
@@ -286,19 +305,19 @@ func validCapability(value string) bool {
 	return !segmentStart
 }
 
-func validateValue(field string, index int, value string) error {
+func validateValueWith(field string, index int, value string, fail validationFailure) error {
 	if !utf8.ValidString(value) {
-		return specFailure(field, index, ProblemInvalidUTF8)
+		return fail(field, index, ProblemInvalidUTF8)
 	}
 	if strings.IndexByte(value, 0) >= 0 {
-		return specFailure(field, index, ProblemContainsNUL)
+		return fail(field, index, ProblemContainsNUL)
 	}
 	if len(value) > MaximumValueBytes {
-		return specFailure(field, index, ProblemTooLarge)
+		return fail(field, index, ProblemTooLarge)
 	}
 	return nil
 }
 
-func specFailure(field string, index int, problem SpecProblem) *SpecError {
+func specFailure(field string, index int, problem SpecProblem) error {
 	return &SpecError{field: field, index: index, problem: problem}
 }
