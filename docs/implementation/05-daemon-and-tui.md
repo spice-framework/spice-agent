@@ -41,10 +41,11 @@ exhaustion, unavailable, cancellation, and uncertain operation state.
   pipe. Remote TCP listening is absent, not merely disabled by default.
 - Endpoint metadata and random authentication tokens use user-only permissions
   and are validated against the current user before connection.
-- `spice-agent` attaches to a compatible user daemon or starts one, with a
-  bounded startup lock and health handshake.
-- `spice-agentd serve` explicitly hosts the daemon. `spice-agent attach`
-  connects to an explicitly selected local endpoint.
+- The library boundary can attach to a compatible protected endpoint or own one
+  candidate launched after a bounded startup lock and health handshake. The
+  distribution commands that exercise it remain pending.
+- The distribution will expose `spice-agentd serve`; `spice-agent attach` will
+  connect to an explicitly selected protected local endpoint.
 - An incompatible daemon is rejected with its observed/required versions and a
   safe remediation command. It is never silently killed or reused.
 - Last acknowledged event sequence drives reconnect. Cursor gaps require an
@@ -68,7 +69,8 @@ portable semantic views and namespaced data; they never load executable UI code.
    then authenticated local listeners, client/session translation,
    negotiation, replay, cancellation, interaction streams, snapshot, and
    health translation.
-3. Add user-scoped endpoint discovery and managed start coordination.
+3. Add user-scoped endpoint discovery, explicit-attach policy, and ownership-safe
+   managed candidate coordination; then supply the distribution process starter.
 4. Implement the Bubble Tea shell with injected presentation components and
    terminal-size-independent semantic models.
 5. Generate separate daemon and terminal `@Application` targets in the
@@ -216,6 +218,19 @@ channel and disables generic transport retry and every nonlocal resolution
 path. The protocol adapter alone performs the one bounded, byte-identical 1.3
 initialization retry. See
 [`evidence/phase4-local-client.md`](evidence/phase4-local-client.md).
+
+The current-user lifecycle follow-up now binds the default runtime directory,
+transport, and address as one validated `endpoint.UserScope`. Explicit attach
+resolves an exact requested address only through protected active metadata and
+can never return the absence sentinel that authorizes launch. Managed startup
+now retains the exact `Candidate` returned by its starter, detects early exit,
+shuts down and joins failed or canceled launches, serializes concurrent
+initialization, and stops only its own candidate. An incomplete bounded join
+retains ownership for a later shutdown attempt. The generic candidate contract
+is implemented; an `os/exec` distribution starter and command wiring are not.
+Evidence is in
+[`evidence/phase4-managed-local-lifecycle.md`](evidence/phase4-managed-local-lifecycle.md).
+
 Protocol-1.3 initialization now adds caller-owned attempt identities, bounded
 server coalescing, atomic committed-response retention, and one exact client
 retry while preserving legacy uncertainty. See
@@ -236,8 +251,8 @@ has an independent control lane, and external acceptance executes the actual
 injected terminal shell through explicit application start and stop. Its full
 gate passed in 158.4 seconds at 90.1% product coverage. Distribution-owned
 process launch, daemon attachment, reconnect, and the real terminal workflow
-remain pending. The remainder of slices 2 through 6 includes managed process
-launch, the daemon-to-TUI bridge, and
+remain pending. The remainder of slices 3 through 6 includes the managed
+process implementation, the daemon-to-TUI bridge, and
 real Windows/Linux reconnect acceptance. See
 [`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
 Foundation-specific evidence is in
@@ -268,12 +283,14 @@ Lifecycle unary adapter evidence is in
 [`evidence/phase4-lifecycle-unary.md`](evidence/phase4-lifecycle-unary.md).
 Authenticated streaming adapter evidence is in
 [`evidence/phase4-streaming-rpc.md`](evidence/phase4-streaming-rpc.md).
+Current-user scope, explicit-attach, and managed-candidate evidence is in
+[`evidence/phase4-managed-local-lifecycle.md`](evidence/phase4-managed-local-lifecycle.md).
 
-The baseline remains intentionally provisional. The pre-host repair closes the
-schema and kernel seams for interaction discovery/run identity, reconnect CAS,
-suspend/resume/import identity, authenticated snapshot envelopes, and atomic
-replay bounds. Before the final Phase 4 freeze, the daemon host must prove them
-over real RPCs, enforce run tombstones and OS-backed authority-key lifecycle,
-and separate RPC contexts from run lifetime. Buf protects
-changes against the committed baseline; it does not imply those host semantics
-are already implemented.
+The baseline remains intentionally provisional. The host and authenticated
+local-client libraries prove the protocol, authority, IPC, explicit-attach, and
+managed-candidate seams, while Buf protects the committed schema baseline.
+Before the final Phase 4 freeze, the distribution must provide the real process
+starter and generated daemon/TUI applications, prove one-command and explicit
+serve/attach behavior through actual Windows and Linux processes and terminals,
+and resolve or formally bound the engine's service-lifetime run-identity
+tombstones.

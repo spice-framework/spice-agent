@@ -268,8 +268,8 @@ func (service *localEngineFixture) StreamInteractions(
 
 type forbiddenManagedStarter struct{}
 
-func (forbiddenManagedStarter) Start(context.Context) error {
-	return errors.New("managed startup unexpectedly attempted")
+func (forbiddenManagedStarter) Start(context.Context) (managed.Candidate, error) {
+	return nil, errors.New("managed startup unexpectedly attempted")
 }
 
 type forbiddenManagedStartupLock struct{}

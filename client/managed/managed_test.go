@@ -232,6 +232,30 @@ func TestConnectorReleaseFailureClosesReturnedSession(t *testing.T) {
 	}
 }
 
+func TestConnectorReleaseFailureShutsDownLaunchedCandidate(t *testing.T) {
+	t.Parallel()
+	releaseFailure := errors.New("release failed")
+	candidate := newFixtureCandidate()
+	session := &fixtureSession{}
+	discovery := &fixtureDiscovery{results: []discoveryResult{
+		{err: managed.ErrEndpointNotFound},
+		{err: managed.ErrEndpointNotFound},
+		{connector: fixtureConnector{session: session}},
+	}}
+	lock := &fixtureLock{lease: fixtureLease{err: releaseFailure}}
+	connector := newManagedFixture(t, discovery, &fixtureStarter{candidate: candidate}, lock)
+	got, err := connector.Initialize(t.Context(), initializeRequestFixture(t))
+	if got != nil || !errors.Is(err, releaseFailure) || session.closed.Load() != 1 {
+		t.Fatalf("release failure = %#v, %v; closes=%d", got, err, session.closed.Load())
+	}
+	if candidate.beginCalls.Load() != 1 || candidate.waitCalls.Load() != 1 || !candidateJoinedFixture(candidate) {
+		t.Fatalf(
+			"release cleanup = begin %d wait %d joined %t",
+			candidate.beginCalls.Load(), candidate.waitCalls.Load(), candidateJoinedFixture(candidate),
+		)
+	}
+}
+
 func TestConnectorPreservesPrimaryAndReleaseFailures(t *testing.T) {
 	t.Parallel()
 	primaryFailure := errors.New("existing endpoint failed")
@@ -244,6 +268,198 @@ func TestConnectorPreservesPrimaryAndReleaseFailures(t *testing.T) {
 	_, err := connector.Initialize(t.Context(), initializeRequestFixture(t))
 	if !errors.Is(err, primaryFailure) || !errors.Is(err, releaseFailure) {
 		t.Fatalf("combined startup/release failure = %v", err)
+	}
+}
+
+func TestConnectorFailsPromptlyAndJoinsEarlyCandidateExit(t *testing.T) {
+	t.Parallel()
+	exitFailure := errors.New("candidate exited")
+	candidate := newFixtureCandidate()
+	candidate.exit(exitFailure)
+	starter := &fixtureStarter{candidate: candidate}
+	connector := newManagedFixture(t, &fixtureDiscovery{}, starter, &fixtureLock{})
+	started := time.Now()
+	session, err := connector.Initialize(t.Context(), initializeRequestFixture(t))
+	if session != nil || !errors.Is(err, managed.ErrCandidateExited) || !errors.Is(err, exitFailure) {
+		t.Fatalf("early exit = %#v, %v", session, err)
+	}
+	if time.Since(started) > 250*time.Millisecond || candidate.beginCalls.Load() != 1 || candidate.waitCalls.Load() != 1 {
+		t.Fatalf(
+			"early exit cleanup took %s; begin=%d wait=%d",
+			time.Since(started), candidate.beginCalls.Load(), candidate.waitCalls.Load(),
+		)
+	}
+}
+
+func TestConnectorFailedStartupShutsDownAndJoinsCandidate(t *testing.T) {
+	t.Parallel()
+	initializeFailure := statusErrorFixture(t, client.ErrorUnavailable, false)
+	candidate := newFixtureCandidate()
+	starter := &fixtureStarter{candidate: candidate}
+	discovery := &fixtureDiscovery{results: []discoveryResult{
+		{err: managed.ErrEndpointNotFound},
+		{err: managed.ErrEndpointNotFound},
+		{connector: fixtureConnector{err: initializeFailure}},
+	}}
+	connector := newManagedFixture(t, discovery, starter, &fixtureLock{})
+	if _, err := connector.Initialize(t.Context(), initializeRequestFixture(t)); !errors.Is(err, initializeFailure) {
+		t.Fatalf("failed startup = %v", err)
+	}
+	if candidate.beginCalls.Load() != 1 || candidate.waitCalls.Load() != 1 || !candidateJoinedFixture(candidate) {
+		t.Fatalf(
+			"failed startup cleanup = begin %d wait %d joined %t",
+			candidate.beginCalls.Load(), candidate.waitCalls.Load(), candidateJoinedFixture(candidate),
+		)
+	}
+}
+
+func TestConnectorShutdownOwnsOnlyLaunchedCandidate(t *testing.T) {
+	t.Parallel()
+	t.Run("external daemon", func(t *testing.T) {
+		t.Parallel()
+		starter := &fixtureStarter{}
+		discovery := &fixtureDiscovery{results: []discoveryResult{{connector: fixtureConnector{session: &fixtureSession{}}}}}
+		connector := newManagedFixture(t, discovery, starter, &fixtureLock{})
+		if _, err := connector.Initialize(t.Context(), initializeRequestFixture(t)); err != nil {
+			t.Fatal(err)
+		}
+		if err := connector.Shutdown(t.Context()); err != nil || starter.calls.Load() != 0 {
+			t.Fatalf("external shutdown = %v, starts %d", err, starter.calls.Load())
+		}
+	})
+
+	t.Run("owned daemon", func(t *testing.T) {
+		t.Parallel()
+		candidate := newFixtureCandidate()
+		starter := &fixtureStarter{candidate: candidate}
+		discovery := &fixtureDiscovery{results: []discoveryResult{
+			{err: managed.ErrEndpointNotFound},
+			{err: managed.ErrEndpointNotFound},
+			{connector: fixtureConnector{session: &fixtureSession{}}},
+		}}
+		connector := newManagedFixture(t, discovery, starter, &fixtureLock{})
+		if _, err := connector.Initialize(t.Context(), initializeRequestFixture(t)); err != nil {
+			t.Fatal(err)
+		}
+		if err := connector.Shutdown(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if candidate.beginCalls.Load() != 1 || candidate.waitCalls.Load() != 1 || !candidateJoinedFixture(candidate) {
+			t.Fatalf(
+				"owned shutdown = begin %d wait %d joined %t",
+				candidate.beginCalls.Load(), candidate.waitCalls.Load(), candidateJoinedFixture(candidate),
+			)
+		}
+	})
+}
+
+func TestConnectorConcurrentInitializeLaunchesOneCandidate(t *testing.T) {
+	t.Parallel()
+	candidate := newFixtureCandidate()
+	starter := &fixtureStarter{candidate: candidate}
+	session := &fixtureSession{}
+	discovery := &fixtureDiscovery{results: []discoveryResult{
+		{err: managed.ErrEndpointNotFound},
+		{err: managed.ErrEndpointNotFound},
+		{connector: fixtureConnector{session: session}},
+		{connector: fixtureConnector{session: session}},
+	}}
+	connector := newManagedFixture(t, discovery, starter, &fixtureLock{})
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for range 2 {
+		go func() {
+			<-start
+			_, err := connector.Initialize(t.Context(), initializeRequestFixture(t))
+			results <- err
+		}()
+	}
+	close(start)
+	for range 2 {
+		if err := receiveManagedTestValue(t, results); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if starter.calls.Load() != 1 {
+		t.Fatalf("concurrent initialization started %d candidates", starter.calls.Load())
+	}
+	if err := connector.Shutdown(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestConnectorShutdownCancelsStartupAndJoinsCandidate(t *testing.T) {
+	t.Parallel()
+	candidate := newFixtureCandidate()
+	started := make(chan struct{})
+	starter := &fixtureStarter{candidate: candidate, started: started}
+	connector := newManagedFixture(t, &fixtureDiscovery{}, starter, &fixtureLock{})
+	initializeDone := make(chan error, 1)
+	go func() {
+		_, err := connector.Initialize(context.Background(), initializeRequestFixture(t))
+		initializeDone <- err
+	}()
+	receiveManagedTestValue(t, started)
+	if err := connector.Shutdown(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := receiveManagedTestValue(t, initializeDone); !errors.Is(err, managed.ErrClosed) {
+		t.Fatalf("canceled startup = %v", err)
+	}
+	if candidate.beginCalls.Load() != 1 || candidate.waitCalls.Load() != 1 || !candidateJoinedFixture(candidate) {
+		t.Fatalf(
+			"canceled cleanup = begin %d wait %d joined %t",
+			candidate.beginCalls.Load(), candidate.waitCalls.Load(), candidateJoinedFixture(candidate),
+		)
+	}
+}
+
+func TestConnectorShutdownTimeoutRetainsOwnershipForRetry(t *testing.T) {
+	t.Parallel()
+	candidate := newFixtureCandidate()
+	candidate.ignoreShutdown.Store(true)
+	starter := &fixtureStarter{candidate: candidate}
+	discovery := &fixtureDiscovery{results: []discoveryResult{
+		{err: managed.ErrEndpointNotFound},
+		{err: managed.ErrEndpointNotFound},
+		{connector: fixtureConnector{session: &fixtureSession{}}},
+	}}
+	connector, err := managed.New(managed.Config{
+		Discovery: discovery, Starter: starter, StartupLock: &fixtureLock{},
+		StartupTimeout: time.Second, RetryInterval: time.Millisecond, ShutdownTimeout: 15 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = connector.Initialize(t.Context(), initializeRequestFixture(t)); err != nil {
+		t.Fatal(err)
+	}
+	if err = connector.Shutdown(t.Context()); !errors.Is(err, managed.ErrShutdownTimeout) {
+		t.Fatalf("shutdown timeout = %v", err)
+	}
+	candidate.ignoreShutdown.Store(false)
+	if err = connector.Shutdown(t.Context()); err != nil {
+		t.Fatalf("shutdown retry = %v", err)
+	}
+	if candidate.beginCalls.Load() != 2 || candidate.waitCalls.Load() != 2 || !candidateJoinedFixture(candidate) {
+		t.Fatalf(
+			"shutdown retry = begin %d wait %d joined %t",
+			candidate.beginCalls.Load(), candidate.waitCalls.Load(), candidateJoinedFixture(candidate),
+		)
+	}
+}
+
+func TestConnectorDependencyFailuresAreRedacted(t *testing.T) {
+	t.Parallel()
+	const secret = "managed-secret-canary"
+	failure := errors.New(secret)
+	connector := newManagedFixture(
+		t, &fixtureDiscovery{results: []discoveryResult{{err: failure}}},
+		&fixtureStarter{}, &fixtureLock{},
+	)
+	_, err := connector.Initialize(t.Context(), initializeRequestFixture(t))
+	if !errors.Is(err, failure) || strings.Contains(err.Error(), secret) {
+		t.Fatalf("discovery failure was not safely redacted: %v", err)
 	}
 }
 
@@ -318,13 +534,25 @@ func (discovery *fixtureDiscovery) Discover(context.Context) (client.Connector, 
 }
 
 type fixtureStarter struct {
-	calls atomic.Int32
-	err   error
+	calls     atomic.Int32
+	err       error
+	mu        sync.Mutex
+	candidate *fixtureCandidate
+	started   chan struct{}
+	startOnce sync.Once
 }
 
-func (starter *fixtureStarter) Start(context.Context) error {
+func (starter *fixtureStarter) Start(context.Context) (managed.Candidate, error) {
 	starter.calls.Add(1)
-	return starter.err
+	if starter.started != nil {
+		starter.startOnce.Do(func() { close(starter.started) })
+	}
+	starter.mu.Lock()
+	defer starter.mu.Unlock()
+	if starter.candidate == nil {
+		starter.candidate = newFixtureCandidate()
+	}
+	return starter.candidate, starter.err
 }
 
 type fixtureLock struct {
@@ -390,6 +618,69 @@ type fixtureSession struct {
 	closed atomic.Int32
 }
 
+type fixtureCandidate struct {
+	done           chan struct{}
+	stop           sync.Once
+	result         error
+	beginErr       error
+	waitErr        error
+	ignoreShutdown atomic.Bool
+	beginCalls     atomic.Int32
+	waitCalls      atomic.Int32
+}
+
+func newFixtureCandidate() *fixtureCandidate {
+	return &fixtureCandidate{done: make(chan struct{})}
+}
+
+func (candidate *fixtureCandidate) Done() <-chan struct{} { return candidate.done }
+
+func (candidate *fixtureCandidate) Result() error { return candidate.result }
+
+func (candidate *fixtureCandidate) BeginShutdown() error {
+	candidate.beginCalls.Add(1)
+	if !candidate.ignoreShutdown.Load() {
+		candidate.stop.Do(func() { close(candidate.done) })
+	}
+	return candidate.beginErr
+}
+
+func (candidate *fixtureCandidate) Wait(ctx context.Context) error {
+	candidate.waitCalls.Add(1)
+	select {
+	case <-candidate.done:
+		return candidate.waitErr
+	case <-ctx.Done():
+		return context.Cause(ctx)
+	}
+}
+
+func (candidate *fixtureCandidate) exit(result error) {
+	candidate.result = result
+	candidate.stop.Do(func() { close(candidate.done) })
+}
+
+func candidateJoinedFixture(candidate *fixtureCandidate) bool {
+	select {
+	case <-candidate.done:
+		return true
+	default:
+		return false
+	}
+}
+
+func receiveManagedTestValue[T any](t *testing.T, values <-chan T) T {
+	t.Helper()
+	select {
+	case value := <-values:
+		return value
+	case <-time.After(time.Second):
+		t.Fatal("managed lifecycle operation timed out")
+		var zero T
+		return zero
+	}
+}
+
 type secretDiscovery struct{ secret string }
 
 func (secretDiscovery) Discover(context.Context) (client.Connector, error) {
@@ -398,7 +689,9 @@ func (secretDiscovery) Discover(context.Context) (client.Connector, error) {
 
 type secretStarter struct{ secret string }
 
-func (secretStarter) Start(context.Context) error { return nil }
+func (secretStarter) Start(context.Context) (managed.Candidate, error) {
+	return newFixtureCandidate(), nil
+}
 
 type secretLock struct{ secret string }
 

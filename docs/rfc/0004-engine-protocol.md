@@ -217,6 +217,26 @@ accidental/ambient local connections but does not defend against code already
 running as the same user. Remote access requires a new threat model and protocol
 extension.
 
+The default endpoint scope is one immutable directory/transport/address tuple,
+not three independently configurable values. Unix uses a trusted private
+`XDG_RUNTIME_DIR` scope or a per-user directory below a trusted sticky temporary
+directory. Windows uses a private LocalAppData runtime directory and a canonical
+local named pipe derived from the current user's SID. Explicit attachment still
+requires matching active protected metadata and its credential; an arbitrary
+local address is never dialed directly. Absence, stale or malformed state, and
+address mismatch are attach failures and cannot authorize managed startup.
+
+Managed process policy owns only the exact candidate returned by its starter.
+The discovery recheck and launch are serialized, and only the exact unwrapped
+absence sentinel permits launch. Candidate exit competes with readiness so an
+early exit fails promptly. Failed or canceled initialization shuts down and
+joins the candidate; connector shutdown cancels initialization and boundedly
+joins only that owned candidate. A daemon found through discovery is external
+and is never stopped. A timed-out join retains ownership for an explicit retry.
+The starter abstraction and these ownership semantics are implemented, but the
+distribution's real process starter and CLI wiring are not yet part of this
+protocol milestone.
+
 Snapshot authority uses a distinct server-owned key. The public 32-byte scope ID
 and positive generation select that key; neither is a secret. The HMAC proves
 integrity and authority but does not encrypt conversation content. Scope keys
@@ -243,8 +263,11 @@ fields, capability mismatch, transport-metadata authentication separation,
 deadline/cancellation fields, overload, cursor gap/recovery, stale interaction
 response, snapshot version skew, malformed input, fuzz smoke, Buf lint/breaking,
 deterministic generation, duplicate operations, authenticated unary and stream
-RPCs, reconnect fencing, Windows/Unix endpoint permissions, and protocol-1.3
-initialization replay. Managed process launch, daemon/TUI attachment, and real
+RPCs, reconnect fencing, Windows/Unix endpoint permissions, protected explicit
+attach, managed-candidate ownership, and protocol-1.3 initialization replay.
+The available current-user and candidate evidence is recorded in
+[`../implementation/evidence/phase4-managed-local-lifecycle.md`](../implementation/evidence/phase4-managed-local-lifecycle.md).
+The distribution process launcher, daemon/TUI attachment, and real
 cross-platform terminal acceptance remain required before the Phase 4 freeze.
 
 The pre-host contract repair resolves interaction prompt discovery, reconnect

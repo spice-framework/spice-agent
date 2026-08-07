@@ -9,7 +9,7 @@ Repository roadmaps link here and must not duplicate status.
 | 1 — Spice-native composition | Complete for preview | generated static DI, auto-configuration, cross-repository continuation |
 | 2 — deterministic kernel | Complete for preview | `841edd3`; deterministic lifecycle, interaction, snapshot, race/fuzz proof |
 | 3 — provider and coding tools | In progress | generated cross-repository continuation and opt-in live acceptance |
-| 4 — daemon and TUI | In progress | provisional local protocol baseline; host/reconnect proof pending |
+| 4 — daemon and TUI | In progress | host/local IPC/current-user candidate libraries proven; distribution process and TUI workflow pending |
 | 5 — runtime plugins | In progress | execution-outcome and kernel plan-lease prerequisites complete; plugin host/conformance pending |
 | 6 — architecture proof | Planned | signed `v0.1.0-preview.1` distribution |
 | 7 — stress prototypes | Planned | permission, SQLite, alternate UI, two-worker experiments |
@@ -214,13 +214,23 @@ identity. Evidence and the remaining process-launch/TUI exclusions are in
 Implementation commit `ec3ef1c` passed the complete local gate in 155.8 seconds
 at 85.2% whole-repository handwritten-product coverage with zero reachable
 vulnerabilities and full race, fuzz, and offline-vendor proof.
+The current-user lifecycle slice adds the normative current-user scope, protected
+explicit-attach policy, and ownership-safe managed-candidate lifecycle. The
+scope selects one inseparable private directory/local transport/address tuple;
+explicit attach requires an exact address match in active protected metadata
+and can never authorize startup; managed shutdown stops only the exact candidate
+this connector launched. Failed, canceled, or early-exiting launches are
+boundedly shut down and joined, while an incomplete join retains ownership for
+a later attempt. Windows focused, repeated, race, and vet evidence plus the
+reported WSL endpoint race evidence are recorded in
+[`evidence/phase4-managed-local-lifecycle.md`](evidence/phase4-managed-local-lifecycle.md).
 Protocol minor 3 now closes the local initialization acknowledgement gap. One
 caller-owned 128-bit identity covers both fresh allocation and reconnect CAS;
 the server coalesces exact duplicates, publishes replay state atomically with
 ownership, retains creation/latest-reconnect results within fixed bounds, and
 rejects conflicting reuse. The client performs one exact retry only for a
 transient unavailable transport and preserves legacy 1.0-1.2 uncertainty.
-Evidence and remaining managed-launch/TUI exclusions are in
+Evidence and remaining process-launch/TUI exclusions are in
 [`evidence/phase4-initialization-replay.md`](evidence/phase4-initialization-replay.md).
 The snapshot-import contract now also exposes a complete unkeyed structural
 validator for the transport boundary. It accounts for compatible unknown
@@ -238,18 +248,20 @@ external acceptance constructs the generated application, starts it, runs the
 actual injected shell, and stops it on normal exit. Full verification passed in
 158.4 seconds at 90.1% handwritten-product coverage, including generation
 freshness, shuffled/race tests, and vendor-offline execution. This proves the
-compiled presentation boundary; it does not yet claim a daemon client adapter,
-managed startup, reconnect, or real Windows/Linux terminal workflow.
+compiled presentation boundary; it does not yet claim distribution-managed
+process startup, reconnect, or a real Windows/Linux terminal workflow.
 Transactional `PrepareStart` and `PrepareResumeSnapshot` handles now provide the
 kernel seam required for authority-before-publish hosting. They acquire and
 validate the exact execution resources without engine registration, events, or
 execution; one commit supplies the run-root context, while abort releases once.
 See
 [`evidence/phase4-kernel-preparation.md`](evidence/phase4-kernel-preparation.md).
-The schema is not the final Phase 4 freeze: the host slice must prove these
-repaired contracts over real RPCs, enforce same-daemon run tombstones and
-OS-backed import-authority lifecycle, and ensure RPC contexts never own run lifetime
-before the baseline can be declared stable.
+The schema is not the final Phase 4 freeze. The host, authenticated local IPC,
+and managed-candidate libraries now prove those repaired contracts, but the
+distribution must still supply real daemon process ownership and generated
+daemon/TUI application wiring, exercise one-command and explicit attach through
+installed Windows/Linux processes and terminals, and resolve or bound the
+engine's service-lifetime run-identity tombstones.
 
 ## Phase 5.0A execution prerequisite
 

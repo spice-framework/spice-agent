@@ -22,6 +22,12 @@ var (
 	ErrStartupTimeout = errors.New("local daemon startup timed out")
 	// ErrClosed reports use after the managed connector has closed.
 	ErrClosed = errors.New("managed connector is closed")
+	// ErrCandidateExited reports that the child launched by this connector
+	// terminated before a usable initialized endpoint was available.
+	ErrCandidateExited = errors.New("managed daemon candidate exited before startup completed")
+	// ErrShutdownTimeout reports that an owned candidate did not join within the
+	// connector's bounded shutdown budget.
+	ErrShutdownTimeout = errors.New("managed daemon shutdown timed out")
 )
 
 // Discovery resolves current-user endpoint state into a configured connector.
@@ -31,10 +37,22 @@ type Discovery interface {
 	Discover(context.Context) (client.Connector, error)
 }
 
-// Starter launches one local daemon candidate. Returning nil means launch was
-// accepted, not that the endpoint is already ready.
+// Candidate is the exact child process lifetime returned by Starter. Done
+// closes exactly once at process exit. Result is safe after Done closes and
+// reports the final process outcome. BeginShutdown is idempotent and
+// nonblocking. Wait joins process resources and must honor its context.
+type Candidate interface {
+	Done() <-chan struct{}
+	Result() error
+	BeginShutdown() error
+	Wait(context.Context) error
+}
+
+// Starter launches one local daemon candidate whose lifetime is independent
+// of the launch context. A non-nil candidate returned with an error is still
+// owned by the caller and will be shut down and joined.
 type Starter interface {
-	Start(context.Context) error
+	Start(context.Context) (Candidate, error)
 }
 
 // StartupLock serializes discovery recheck and process launch across clients.
@@ -50,23 +68,29 @@ type StartupLease interface {
 
 // Config supplies platform-owned managed-start boundaries.
 type Config struct {
-	Discovery      Discovery
-	Starter        Starter
-	StartupLock    StartupLock
-	StartupTimeout time.Duration
-	RetryInterval  time.Duration
+	Discovery       Discovery
+	Starter         Starter
+	StartupLock     StartupLock
+	StartupTimeout  time.Duration
+	RetryInterval   time.Duration
+	ShutdownTimeout time.Duration
 }
 
 // Connector implements client.Connector with bounded attach-or-start policy.
 type Connector struct {
-	discovery      Discovery
-	starter        Starter
-	startupLock    StartupLock
-	startupTimeout time.Duration
-	retryInterval  time.Duration
+	discovery       Discovery
+	starter         Starter
+	startupLock     StartupLock
+	startupTimeout  time.Duration
+	retryInterval   time.Duration
+	shutdownTimeout time.Duration
 
-	mu     sync.RWMutex
-	closed bool
+	initializeGate chan struct{}
+
+	mu           sync.Mutex
+	closed       bool
+	activeCancel context.CancelCauseFunc
+	owned        Candidate
 }
 
 // String prevents dependency implementations from leaking endpoint material.
@@ -90,14 +114,24 @@ func New(config Config) (*Connector, error) {
 	if config.Discovery == nil || config.Starter == nil || config.StartupLock == nil {
 		return nil, errors.New("managed connector requires discovery, starter, and startup lock")
 	}
-	if config.StartupTimeout <= 0 || config.RetryInterval <= 0 ||
+	if config.ShutdownTimeout == 0 {
+		config.ShutdownTimeout = config.StartupTimeout
+	}
+	if config.StartupTimeout <= 0 || config.RetryInterval <= 0 || config.ShutdownTimeout <= 0 ||
 		config.RetryInterval > config.StartupTimeout {
 		return nil, errors.New("managed connector timing is invalid")
 	}
 	return &Connector{
 		discovery: config.Discovery, starter: config.Starter, startupLock: config.StartupLock,
 		startupTimeout: config.StartupTimeout, retryInterval: config.RetryInterval,
+		shutdownTimeout: config.ShutdownTimeout, initializeGate: newInitializeGate(),
 	}, nil
+}
+
+func newInitializeGate() chan struct{} {
+	gate := make(chan struct{}, 1)
+	gate <- struct{}{}
+	return gate
 }
 
 // Initialize attaches to an existing endpoint or performs one serialized,
@@ -115,12 +149,17 @@ func (connector *Connector) Initialize(
 	if err := request.Validate(); err != nil {
 		return nil, fmt.Errorf("managed initialization request: %w", err)
 	}
-	if err := connector.available(); err != nil {
-		return nil, err
-	}
 	if err := context.Cause(ctx); err != nil {
 		return nil, err
 	}
+	operationContext, finish, err := connector.beginInitialize(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		session, resultErr = finish(session, resultErr)
+	}()
+	ctx = operationContext
 	resolved, err := connector.discovery.Discover(ctx)
 	if cause := context.Cause(ctx); cause != nil {
 		return nil, cause
@@ -129,9 +168,15 @@ func (connector *Connector) Initialize(
 		return initializeResolved(ctx, resolved, request)
 	}
 	if !exactEndpointAbsence(err) {
-		return nil, fmt.Errorf("discover local daemon: %w", err)
+		return nil, opaqueFailure("discover local daemon failed", err)
 	}
+	return connector.initializeAfterAbsence(ctx, request)
+}
 
+func (connector *Connector) initializeAfterAbsence(
+	ctx context.Context,
+	request client.InitializeRequest,
+) (session client.Session, resultErr error) {
 	startupContext, cancelStartup := context.WithTimeoutCause(ctx, connector.startupTimeout, ErrStartupTimeout)
 	defer cancelStartup()
 	lease, err := connector.startupLock.Acquire(startupContext)
@@ -140,25 +185,33 @@ func (connector *Connector) Initialize(
 		if lease != nil {
 			releaseErr = lease.Release()
 		}
-		return nil, errors.Join(
-			classifyStartupContext(startupContext, fmt.Errorf("acquire daemon startup lock: %w", err)),
+		return nil, opaqueFailure(
+			"acquire daemon startup lock failed",
+			classifyStartupContext(startupContext, opaqueFailure("acquire daemon startup lock failed", err)),
 			releaseErr,
 		)
 	}
 	if lease == nil {
 		return nil, errors.New("daemon startup lock returned a nil lease")
 	}
+	var launchedCandidate Candidate
 	defer func() {
 		if releaseErr := lease.Release(); releaseErr != nil {
-			var closeErr error
+			var closeErr, cleanupErr error
 			if session != nil {
 				closeErr = session.Close()
 				session = nil
 			}
-			resultErr = errors.Join(
+			if launchedCandidate != nil {
+				cleanupErr = connector.cleanupOwnedCandidate(launchedCandidate)
+				launchedCandidate = nil
+			}
+			resultErr = opaqueFailure(
+				"managed startup cleanup failed",
 				resultErr,
-				fmt.Errorf("release daemon startup lock: %w", releaseErr),
+				releaseErr,
 				closeErr,
+				cleanupErr,
 			)
 		}
 	}()
@@ -166,7 +219,7 @@ func (connector *Connector) Initialize(
 		return nil, classifyStartupContext(startupContext, err)
 	}
 
-	resolved, err = connector.discovery.Discover(startupContext)
+	resolved, err := connector.discovery.Discover(startupContext)
 	if cause := context.Cause(startupContext); cause != nil {
 		return nil, classifyStartupContext(startupContext, cause)
 	}
@@ -174,28 +227,149 @@ func (connector *Connector) Initialize(
 		return initializeResolved(startupContext, resolved, request)
 	}
 	if !exactEndpointAbsence(err) {
-		return nil, fmt.Errorf("rediscover local daemon: %w", err)
+		return nil, opaqueFailure("rediscover local daemon failed", err)
 	}
 	if err = context.Cause(startupContext); err != nil {
 		return nil, classifyStartupContext(startupContext, err)
 	}
-	if err = connector.starter.Start(startupContext); err != nil {
-		return nil, classifyStartupContext(startupContext, fmt.Errorf("start local daemon: %w", err))
+	candidate, launched, err := connector.ensureCandidate(startupContext)
+	if err != nil {
+		return nil, classifyStartupContext(startupContext, err)
 	}
-	return connector.awaitStarted(startupContext, request)
+	if launched {
+		launchedCandidate = candidate
+	}
+	session, err = connector.awaitStarted(startupContext, request, candidate)
+	if err == nil {
+		return session, nil
+	}
+	if !launched && !errors.Is(err, ErrCandidateExited) {
+		return nil, err
+	}
+	cleanupErr := connector.cleanupOwnedCandidate(candidate)
+	launchedCandidate = nil
+	return nil, opaqueFailure("managed daemon startup failed", err, cleanupErr)
+}
+
+func (connector *Connector) beginInitialize(
+	ctx context.Context,
+) (context.Context, func(client.Session, error) (client.Session, error), error) {
+	select {
+	case <-ctx.Done():
+		return nil, nil, context.Cause(ctx)
+	case <-connector.initializeGate:
+	}
+	connector.mu.Lock()
+	if connector.closed {
+		connector.mu.Unlock()
+		connector.initializeGate <- struct{}{}
+		return nil, nil, ErrClosed
+	}
+	operationContext, cancel := context.WithCancelCause(ctx)
+	connector.activeCancel = cancel
+	connector.mu.Unlock()
+	return operationContext, func(session client.Session, resultErr error) (client.Session, error) {
+		return connector.finishInitialize(operationContext, cancel, session, resultErr)
+	}, nil
+}
+
+func (connector *Connector) finishInitialize(
+	ctx context.Context,
+	cancel context.CancelCauseFunc,
+	session client.Session,
+	resultErr error,
+) (client.Session, error) {
+	connector.mu.Lock()
+	cause := context.Cause(ctx)
+	if cause == nil && connector.closed {
+		cause = ErrClosed
+	}
+	connector.activeCancel = nil
+	connector.mu.Unlock()
+	cancel(nil)
+	if cause != nil {
+		var closeErr error
+		if session != nil {
+			closeErr = session.Close()
+			session = nil
+		}
+		resultErr = opaqueFailure("managed initialization did not complete", cause, resultErr, closeErr)
+	}
+	connector.initializeGate <- struct{}{}
+	return session, resultErr
+}
+
+func (connector *Connector) ensureCandidate(ctx context.Context) (Candidate, bool, error) {
+	connector.mu.Lock()
+	existing := connector.owned
+	closed := connector.closed
+	connector.mu.Unlock()
+	if existing != nil {
+		return existing, false, nil
+	}
+	if closed {
+		return nil, false, ErrClosed
+	}
+	candidate, err := connector.starter.Start(ctx)
+	if candidate == nil {
+		if err != nil {
+			return nil, false, opaqueFailure("start local daemon failed", err)
+		}
+		return nil, false, errors.New("local daemon starter returned a nil candidate")
+	}
+	if candidate.Done() == nil {
+		_, cleanupErr := connector.shutdownCandidate(candidate, context.Background())
+		return nil, false, opaqueFailure("local daemon candidate is invalid", cleanupErr)
+	}
+	connector.mu.Lock()
+	if connector.owned != nil {
+		connector.mu.Unlock()
+		_, cleanupErr := connector.shutdownCandidate(candidate, context.Background())
+		return nil, false, opaqueFailure("managed connector already owns a daemon candidate", cleanupErr)
+	}
+	connector.owned = candidate
+	closed = connector.closed
+	connector.mu.Unlock()
+	if err != nil {
+		cleanupErr := connector.cleanupOwnedCandidate(candidate)
+		return nil, false, opaqueFailure("start local daemon failed", err, cleanupErr)
+	}
+	if closed {
+		cleanupErr := connector.cleanupOwnedCandidate(candidate)
+		return nil, false, opaqueFailure("managed connector closed during daemon launch", ErrClosed, cleanupErr)
+	}
+	return candidate, true, nil
 }
 
 func (connector *Connector) awaitStarted(
 	ctx context.Context,
 	request client.InitializeRequest,
+	candidate Candidate,
 ) (client.Session, error) {
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 	for {
+		if cause := context.Cause(ctx); cause != nil {
+			return nil, classifyStartupContext(ctx, cause)
+		}
+		if candidateJoined(candidate) {
+			return nil, candidateExitFailure(candidate)
+		}
 		select {
 		case <-ctx.Done():
 			return nil, classifyStartupContext(ctx, ctx.Err())
+		case <-candidate.Done():
+			if cause := context.Cause(ctx); cause != nil {
+				return nil, classifyStartupContext(ctx, cause)
+			}
+			return nil, candidateExitFailure(candidate)
 		case <-timer.C:
+		}
+		if cause := context.Cause(ctx); cause != nil {
+			return nil, classifyStartupContext(ctx, cause)
+		}
+		if candidateJoined(candidate) {
+			return nil, candidateExitFailure(candidate)
 		}
 		resolved, err := connector.discovery.Discover(ctx)
 		if cause := context.Cause(ctx); cause != nil {
@@ -210,10 +384,14 @@ func (connector *Connector) awaitStarted(
 				return nil, initializeErr
 			}
 		} else if !exactEndpointAbsence(err) {
-			return nil, fmt.Errorf("discover started daemon: %w", err)
+			return nil, opaqueFailure("discover started daemon failed", err)
 		}
 		timer.Reset(connector.retryInterval)
 	}
+}
+
+func candidateExitFailure(candidate Candidate) error {
+	return opaqueFailure("managed daemon candidate exited", ErrCandidateExited, candidate.Result())
 }
 
 func exactEndpointAbsence(err error) bool {
@@ -236,14 +414,14 @@ func initializeResolved(
 		if session != nil {
 			closeErr = session.Close()
 		}
-		return nil, errors.Join(cause, err, closeErr)
+		return nil, opaqueFailure("managed initialization was canceled", cause, err, closeErr)
 	}
 	if err != nil {
 		var closeErr error
 		if session != nil {
 			closeErr = session.Close()
 		}
-		return nil, errors.Join(fmt.Errorf("initialize local daemon: %w", err), closeErr)
+		return nil, opaqueFailure("initialize local daemon failed", err, closeErr)
 	}
 	if session == nil {
 		return nil, errors.New("local daemon returned a nil session")
@@ -267,24 +445,129 @@ func classifyStartupContext(ctx context.Context, fallback error) error {
 	return fallback
 }
 
-func (connector *Connector) available() error {
-	connector.mu.RLock()
-	defer connector.mu.RUnlock()
-	if connector.closed {
-		return ErrClosed
+func (connector *Connector) cleanupOwnedCandidate(candidate Candidate) error {
+	joined, err := connector.shutdownCandidate(candidate, context.Background())
+	if joined {
+		connector.mu.Lock()
+		connector.owned = nil
+		connector.mu.Unlock()
 	}
-	return nil
+	return err
 }
 
-// Close prevents future initialization. It does not close sessions already
-// returned to callers and never stops a user-scoped daemon.
+func (connector *Connector) shutdownCandidate(
+	candidate Candidate,
+	parent context.Context,
+) (bool, error) {
+	if candidate == nil {
+		return true, nil
+	}
+	ctx, cancel := context.WithTimeoutCause(parent, connector.shutdownTimeout, ErrShutdownTimeout)
+	defer cancel()
+	beginErr := candidate.BeginShutdown()
+	waitErr := candidate.Wait(ctx)
+	joined := candidateJoined(candidate)
+	if !joined {
+		cause := context.Cause(ctx)
+		if cause == nil {
+			cause = ErrShutdownTimeout
+		}
+		return false, opaqueFailure("managed daemon shutdown did not join", cause, waitErr, beginErr)
+	}
+	return true, opaqueFailureOrNil("managed daemon shutdown failed", beginErr, waitErr, candidate.Result())
+}
+
+func candidateJoined(candidate Candidate) bool {
+	if candidate == nil || candidate.Done() == nil {
+		return false
+	}
+	select {
+	case <-candidate.Done():
+		return true
+	default:
+		return false
+	}
+}
+
+// Shutdown closes admission, cancels in-flight initialization, and boundedly
+// shuts down and joins only the exact candidate launched by this connector.
+// A daemon discovered before launch is external and is never stopped.
+func (connector *Connector) Shutdown(ctx context.Context) error {
+	if connector == nil {
+		return nil
+	}
+	if ctx == nil {
+		return errors.New("managed shutdown context is required")
+	}
+	shutdownContext, cancel := context.WithTimeoutCause(ctx, connector.shutdownTimeout, ErrShutdownTimeout)
+	defer cancel()
+	connector.mu.Lock()
+	connector.closed = true
+	activeCancel := connector.activeCancel
+	connector.mu.Unlock()
+	if activeCancel != nil {
+		activeCancel(ErrClosed)
+	}
+	select {
+	case <-shutdownContext.Done():
+		return classifyShutdownContext(shutdownContext)
+	case <-connector.initializeGate:
+	}
+	defer func() { connector.initializeGate <- struct{}{} }()
+	connector.mu.Lock()
+	candidate := connector.owned
+	connector.mu.Unlock()
+	joined, err := connector.shutdownCandidate(candidate, shutdownContext)
+	if joined {
+		connector.mu.Lock()
+		connector.owned = nil
+		connector.mu.Unlock()
+	}
+	return err
+}
+
+func classifyShutdownContext(ctx context.Context) error {
+	cause := context.Cause(ctx)
+	if errors.Is(cause, ErrShutdownTimeout) {
+		return opaqueFailure("managed daemon shutdown timed out", ErrShutdownTimeout, context.DeadlineExceeded)
+	}
+	return cause
+}
+
+// Close is the context-free compatibility alias for bounded Shutdown. It does
+// not close sessions already returned to callers.
 func (connector *Connector) Close() error {
 	if connector == nil {
 		return nil
 	}
-	connector.mu.Lock()
-	connector.closed = true
-	connector.mu.Unlock()
+	return connector.Shutdown(context.Background())
+}
+
+type redactedFailure struct {
+	message string
+	causes  []error
+}
+
+func (failure *redactedFailure) Error() string { return failure.message }
+
+func (failure *redactedFailure) Unwrap() []error { return failure.causes }
+
+func opaqueFailure(message string, causes ...error) error {
+	filtered := make([]error, 0, len(causes))
+	for _, cause := range causes {
+		if cause != nil {
+			filtered = append(filtered, cause)
+		}
+	}
+	return &redactedFailure{message: message, causes: filtered}
+}
+
+func opaqueFailureOrNil(message string, causes ...error) error {
+	for _, cause := range causes {
+		if cause != nil {
+			return opaqueFailure(message, causes...)
+		}
+	}
 	return nil
 }
 

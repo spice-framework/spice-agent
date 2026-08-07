@@ -133,10 +133,11 @@ ownership check and then reuses the same private snapshot path, preventing the
 initialization adapter and later health RPC from inventing separate readiness
 models.
 
-RunHost contains no gRPC server, Protobuf/RPC translation, event or interaction
-stream adapter, listener, endpoint authentication, Unix socket, Windows named
-pipe, discovery, or managed-startup implementation. Those remain the next
-Phase 4 transport slices.
+RunHost itself contains no gRPC server, Protobuf/RPC translation, event or
+interaction stream adapter, listener, endpoint authentication, Unix socket,
+Windows named pipe, discovery, or managed-startup implementation. Sibling
+transport packages implement those boundaries without importing them back into
+RunHost.
 
 The sibling `daemon/grpcserver` package now owns the first transport-security
 prerequisite: an opaque random 256-bit endpoint credential and matching unary
@@ -184,6 +185,35 @@ interaction JSON is bounded and secret-redacted by default, and every typed
 failure preserves the wire status's common safe facts. Authentication,
 discovery, gRPC translation, and OS endpoint ownership belong to an adapter,
 not this contract or the TUI.
+
+`daemon/endpoint.UserScope` is the normative current-user endpoint root. It
+keeps the verified private runtime directory, platform-local transport, and
+canonical address inseparable. Unix selects a trusted private XDG runtime scope
+or a per-user directory below a trusted sticky temporary directory; Windows
+selects a private LocalAppData scope and a canonical local named pipe derived
+from the current SID. Revalidation and store opening return through the retained
+ownership-checking storage boundary. No default scope can select TCP, a remote
+pipe, or a caller-composed directory/address pair.
+
+`client/localclient.ExplicitDiscovery` resolves a caller-selected address only
+by exact match against active protected endpoint metadata. It never dials an
+unpublished address, never turns missing, stale, malformed, or mismatched state
+into startup authorization, and preserves credential/address redaction. The
+ordinary local discovery adapter remains responsible for constructing the lazy
+authenticated gRPC connection over `daemon/localipc`.
+
+`client/managed` owns attach-or-start policy rather than process construction.
+Only the exact unwrapped absence sentinel authorizes the serialized
+discovery/recheck/start sequence. A `Starter` returns the exact `Candidate`
+lifetime handle owned by that connector. Readiness watches both discovery and
+candidate exit; failed, canceled, or release-failed initialization boundedly
+shuts down and joins the candidate. Connector shutdown closes admission,
+cancels an in-flight initializer, and stops only that owned candidate—never a
+daemon obtained from discovery. An incomplete join retains ownership for a
+later shutdown attempt. The distribution still must supply the concrete process
+starter and compose these libraries into managed and explicit commands. Current
+evidence is in
+[`docs/implementation/evidence/phase4-managed-local-lifecycle.md`](docs/implementation/evidence/phase4-managed-local-lifecycle.md).
 
 `common/v1` and `engine/v1` are the only initial Protobuf process boundary.
 They encode protocol negotiation, typed status, server-owned definitions,
