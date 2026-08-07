@@ -178,7 +178,11 @@ func pythonFixtureAddress(t *testing.T) string {
 			t.Errorf("remove Python fixture directory: %v", cleanupErr)
 		}
 	})
-	address := filepath.Join(directory, "plugin-"+hex.EncodeToString(random)+".sock")
+	realDirectory, err := filepath.EvalSymlinks(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	address := filepath.Join(realDirectory, "plugin-"+hex.EncodeToString(random)+".sock")
 	if !filepath.IsAbs(address) {
 		t.Fatal("Python fixture socket path is not absolute")
 	}

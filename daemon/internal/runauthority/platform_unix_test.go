@@ -12,11 +12,11 @@ import (
 )
 
 func TestUnixRejectsIntermediateSymlink(t *testing.T) {
-	realDirectory := filepath.Join(t.TempDir(), "real")
+	realDirectory := filepath.Join(authorityTestRoot(t), "real")
 	if err := os.Mkdir(realDirectory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	link := filepath.Join(t.TempDir(), "link")
+	link := filepath.Join(authorityTestRoot(t), "link")
 	if err := os.Symlink(realDirectory, link); err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +26,7 @@ func TestUnixRejectsIntermediateSymlink(t *testing.T) {
 }
 
 func TestUnixRejectsHardLinkedAuthorityFile(t *testing.T) {
-	directory := filepath.Join(t.TempDir(), "authority")
+	directory := filepath.Join(authorityTestRoot(t), "authority")
 	store, err := Open(Config{Directory: directory})
 	if err != nil {
 		t.Fatal(err)
@@ -43,7 +43,7 @@ func TestUnixRejectsHardLinkedAuthorityFile(t *testing.T) {
 }
 
 func TestUnixBoundDirectorySurvivesPathSubstitution(t *testing.T) {
-	root := t.TempDir()
+	root := authorityTestRoot(t)
 	directory := filepath.Join(root, "authority")
 	store := openTestStore(t, directory)
 	active, err := store.Start(t.Context(), "bound-run")

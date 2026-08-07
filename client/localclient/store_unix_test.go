@@ -15,5 +15,9 @@ func currentStoreDirectory(t testing.TB) string {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(root) })
-	return filepath.Join(root, "endpoint")
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(realRoot, "endpoint")
 }

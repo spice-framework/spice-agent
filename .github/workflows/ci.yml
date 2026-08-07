@@ -20,6 +20,7 @@ jobs:
           cache-dependency-path: |
             go.sum
             tools/go.sum
+      - run: go run ./internal/qualitygate -mode=tools-bootstrap
       - run: go run ./internal/qualitygate -mode=verify
   required:
     if: always()

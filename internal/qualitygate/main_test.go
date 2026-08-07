@@ -22,6 +22,26 @@ func TestNetworkIsReservedForExplicitBootstrap(t *testing.T) {
 	}
 }
 
+func TestRepositoryPortabilityRequiresLFAndExplicitToolBootstrap(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeGateFile(t, root, ".gitattributes", "* text=auto eol=lf\n*.pb -text\n*.png -text\n")
+	writeGateFile(t, root, ".github/workflows/ci.yml", `steps:
+  - run: go run ./internal/qualitygate -mode=tools-bootstrap
+  - run: go run ./internal/qualitygate -mode=verify
+`)
+	if err := checkRepositoryPortability(root); err != nil {
+		t.Fatal(err)
+	}
+
+	writeGateFile(t, root, ".github/workflows/ci.yml", `steps:
+  - run: go run ./internal/qualitygate -mode=verify
+`)
+	if err := checkRepositoryPortability(root); err == nil || !strings.Contains(err.Error(), "bootstrap") {
+		t.Fatalf("missing bootstrap error = %v", err)
+	}
+}
+
 func TestBootstrapUsesCopiedModuleGraphAndPreservesSource(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

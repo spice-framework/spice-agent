@@ -385,7 +385,11 @@ func (*completedStream) Close() error { return nil }
 func authorityTestRoot(t *testing.T) string {
 	t.Helper()
 	if runtime.GOOS != "windows" {
-		return t.TempDir()
+		root, err := filepath.EvalSymlinks(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return root
 	}
 	cache, err := os.UserCacheDir()
 	if err != nil {

@@ -21,5 +21,9 @@ func currentPlatformAddress(t testing.TB) string {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(directory) })
-	return filepath.Join(directory, "agent.sock")
+	realDirectory, err := filepath.EvalSymlinks(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(realDirectory, "agent.sock")
 }

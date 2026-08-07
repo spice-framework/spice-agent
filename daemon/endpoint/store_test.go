@@ -596,7 +596,11 @@ func bindDirectoryFixture(tb testing.TB, path string) *userstorage.Directory {
 func endpointTestPath(tb testing.TB, name string) string {
 	tb.Helper()
 	if runtime.GOOS != "windows" {
-		return filepath.Join(tb.TempDir(), name)
+		root, err := filepath.EvalSymlinks(tb.TempDir())
+		if err != nil {
+			tb.Fatal(err)
+		}
+		return filepath.Join(root, name)
 	}
 	cache, err := os.UserCacheDir()
 	if err != nil {

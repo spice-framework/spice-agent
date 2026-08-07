@@ -231,7 +231,11 @@ func fixtureAddress(t *testing.T) string {
 			t.Errorf("remove fixture directory: %v", cleanupErr)
 		}
 	})
-	return filepath.Join(directory, name+".sock")
+	realDirectory, err := filepath.EvalSymlinks(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(realDirectory, name+".sock")
 }
 
 func repositoryRoot(t *testing.T) string {
