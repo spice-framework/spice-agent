@@ -13,6 +13,16 @@ sequenced events, cancellation, panic containment, and snapshots. It does not
 own providers, filesystem or shell tools, persistence, permissions, telemetry,
 MCP, Git, indexing, TUI code, subagents, or distributed scheduling.
 
+New and resumed execution use a transactional kernel boundary. `PrepareStart`
+allocates the stable run ID and acquires the current immutable plan; snapshot
+preparation acquires the exact recorded generation. Both validate and build an
+unregistered event log without publishing events or starting execution. An
+outer host can therefore acquire authority before `Commit` atomically registers
+the run and starts it with a separately supplied caller-owned root context.
+`Abort`/`Close` release the uncommitted log and lease exactly once. Preparation
+contexts never become run lifetimes, and no protocol or daemon authority policy
+is embedded in the kernel.
+
 Runtime plugins are the sole dynamic graph. A run leases one immutable plugin
 generation; activation never changes existing runs and never alters compiled DI.
 The kernel expresses this boundary generically as `stage.ToolPlanSource` and

@@ -93,6 +93,12 @@ Its deterministic concurrency, shutdown, overflow, aliasing, capacity, and
 secret-containment evidence is recorded in
 [`evidence/phase4-host-foundation.md`](evidence/phase4-host-foundation.md).
 No RPC server or local transport is claimed by this foundation.
+Transactional `PrepareStart` and `PrepareResumeSnapshot` handles now provide the
+kernel seam required for authority-before-publish hosting. They acquire and
+validate the exact execution resources without engine registration, events, or
+execution; one commit supplies the run-root context, while abort releases once.
+See
+[`evidence/phase4-kernel-preparation.md`](evidence/phase4-kernel-preparation.md).
 The schema is not the final Phase 4 freeze: the host slice must prove these
 repaired contracts over real RPCs, enforce same-daemon run tombstones and
 cross-process import authority, and ensure RPC contexts never own run lifetime

@@ -70,6 +70,15 @@ does not erase committed operation outcomes.
   snapshots, and preserves the run ID embedded in the snapshot. Clients cannot
   rename an imported run or assert a replacement plan.
 
+The daemon adapter must use the kernel's transactional preparation boundary for
+both `StartRun` and `ImportSnapshot`. It first prepares the execution, uses the
+prepared immutable run ID to acquire daemon ownership, and commits only after
+that ownership is durable. The commit receives a daemon-owned run-root context;
+the setup or RPC context never becomes the execution lifetime. If ownership
+cannot be acquired, the adapter closes the prepared execution and releases its
+event log and dynamic-plan lease. These kernel contracts enable the adapter but
+do not themselves implement daemon authority or protocol behavior.
+
 ## Bounds and backpressure
 
 Every unary/stream request has encoded-byte, collection-count, and deadline

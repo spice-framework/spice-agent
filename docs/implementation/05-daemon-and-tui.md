@@ -92,12 +92,18 @@ protocol tests, and fuzz smoke are green. This is intentionally not a daemon.
 The transport-independent foundation of slice 2 is also implemented: immutable
 server definitions, root-owned reconnect CAS sessions, bounded per-client
 idempotency, and an atomic complete-first pending-interaction broker. It adds no
-listener or RPC adapter. The remainder of slices 2 through 6 stays pending,
+listener or RPC adapter. The kernel now also exposes transactional prepared
+start/resume handles: preparation yields a stable run ID and exact leased plan
+without registration or execution, then commit accepts the separately owned run
+root. This is the authority-acquisition seam, not an authority implementation.
+The remainder of slices 2 through 6 stays pending,
 including OS transport, authentication, run hosting/translation, managed
 startup, Bubble Tea behavior, and real Windows/Linux reconnect acceptance. See
 [`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
 Foundation-specific evidence is in
 [`evidence/phase4-host-foundation.md`](evidence/phase4-host-foundation.md).
+Kernel preparation evidence is in
+[`evidence/phase4-kernel-preparation.md`](evidence/phase4-kernel-preparation.md).
 
 The baseline remains intentionally provisional. The pre-host repair closes the
 schema and kernel seams for interaction discovery/run identity, reconnect CAS,
