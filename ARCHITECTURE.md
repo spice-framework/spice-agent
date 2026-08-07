@@ -209,10 +209,13 @@ lifetime handle owned by that connector. Readiness watches both discovery and
 candidate exit; failed, canceled, or release-failed initialization boundedly
 shuts down and joins the candidate. Connector shutdown closes admission,
 cancels an in-flight initializer, and stops only that owned candidate—never a
-daemon obtained from discovery. An incomplete join retains ownership for a
-later shutdown attempt. The distribution still must supply the concrete process
-starter and compose these libraries into managed and explicit commands. Current
-evidence is in
+daemon obtained from discovery. A candidate's `Result` reports only its child
+process outcome, while `Wait` returns nil only when all owned process and
+platform-containment resources are safe to release. A timed-out or failed
+containment join retains ownership for a later shutdown attempt; root-process
+exit alone never proves safe release. The distribution still must supply the
+concrete process starter and compose these libraries into managed and explicit
+commands. Current evidence is in
 [`docs/implementation/evidence/phase4-managed-local-lifecycle.md`](docs/implementation/evidence/phase4-managed-local-lifecycle.md).
 
 `common/v1` and `engine/v1` are the only initial Protobuf process boundary.

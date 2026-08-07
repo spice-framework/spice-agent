@@ -28,6 +28,9 @@ var (
 	// ErrShutdownTimeout reports that an owned candidate did not join within the
 	// connector's bounded shutdown budget.
 	ErrShutdownTimeout = errors.New("managed daemon shutdown timed out")
+	// ErrCandidateJoin reports that a candidate process exited, but one or more
+	// of its owned containment resources could not yet be safely released.
+	ErrCandidateJoin = errors.New("managed daemon candidate resources did not join")
 )
 
 // Discovery resolves current-user endpoint state into a configured connector.
@@ -38,9 +41,11 @@ type Discovery interface {
 }
 
 // Candidate is the exact child process lifetime returned by Starter. Done
-// closes exactly once at process exit. Result is safe after Done closes and
-// reports the final process outcome. BeginShutdown is idempotent and
-// nonblocking. Wait joins process resources and must honor its context.
+// closes exactly once after the child exits and the platform supervisor has
+// attempted its terminal cleanup. Result is safe after Done closes and reports
+// only the child process outcome. BeginShutdown is idempotent and nonblocking.
+// Wait honors its context and returns nil only after every process and
+// containment resource owned by the candidate is safe to release.
 type Candidate interface {
 	Done() <-chan struct{}
 	Result() error
@@ -466,15 +471,15 @@ func (connector *Connector) shutdownCandidate(
 	defer cancel()
 	beginErr := candidate.BeginShutdown()
 	waitErr := candidate.Wait(ctx)
-	joined := candidateJoined(candidate)
+	joined := candidateJoined(candidate) && waitErr == nil
 	if !joined {
 		cause := context.Cause(ctx)
 		if cause == nil {
-			cause = ErrShutdownTimeout
+			cause = ErrCandidateJoin
 		}
 		return false, opaqueFailure("managed daemon shutdown did not join", cause, waitErr, beginErr)
 	}
-	return true, opaqueFailureOrNil("managed daemon shutdown failed", beginErr, waitErr, candidate.Result())
+	return true, opaqueFailureOrNil("managed daemon shutdown failed", beginErr, candidate.Result())
 }
 
 func candidateJoined(candidate Candidate) bool {

@@ -7,5 +7,7 @@
 // never killed, replaced, or silently bypassed. Startup is serialized by a
 // caller-supplied current-user lock and bounded by both the operation context
 // and the configured timeout. Failed or canceled launches are shut down and
-// joined; Shutdown never targets a daemon found through Discovery.
+// joined; Shutdown never targets a daemon found through Discovery. A
+// candidate's process result is separate from its containment join: ownership
+// is released only after Wait confirms that every owned resource is safe.
 package managed

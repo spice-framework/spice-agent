@@ -449,6 +449,36 @@ func TestConnectorShutdownTimeoutRetainsOwnershipForRetry(t *testing.T) {
 	}
 }
 
+func TestConnectorJoinFailureRetainsOwnershipForRetry(t *testing.T) {
+	t.Parallel()
+	joinFailure := errors.New("containment join failed")
+	candidate := newFixtureCandidate()
+	candidate.waitErr = joinFailure
+	starter := &fixtureStarter{candidate: candidate}
+	discovery := &fixtureDiscovery{results: []discoveryResult{
+		{err: managed.ErrEndpointNotFound},
+		{err: managed.ErrEndpointNotFound},
+		{connector: fixtureConnector{session: &fixtureSession{}}},
+	}}
+	connector := newManagedFixture(t, discovery, starter, &fixtureLock{})
+	if _, err := connector.Initialize(t.Context(), initializeRequestFixture(t)); err != nil {
+		t.Fatal(err)
+	}
+	if err := connector.Shutdown(t.Context()); !errors.Is(err, managed.ErrCandidateJoin) || !errors.Is(err, joinFailure) {
+		t.Fatalf("join failure = %v", err)
+	}
+	candidate.waitErr = nil
+	if err := connector.Shutdown(t.Context()); err != nil {
+		t.Fatalf("join retry = %v", err)
+	}
+	if candidate.beginCalls.Load() != 2 || candidate.waitCalls.Load() != 2 {
+		t.Fatalf(
+			"join retry = begin %d wait %d",
+			candidate.beginCalls.Load(), candidate.waitCalls.Load(),
+		)
+	}
+}
+
 func TestConnectorDependencyFailuresAreRedacted(t *testing.T) {
 	t.Parallel()
 	const secret = "managed-secret-canary"

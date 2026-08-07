@@ -30,9 +30,11 @@ formatting paths omit endpoint addresses and credential material.
 ## Candidate ownership and shutdown
 
 `client/managed.Starter` returns a `Candidate` handle with `Done`, `Result`,
-`BeginShutdown`, and context-bounded `Wait` operations. The candidate lifetime
-is independent of the launch context. A non-nil candidate returned alongside a
-launch error is still owned and must be cleaned up.
+`BeginShutdown`, and context-bounded `Wait` operations. `Result` is only the
+child process outcome. `Wait` returns nil only when every process and
+containment resource owned by the candidate is safe to release. The candidate
+lifetime is independent of the launch context. A non-nil candidate returned
+alongside a launch error is still owned and must be cleaned up.
 
 One managed connector serializes initialization locally and uses the supplied
 cross-process startup lease for the discovery recheck and launch decision. It
@@ -53,8 +55,9 @@ Ownership is exact:
   waits for it to leave the serialized boundary, then boundedly stops and joins
   only the owned candidate.
 
-If the candidate cannot join before the shutdown budget, ownership is retained
-and a later `Shutdown` may retry. Dependency errors remain available through
+If the candidate cannot join before the shutdown budget, or its containment
+join reports a failure after process exit, ownership is retained and a later
+`Shutdown` may retry. Dependency errors remain available through
 `errors.Is`/`errors.As`, while their arbitrary text is not copied into the
 public error string. This is lifecycle ownership, not a sandbox: the future
 distribution starter will still launch a daemon with the user's process
@@ -89,8 +92,8 @@ match and protected-store behavior, stale/malformed/canceled attach failures,
 format redaction, exact startup authorization, early exit, failed and canceled
 startup cleanup, release-failure cleanup, external-versus-owned shutdown,
 concurrent initialization, bounded shutdown timeout, retry after an incomplete
-join, dependency-error redaction, and suppression of a late session when
-shutdown wins the initialization-finalization race.
+or failed containment join, dependency-error redaction, and suppression of a
+late session when shutdown wins the initialization-finalization race.
 
 ## Remaining exclusions
 
