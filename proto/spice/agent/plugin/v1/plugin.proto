@@ -1,0 +1,179 @@
+syntax = "proto3";
+
+package spice.agent.plugin.v1;
+
+import "spice/agent/common/v1/common.proto";
+
+option go_package = "github.com/spice-framework/spice-agent/plugin/v1;pluginv1";
+
+// ToolEffect classifies whether a successful call can mutate external state.
+enum ToolEffect {
+  TOOL_EFFECT_UNSPECIFIED = 0;
+  TOOL_EFFECT_READ_ONLY = 1;
+  TOOL_EFFECT_MUTATING = 2;
+}
+
+// ReplaySafety declares the maximum deliberate replay allowed after a
+// definitive infrastructure failure. It never authorizes uncertain replay.
+enum ReplaySafety {
+  REPLAY_SAFETY_UNSPECIFIED = 0;
+  REPLAY_SAFETY_SAFE = 1;
+  REPLAY_SAFETY_IDEMPOTENT = 2;
+  REPLAY_SAFETY_UNSAFE = 3;
+}
+
+// ExecutionState states whether external mutation is known not to be
+// uncertain after an infrastructure failure.
+enum ExecutionState {
+  EXECUTION_STATE_UNSPECIFIED = 0;
+  EXECUTION_STATE_DEFINITIVE = 1;
+  EXECUTION_STATE_UNCERTAIN = 2;
+}
+
+// RetryDisposition is bounded retry advice. Tool replay metadata remains the
+// authoritative upper bound and uncertain failures always use NEVER.
+enum RetryDisposition {
+  RETRY_DISPOSITION_UNSPECIFIED = 0;
+  RETRY_DISPOSITION_NEVER = 1;
+  RETRY_DISPOSITION_ALLOWED = 2;
+}
+
+// Limits are the positive capacities negotiated for one plugin connection.
+message Limits {
+  uint64 max_message_bytes = 1;
+  uint32 max_tools = 2;
+  uint64 max_schema_bytes = 3;
+  uint64 max_call_argument_bytes = 4;
+  uint64 max_result_bytes = 5;
+  uint64 max_progress_bytes = 6;
+  uint32 max_concurrent_calls = 7;
+}
+
+// BuildIdentity identifies a host or plugin build and language runtime without
+// assuming the process is implemented in Go.
+message BuildIdentity {
+  string component = 1;
+  string version = 2;
+  string commit = 3;
+  string runtime = 4;
+}
+
+// ToolDefinition is one immutable model-visible and security-relevant tool
+// contract. Definitions are sorted by name in the manifest.
+message ToolDefinition {
+  string name = 1;
+  string description = 2;
+  bytes input_schema_json = 3;
+  ToolEffect effect = 4;
+  ReplaySafety replay_safety = 5;
+  spice.agent.common.v1.CapabilitySet capabilities = 6;
+}
+
+// Manifest is the immutable candidate identity and complete runtime-tool set.
+message Manifest {
+  string name = 1;
+  string version = 2;
+  repeated ToolDefinition tools = 3;
+}
+
+// InitializeRequest is the mandatory first operation. The launch secret is
+// never transmitted. The plugin proves it by authenticating the complete
+// request and response transcript in handshake_proof.
+message InitializeRequest {
+  spice.agent.common.v1.ProtocolRange protocol = 1;
+  BuildIdentity host = 2;
+  spice.agent.common.v1.CapabilitySet supported_capabilities = 3;
+  spice.agent.common.v1.CapabilitySet required_capabilities = 4;
+  Limits requested_limits = 5;
+  bytes launch_id = 6;
+  bytes handshake_challenge = 7;
+}
+
+// InitializeResponse contains the authenticated negotiated candidate contract.
+// plugin, launch_id, handshake_challenge, and handshake_proof are present on
+// both success and application failure; negotiated fields are success-only.
+message InitializeResponse {
+  spice.agent.common.v1.Status status = 1;
+  spice.agent.common.v1.ProtocolVersion protocol = 2;
+  BuildIdentity plugin = 3;
+  spice.agent.common.v1.CapabilitySet capabilities = 4;
+  Limits limits = 5;
+  Manifest manifest = 6;
+  bytes launch_id = 7;
+  bytes session_id = 8;
+  bytes handshake_challenge = 9;
+  bytes handshake_proof = 10;
+}
+
+// ExecuteRequest invokes exactly one tool from the initialized manifest.
+message ExecuteRequest {
+  bytes session_id = 1;
+  string call_id = 2;
+  string tool_name = 3;
+  bytes arguments_json = 4;
+}
+
+// Progress is non-terminal, bounded, model-independent progress.
+message Progress {
+  string message = 1;
+}
+
+// Result is a terminal tool result. problem is model-visible tool failure, not
+// a transport or infrastructure failure.
+message Result {
+  bytes content_json = 1;
+  string problem = 2;
+}
+
+// ExecutionFailure is a terminal correlated infrastructure failure. The
+// plugin is responsible for ensuring safe_message contains no secret.
+message ExecutionFailure {
+  ExecutionState state = 1;
+  RetryDisposition retry = 2;
+  string safe_message = 3;
+}
+
+// ExecuteResponse is one strictly increasing stream frame. Progress precedes
+// exactly one terminal result or failure.
+message ExecuteResponse {
+  string call_id = 1;
+  uint64 sequence = 2;
+  oneof frame {
+    Progress progress = 3;
+    Result result = 4;
+    ExecutionFailure failure = 5;
+  }
+}
+
+// DrainRequest stops new calls and waits for admitted calls to terminate.
+message DrainRequest {
+  bytes session_id = 1;
+}
+
+// DrainResponse succeeds only when no call remains active.
+message DrainResponse {
+  spice.agent.common.v1.Status status = 1;
+  uint32 active_calls = 2;
+}
+
+// ShutdownRequest asks a drained plugin to release connection-owned resources.
+message ShutdownRequest {
+  bytes session_id = 1;
+}
+
+// ShutdownResponse reports bounded application-level shutdown completion.
+message ShutdownResponse {
+  spice.agent.common.v1.Status status = 1;
+}
+
+// PluginService is the initial runtime-tool-only local process boundary.
+service PluginService {
+  // Initialize authenticates and freezes one candidate connection.
+  rpc Initialize(InitializeRequest) returns (InitializeResponse);
+  // Execute streams progress and exactly one terminal frame.
+  rpc Execute(ExecuteRequest) returns (stream ExecuteResponse);
+  // Drain stops admission and joins admitted calls.
+  rpc Drain(DrainRequest) returns (DrainResponse);
+  // Shutdown releases a drained candidate.
+  rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
+}

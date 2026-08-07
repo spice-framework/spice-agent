@@ -1,6 +1,7 @@
 # RFC 0005: Runtime Tool Plugin Protocol
 
-- **Status:** draft
+- **Status:** initial `plugin/v1` runtime-tool wire contract frozen; host and
+  generation management remain provisional
 - **Initial package:** `plugin/v1`
 - **Transport:** one local gRPC connection per process generation
 
@@ -19,9 +20,18 @@ the verified file, detects path/digest drift as far as the operating system
 permits, launches with a random single-use handshake secret, and bounds stderr.
 PATH lookup and ambient directory scanning are forbidden.
 
-`Initialize` exchanges protocol/build identity, manifest, tool definitions,
-capabilities, limits, and the launch-secret proof. A candidate is not visible to
-runs until all facts validate.
+`Initialize` exchanges protocol/build identity, a sorted immutable manifest,
+tool definitions, feature capabilities, negotiated limits, a 128-bit launch
+identity, a 256-bit host challenge, and a 128-bit connection session identity.
+The 256-bit launch secret is never transmitted. The plugin returns an
+HMAC-SHA256 proof over a domain-separated deterministic encoding of the entire
+request and response with the proof field cleared. Unknown fields therefore
+participate in authentication and remain additive. A candidate is not visible
+to runs until all facts validate.
+
+Build identity names a language-neutral runtime string (for example,
+`go1.26.5` or `python3.12`) rather than a Go-only field, so independent Python
+fixtures implement the same schema without inventing provenance.
 
 ## Generation lifecycle
 
@@ -37,11 +47,17 @@ to confirm termination is observable.
 
 ## Initial tool API
 
-`ListTools` returns immutable bounded definitions. `Execute` accepts one validated
-call and streams bounded progress followed by exactly one result or typed
-failure. Call/progress IDs must match. Unknown capabilities, duplicate names,
-oversized schemas/payloads, post-terminal messages, and stdout protocol
-contamination fail the candidate or call according to phase.
+The initialization manifest is the one immutable bounded definition catalog;
+there is no mutable `ListTools` surface. Each definition uses the kernel's
+canonical capability, effect, replay-safety, and input-schema contract.
+`Execute` accepts one validated call and streams strictly contiguous frames
+starting at sequence one: zero or more bounded progress frames followed by
+exactly one model-visible result or correlated typed infrastructure failure.
+An uncertain failure always forbids retry. Call IDs must match. Unknown
+capabilities/enums, duplicate or unsorted names, oversized schemas/payloads,
+missing terminals, and post-terminal messages fail closed. `Drain` stops call
+admission and joins admitted calls; `Shutdown` releases a drained session.
+RPC cancellation/deadline remain the transport mechanism for bounded waits.
 
 ## Compatibility and language neutrality
 
@@ -57,10 +73,14 @@ runs with the daemon user's privileges unless a later launcher/policy extension
 provides real isolation. Capability declarations are mandatory metadata but not
 security theater: help/status must state whether an enforcing decorator exists.
 
-## Acceptance before freeze
+## Wire-freeze acceptance
 
-Conformance covers wrong digest, path replacement, handshake replay, old/new
-versions, unknown fields, duplicate tools, malformed/oversized traffic, bounded
-stderr, crash at every lifecycle phase, cancellation, uncertain mutation,
-activation races, generation leases, drain timeout, and clean Windows/Unix
-process-tree shutdown.
+Repository validation covers transcript tampering and wrong secrets, old/new
+versions, unknown-field round trips, duplicate/unsorted tools, unknown
+capabilities and enums, malformed/oversized traffic, correlation and sequence
+mismatch, uncertain mutation, missing terminals, post-terminal traffic, and
+Drain/Shutdown shape. The following remain host/conformance acceptance and are
+not claimed by this wire freeze: wrong digest, path replacement, handshake
+replay storage, bounded stderr, crash at every lifecycle phase, cancellation
+and drain timeouts across a real process, activation races, generation leases,
+and Windows/Unix process-tree shutdown.

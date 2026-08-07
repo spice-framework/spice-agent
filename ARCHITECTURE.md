@@ -240,7 +240,19 @@ concrete process starter and compose these libraries into managed and explicit
 commands. Current evidence is in
 [`docs/implementation/evidence/phase4-managed-local-lifecycle.md`](docs/implementation/evidence/phase4-managed-local-lifecycle.md).
 
-`common/v1` and `engine/v1` are the only initial Protobuf process boundary.
+`common/v1`, `engine/v1`, and `plugin/v1` are the initial Protobuf process
+boundaries. `plugin/v1` is runtime-tool-only: one authenticated initialization
+freezes a sorted immutable manifest and negotiated limits, one Execute stream
+carries contiguous correlated progress followed by exactly one result or typed
+infrastructure failure, and Drain/Shutdown bound generation lifecycle. Its
+HMAC-SHA256 handshake proof covers the complete deterministic request/response
+transcript, including unknown fields, without placing the launch secret on the
+wire. The handwritten layer converts manifests and calls to the existing
+`tool` values; it introduces no second tool model, registry, or retry policy.
+The protocol alone does not verify an executable digest, own a process, activate
+a generation, enforce declared capabilities, or prove process-tree cleanup.
+
+`common/v1` and `engine/v1` define the daemon/client process boundary.
 They encode protocol negotiation, typed status, server-owned definitions,
 stable-owner reconnect, health, atomic run/event replay, complete-first pending
 interaction streams, cancellation, suspend/resume, and snapshot transfer.

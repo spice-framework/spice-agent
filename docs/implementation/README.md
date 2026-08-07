@@ -10,7 +10,7 @@ Repository roadmaps link here and must not duplicate status.
 | 2 — deterministic kernel | Complete for preview | `841edd3`; deterministic lifecycle, interaction, snapshot, race/fuzz proof |
 | 3 — provider and coding tools | In progress | generated cross-repository continuation and opt-in live acceptance |
 | 4 — daemon and TUI | In progress | host/local IPC/current-user candidate libraries proven; distribution process and TUI workflow pending |
-| 5 — runtime plugins | In progress | execution-outcome and kernel plan-lease prerequisites complete; plugin host/conformance pending |
+| 5 — runtime plugins | In progress | execution-outcome, plan-lease, and frozen plugin/v1 wire prerequisites complete; host/conformance pending |
 | 6 — architecture proof | Planned | signed `v0.1.0-preview.1` distribution |
 | 7 — stress prototypes | Planned | permission, SQLite, alternate UI, two-worker experiments |
 | 8 — stabilization | Planned | external authors and frozen compatibility policy |
@@ -309,6 +309,21 @@ constructors through `StaticToolPlanSource`. Ordered decorators fail closed and
 cannot change or bypass the snapshotted definition set. This is a kernel seam,
 not a plugin protocol or host implementation. Exact acceptance commands are in
 [`evidence/phase5-tool-plan-leases.md`](evidence/phase5-tool-plan-leases.md).
+
+## Phase 5.1 runtime-tool protocol
+
+The initial additive `plugin/v1` contract is frozen behind Buf FILE-level
+breaking checks and deterministic local generation. It authenticates the full
+initialization transcript without transmitting the per-launch secret, freezes
+one sorted immutable tool catalog using the kernel's existing effect, replay,
+and capability types, and validates contiguous Execute progress followed by
+exactly one correlated terminal result or typed failure. Session-bound
+Drain/Shutdown complete the wire lifecycle. Unknown fields round-trip and count
+toward limits; duplicates, unknown enums/capabilities, mismatches, oversized
+payloads, missing terminals, and post-terminal traffic fail closed. This slice
+does not claim executable/digest ownership, process launch, activation, leases,
+fixtures, or capability enforcement. Exact acceptance is in
+[`evidence/phase5-runtime-plugin-protocol.md`](evidence/phase5-runtime-plugin-protocol.md).
 
 ## Current infrastructure blocker
 

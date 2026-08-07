@@ -390,7 +390,7 @@ func generateProtocol(ctx context.Context, root, output string) (returnErr error
 
 func generatedProtocolDigests(root string) (map[string][sha256.Size]byte, error) {
 	result := make(map[string][sha256.Size]byte)
-	for _, directory := range []string{"common/v1", "engine/v1"} {
+	for _, directory := range []string{"common/v1", "engine/v1", "plugin/v1"} {
 		path := filepath.Join(root, filepath.FromSlash(directory))
 		entries, err := os.ReadDir(path)
 		if err != nil {
@@ -464,6 +464,7 @@ func fuzzTargets() []fuzzTarget {
 		{"./annotation/agent", "FuzzToolHandler"},
 		{"./common/v1", "FuzzCommonEnvelope"},
 		{"./engine/v1", "FuzzEngineEnvelope"},
+		{"./plugin/v1", "FuzzPluginEnvelope"},
 		{"./daemon/endpoint", "FuzzDecodeMetadata"},
 	}
 }
@@ -552,6 +553,7 @@ func checkArchitecture(root string) error {
 				`"google.golang.org/protobuf`,
 				`"` + modulePath + `/common/v1"`,
 				`"` + modulePath + `/engine/v1"`,
+				`"` + modulePath + `/plugin/v1"`,
 			} {
 				if bytes.Contains(content, []byte(forbiddenImport)) {
 					return fmt.Errorf("kernel file %s imports process-boundary package %s", relative, forbiddenImport)

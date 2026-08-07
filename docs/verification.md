@@ -13,7 +13,7 @@ credentials and private-module environment removed, and verifies that no
 repository byte changed. It does not tidy, vendor, generate, or install into the
 repository.
 
-`make proto` regenerates committed `common/v1` and `engine/v1` Go from local
+`make proto` regenerates committed `common/v1`, `engine/v1`, and `plugin/v1` Go from local
 tool directives. `make check` runs Buf lint, compares schemas with the committed
 FILE-level `schema-baseline`, regenerates into a temporary directory using the
 exact selected Go binary, and rejects any byte difference. There are no remote

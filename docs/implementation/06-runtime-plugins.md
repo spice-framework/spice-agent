@@ -19,6 +19,18 @@ reference decrement during release; generation drain remains asynchronous and
 source-owned. This slice deliberately contains no plugin protocol,
 process host, daemon integration, or activation manager.
 
+The initial Phase 5.1 `plugin/v1` runtime-tool wire contract is frozen. It
+defines authenticated protocol/build/limit/manifest initialization, immutable
+tool definitions converted to the kernel's existing `tool.Definition`, one
+contiguous Execute server stream with exactly one terminal result or correlated
+typed failure, and session-bound Drain/Shutdown lifecycle. The launch secret is
+never serialized; HMAC-SHA256 authenticates the deterministic complete
+handshake transcript. Handwritten validators count unknown fields toward
+bounds, preserve them on wire round trips, and fail closed on duplicate tools,
+unknown enums/capabilities, correlation or sequence mismatch, oversized JSON,
+missing terminals, and post-terminal frames. This protocol slice contains no
+process host, digest verifier, generation activation, or language fixture.
+
 ## Runtime-plugin contracts
 
 - One host process and one local gRPC connection exist per plugin generation.
@@ -55,7 +67,7 @@ the active/failed generation; no partial generated tree is activated.
 
 ## Implementation slices
 
-1. Freeze `plugin/v1` with Buf lint/breaking checks.
+1. Freeze `plugin/v1` with Buf lint/breaking checks. **Complete.**
 2. Implement manifest/digest verification and the fallback direct launcher.
 3. Add generation manager, candidate handshake, atomic activation, leases,
    bounded stderr, restart policy, drain, and cleanup.
@@ -93,5 +105,6 @@ unbounded queue. Evidence includes digests, generation/lease timelines, process
 logs, conformance versions, and failure-injection results.
 
 Status is **in progress**. The execution-outcome and kernel plan-lease
-prerequisites are implemented; plugin protocol, process-generation manager,
-fixtures, and developer loop remain pending.
+prerequisites and initial runtime-tool protocol are implemented. Process/digest
+ownership, generation management, Go/Python fixtures, conformance, and the
+developer loop remain pending.
