@@ -30,6 +30,14 @@ or dynamic plan fingerprint. Incompatible major versions or required
 capabilities fail before a run is created, with both observed and required
 values.
 
+The transport-independent host represents this catalog as exact immutable
+`agent.Definition` values rather than reconstructing model or maximum-turn
+policy from wire data. Its stable client store derives every ownership epoch
+context from the daemon root and performs reconnect as an exact one-winner CAS.
+Mutating RPC adapters will use the bounded idempotency ledger keyed by stable
+client identity plus operation identity; an epoch change fences execution but
+does not erase committed operation outcomes.
+
 ## Operations
 
 - `Health` reports readiness, version, replay limits, active-run count, and
@@ -91,6 +99,10 @@ Transport failure never implies a mutating request failed before commit.
 Operation IDs provide deduplication where defined. Mutating tool outcomes that
 lose acknowledgement are marked uncertain and never replayed automatically.
 Cancellation is cooperative and terminal events remain authoritative.
+Executor panics and unexpected errors are contained as one bounded canonical
+uncertain outcome and a secret-safe sentinel; expected business failures are
+explicit canonical outcomes. A canceled duplicate waiter never cancels or
+replaces the operation owner.
 
 ## Acceptance before freeze
 

@@ -85,6 +85,14 @@ protocol fuzzing are covered. No daemon, listener, transport authentication,
 managed startup, or TUI implementation is claimed by this slice. Reproducible
 commands are recorded in
 [`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
+The first host-foundation slice now implements the transport-independent
+`daemon` named interface: exact immutable definition catalogs, root-owned
+stable-client reconnect CAS, bounded per-client idempotency with panic-safe
+uncertain outcomes, and an atomic complete-first pending-interaction broker.
+Its deterministic concurrency, shutdown, overflow, aliasing, capacity, and
+secret-containment evidence is recorded in
+[`evidence/phase4-host-foundation.md`](evidence/phase4-host-foundation.md).
+No RPC server or local transport is claimed by this foundation.
 The schema is not the final Phase 4 freeze: the host slice must prove these
 repaired contracts over real RPCs, enforce same-daemon run tombstones and
 cross-process import authority, and ensure RPC contexts never own run lifetime

@@ -51,8 +51,9 @@ portable semantic views and namespaced data; they never load executable UI code.
 ## Implementation slices
 
 1. Freeze common/engine schemas and generate deterministic Go code.
-2. Implement authenticated local listeners, client/session API, negotiation,
-   replay, cancellation, interaction, snapshot, and health.
+2. Implement the transport-independent host primitives, then authenticated
+   local listeners, client/session translation, negotiation, replay,
+   cancellation, interaction, snapshot, and health.
 3. Add user-scoped endpoint discovery and managed start coordination.
 4. Implement the Bubble Tea shell with injected presentation components and
    terminal-size-independent semantic models.
@@ -88,10 +89,15 @@ cursor, terminal transcript, and generated target source map.
 Status is **in progress**. Slice 1 is implemented: provisional schemas,
 generated Go, handwritten boundary validation, compatibility/freshness gate,
 protocol tests, and fuzz smoke are green. This is intentionally not a daemon.
-Slices 2 through 6 remain pending, including OS transport, authentication,
-managed startup, client/session translation, Bubble Tea behavior, and real
-Windows/Linux reconnect acceptance. See
+The transport-independent foundation of slice 2 is also implemented: immutable
+server definitions, root-owned reconnect CAS sessions, bounded per-client
+idempotency, and an atomic complete-first pending-interaction broker. It adds no
+listener or RPC adapter. The remainder of slices 2 through 6 stays pending,
+including OS transport, authentication, run hosting/translation, managed
+startup, Bubble Tea behavior, and real Windows/Linux reconnect acceptance. See
 [`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
+Foundation-specific evidence is in
+[`evidence/phase4-host-foundation.md`](evidence/phase4-host-foundation.md).
 
 The baseline remains intentionally provisional. The pre-host repair closes the
 schema and kernel seams for interaction discovery/run identity, reconnect CAS,

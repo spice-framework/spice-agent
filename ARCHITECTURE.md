@@ -56,6 +56,17 @@ Public contracts do not import repository internals. Protocol and host packages
 may depend on public contracts; the kernel does not depend on transport, UI, or
 provider implementations.
 
+The public `daemon` package is the transport-independent host seam. A generated
+`DefinitionSet` wraps exact immutable `agent.Definition` values and owns the
+server-side model/turn policy. Stable cryptographic client identities use
+compare-and-swap ownership epochs derived from the daemon root context. A
+bounded per-client idempotency ledger commits canonical success, business
+failure, or secret-safe uncertain outcomes. `PendingBroker` is both the kernel
+interaction broker and the complete-first discovery source: a subscription
+atomically captures a sorted snapshot and its gap-free revisioned tail. These
+primitives contain no gRPC, Protobuf translation, listener, endpoint, or OS IPC
+behavior.
+
 `common/v1` and `engine/v1` are the only initial Protobuf process boundary.
 They encode protocol negotiation, typed status, server-owned definitions,
 stable-owner reconnect, health, atomic run/event replay, complete-first pending

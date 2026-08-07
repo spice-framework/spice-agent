@@ -19,6 +19,7 @@ func TestModulithUsesOneRepositoryRootAndUniquePublicInterfaces(t *testing.T) {
 		"agent/doc.go":            "kernel",
 		"annotation/agent/doc.go": "annotations",
 		"common/v1/doc.go":        "protocol-common-v1",
+		"daemon/doc.go":           "daemon",
 		"engine/v1/doc.go":        "protocol-engine-v1",
 		"event/doc.go":            "event",
 		"interaction/doc.go":      "interaction",
