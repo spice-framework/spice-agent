@@ -10,7 +10,7 @@ Repository roadmaps link here and must not duplicate status.
 | 2 — deterministic kernel | Complete for preview | `841edd3`; deterministic lifecycle, interaction, snapshot, race/fuzz proof |
 | 3 — provider and coding tools | In progress | generated cross-repository continuation and opt-in live acceptance |
 | 4 — daemon and TUI | In progress | generated daemon/TUI distribution targets and managed local composition proven; installed Windows/Linux terminal interaction pending |
-| 5 — runtime plugins | In progress | frozen plugin/v1 plus independent Go/Python conformance complete; production host and activation pending |
+| 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, and core auto-configuration complete; recovery, distribution cutover, and developer loop pending |
 | 6 — architecture proof | Planned | signed `v0.1.0-preview.1` distribution |
 | 7 — stress prototypes | Planned | permission, SQLite, alternate UI, two-worker experiments |
 | 8 — stabilization | Planned | external authors and frozen compatibility policy |
@@ -27,14 +27,22 @@ exact stdout readiness contract, immutable pinned executable configuration,
 held platform file-identity/digest lease, immediate recheck contract, bounded
 non-reflecting stdout/stderr monitors, current-user local endpoint allocation,
 authenticated candidate launch, and fail-closed remote tool translation. A
-complete immutable desired plugin `Set` is also available for the activation
-boundary. This remains a pre-activation foundation: atomic generations,
-run-scoped leases, crash recovery, graceful drain/shutdown, Spice
-auto-configuration, and `spice dev` remain pending. Detailed evidence and the
+complete immutable desired plugin `Set` feeds an atomic host that publishes one
+complete merged generation, leases exact current or retained generations,
+fails closed after an active crash, and performs bounded reverse graceful
+lifecycle and containment without blocking lease release. The optional leaf
+auto-configuration exposes that same Host through ordinary named fallback Spice
+beans with generated cleanup. Bounded recovery, public health, reference
+distribution cutover, installed process acceptance, and
+`spice dev` remain pending. Detailed evidence and the
 pathname-to-exec limitation are recorded in
 [`evidence/phase5-host-security-foundation.md`](evidence/phase5-host-security-foundation.md)
 and
-[`evidence/phase5-candidate-and-remote-tools.md`](evidence/phase5-candidate-and-remote-tools.md).
+[`evidence/phase5-candidate-and-remote-tools.md`](evidence/phase5-candidate-and-remote-tools.md),
+with generation/lifecycle evidence in
+[`evidence/phase5-generations-and-lifecycle.md`](evidence/phase5-generations-and-lifecycle.md)
+and auto-configuration evidence in
+[`evidence/phase5-runtime-autoconfiguration.md`](evidence/phase5-runtime-autoconfiguration.md).
 
 ## Phase 2 preview boundary
 

@@ -59,12 +59,27 @@ launch. Cleanup releases the endpoint and verification lease only after process
 containment is proved. Remote execution never retries and maps any possibly
 started mutating operation without a valid terminal result to an uncertain,
 non-retryable kernel failure. A complete immutable desired `Set` supplies the
-future atomic-activation input. Generations, run-scoped leases, crash recovery,
-graceful drain/shutdown, and static auto-configuration remain pending. Evidence
-is in
+atomic-activation input. `plugin/host.Host` now stages and validates a complete
+set invisibly, rejects all tool-name collisions, applies ordered generated
+decorators to the complete compiled/runtime merge, and publishes one immutable
+generation. Exact run leases survive later activation. The final retired lease
+closes reacquisition before asynchronous reverse cleanup; a current candidate
+crash fails new leasing closed instead of substituting an old or compiled-only
+graph. Accepted candidates close local admission, join active calls, perform
+validated bounded Drain and Shutdown, allow bounded graceful process exit, and
+retain endpoint/executable ownership until containment is proved. Host shutdown
+joins staging and leases and supports explicit ownership-cleanup retry. Bounded
+recovery and public health remain pending. Optional leaf auto-configuration now
+contributes the compiled dispatcher, current-user endpoint factory, concrete
+Host with generated cleanup, and exact `stage.ToolPlanSource` adapter as
+ordinary named fallback beans. Evidence is in
 [`evidence/phase5-host-security-foundation.md`](evidence/phase5-host-security-foundation.md)
 and
-[`evidence/phase5-candidate-and-remote-tools.md`](evidence/phase5-candidate-and-remote-tools.md).
+[`evidence/phase5-candidate-and-remote-tools.md`](evidence/phase5-candidate-and-remote-tools.md),
+with generation/lifecycle evidence in
+[`evidence/phase5-generations-and-lifecycle.md`](evidence/phase5-generations-and-lifecycle.md)
+and auto-configuration evidence in
+[`evidence/phase5-runtime-autoconfiguration.md`](evidence/phase5-runtime-autoconfiguration.md).
 
 ## Runtime-plugin contracts
 
@@ -107,11 +122,11 @@ the active/failed generation; no partial generated tree is activated.
    **Complete through authenticated candidate launch and manifest validation;
    public fallback source composition remains in slice 4.**
 3. Add generation manager, candidate handshake, atomic activation, leases,
-   bounded stderr, restart policy, drain, and cleanup. **Candidate handshake,
-   bounded stderr, and rejection cleanup complete; activation, leases, restart,
-   drain, and graceful shutdown pending.**
+   bounded stderr, restart policy, drain, and cleanup. **Complete except bounded
+   restart/recovery policy and its public health projection.**
 4. Provide optional Spice auto-configuration that decorates/injects the dynamic
-   tool source through normal static DI.
+   tool source through normal static DI. **Core adapter complete; reference
+   distribution cutover pending.**
 5. Ship Go and Python echo/filesystem-neutral fixture tools and conformance CLI.
    **Complete for the initial runtime-tool profile.**
 6. Integrate last-known-good `spice dev` for generated daemon/TUI targets.
@@ -148,5 +163,6 @@ Status is **in progress**. The execution-outcome and kernel plan-lease
 prerequisites, initial runtime-tool protocol, reusable conformance harness,
 independent Go/Python fixtures, digest/process ownership, local candidate
 handshake, and remote execution translation are implemented. Atomic generation
-management, run leases, graceful lifecycle, static auto-configuration, and the
-developer loop remain pending.
+management, exact run leases, and graceful lifecycle are implemented. Bounded
+recovery/public health, distribution cutover, real
+process activation acceptance, and the developer loop remain pending.

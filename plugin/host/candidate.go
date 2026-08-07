@@ -231,20 +231,19 @@ func (candidate *candidate) cleanup(ctx context.Context) error {
 	if candidate.endpoint != nil {
 		if err := candidate.endpoint.Close(); err != nil {
 			failures = append(failures, err)
-		} else {
-			candidate.endpoint = nil
 		}
+		candidate.endpoint = nil
 	}
 	if candidate.lease != nil {
 		if err := candidate.lease.Close(); err != nil {
 			failures = append(failures, err)
-		} else {
-			candidate.lease = nil
 		}
+		candidate.lease = nil
 	}
+	result := cleanupFailure(errors.Join(failures...))
 	candidate.closed = true
-	candidate.result = cleanupFailure(errors.Join(failures...))
-	return candidate.result
+	candidate.result = result
+	return result
 }
 
 func (candidate *candidate) postReadyFailure() error {

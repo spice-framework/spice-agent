@@ -60,4 +60,14 @@ the exact generation. Lease release is bounded and happens once before the
 authoritative terminal is chosen, so failure becomes `RunFailed` rather than
 hidden cleanup.
 
+The production runtime-plugin host merges a complete authenticated runtime-tool
+set with the compiled Spice dispatcher and atomically publishes it for future
+runs. Existing runs retain their exact generation. Candidate crashes fail new
+leases closed, mutating calls with unknown outcomes are never replayed, and the
+last lease schedules bounded Drain, Shutdown, and process containment without
+blocking run finalization. Dynamic generations never mutate generated Spice DI.
+Applications enable the host through an explicit blank import of
+`plugin/host/autoconfigure`; its replaceable defaults remain ordinary generated
+beans rather than runtime discovery.
+
 Spice Agent is licensed under Apache-2.0.

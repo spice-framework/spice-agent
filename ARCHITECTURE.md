@@ -42,6 +42,24 @@ Ordered dispatcher decorators are applied once to a merged dispatcher and must
 preserve its snapshotted definition set. A leased dispatcher rejects any call
 not present in that snapshot.
 
+`plugin/host.Host` is the production owner of those generations. It stages one
+complete digest-pinned and authenticated process set outside its state lock,
+composes runtime tools with the compiled dispatcher, rejects every name
+collision, and publishes at one atomic boundary. Per-host entropy and a
+monotonic sequence prevent plan-identity reuse. Retired generations remain
+exactly leasable only while already retained; the final release closes that
+window before asynchronous Drain, Shutdown, and containment. Candidate crash
+makes new leases fail closed without changing existing lease identity or
+replaying calls. The host never exposes a registry and never mutates the Spice
+bean graph.
+
+Applications opt in by blank-importing `plugin/host/autoconfigure`. That leaf
+package contributes the compiled named-tool dispatcher, current-user endpoint
+factory, concrete Host with generated cleanup, and exact `ToolPlanSource`
+adapter as normal named fallback beans. Application-owned exact beans replace
+defaults through the same compile-time graph rules. No kernel, stage, protocol,
+or host implementation package imports the adapter.
+
 `annotation/agent` exposes `@Stage`, `@Tool`, and `@ModelProvider`. Their typed
 handlers return only Spice's generic provider and bean-metadata contributions.
 Factory signatures remain ordinary Go and the generic compiler owns exact type
@@ -253,7 +271,9 @@ transcript, including unknown fields, without placing the launch secret on the
 wire. The handwritten layer converts manifests and calls to the existing
 `tool` values; it introduces no second tool model, registry, or retry policy.
 The protocol alone does not verify an executable digest, own a process, activate
-a generation, enforce declared capabilities, or prove process-tree cleanup.
+a generation, enforce declared capabilities, or prove process-tree cleanup;
+the sibling production host supplies those responsibilities without importing
+them into the protocol or kernel.
 `plugin/conformance` is the reusable black-box contract suite. Independent Go
 and Python 3.12+ fixture commands receive their address and one-use secret
 through bounded private stdin bootstrap, emit one exact readiness record on

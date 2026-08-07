@@ -1,7 +1,8 @@
 # RFC 0005: Runtime Tool Plugin Protocol
 
 - **Status:** initial `plugin/v1` runtime-tool wire contract frozen and Go/Python
-  conformance proven; host and generation management remain provisional
+  conformance proven; authenticated host, atomic generations, exact leases, and
+  graceful lifecycle implemented; recovery policy remains provisional
 - **Initial package:** `plugin/v1`
 - **Transport:** one local gRPC connection per process generation
 
@@ -144,6 +145,13 @@ Host restart is bounded and applies only to future calls. A call interrupted by
 crash is failed. A mutating call with uncertain outcome is never automatically
 replayed. Cancellation propagates through RPC then process-tree cleanup; failure
 to confirm termination is observable.
+
+The implemented host fails closed when an active generation becomes unhealthy;
+it does not substitute an older generation or compiled-only dispatcher. A fresh
+complete set must validate before replacement. Automatic bounded recovery is a
+separate policy still pending. Plan identities contain a private random host
+epoch, so exact generation recovery is intentionally limited to a retained live
+host. Process restart cannot recreate a dynamic generation named by a snapshot.
 
 ## Initial tool API
 

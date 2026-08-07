@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"slices"
+	"sync"
 	"time"
 
 	pluginv1 "github.com/spice-framework/spice-agent/plugin/v1"
@@ -21,6 +22,11 @@ type remoteSession struct {
 	limits      *pluginv1.Limits
 	callTimeout time.Duration
 	admission   chan struct{}
+
+	mu       sync.Mutex
+	draining bool
+	active   uint32
+	zero     chan struct{}
 }
 
 func newRemoteSession(
@@ -45,12 +51,15 @@ func newRemoteSession(
 	if !ok {
 		return nil, errors.New("runtime plugin negotiated limits could not be copied")
 	}
+	zero := make(chan struct{})
+	close(zero)
 	return &remoteSession{
 		client:      client,
 		sessionID:   slices.Clone(sessionID),
 		limits:      clonedLimits,
 		callTimeout: callTimeout,
 		admission:   make(chan struct{}, int(clonedLimits.GetMaxConcurrentCalls())),
+		zero:        zero,
 	}, nil
 }
 
@@ -212,8 +221,19 @@ func (session *remoteSession) acquire(ctx context.Context) error {
 	}
 	select {
 	case session.admission <- struct{}{}:
-		if err := ctx.Err(); err != nil {
+		session.mu.Lock()
+		if session.draining {
+			session.mu.Unlock()
 			<-session.admission
+			return errors.New("runtime plugin session is draining")
+		}
+		if session.active == 0 {
+			session.zero = make(chan struct{})
+		}
+		session.active++
+		session.mu.Unlock()
+		if err := ctx.Err(); err != nil {
+			session.release()
 			return err
 		}
 		return nil
@@ -222,7 +242,32 @@ func (session *remoteSession) acquire(ctx context.Context) error {
 	}
 }
 
-func (session *remoteSession) release() { <-session.admission }
+func (session *remoteSession) release() {
+	session.mu.Lock()
+	if session.active == 0 {
+		session.mu.Unlock()
+		panic("remote plugin session release without admission")
+	}
+	session.active--
+	if session.active == 0 {
+		close(session.zero)
+	}
+	session.mu.Unlock()
+	<-session.admission
+}
+
+func (session *remoteSession) beginDrain(ctx context.Context) error {
+	session.mu.Lock()
+	session.draining = true
+	zero := session.zero
+	session.mu.Unlock()
+	select {
+	case <-zero:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
 
 type remoteTerminal struct {
 	result  tool.Result

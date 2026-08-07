@@ -24,6 +24,7 @@ var Manifest = starter.Must(starter.Spec{
 		"agent.kernel",
 		"agent.messages",
 		"agent.model-spi",
+		"agent.runtime-plugin-host",
 		"agent.tool-spi",
 	},
 })
