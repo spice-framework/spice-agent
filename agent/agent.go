@@ -318,6 +318,7 @@ type Run struct {
 	suspendRequested   bool
 	suspendWaiter      chan error
 	resumeSignal       chan struct{}
+	localResume        *PreparedLocalResume
 	activeInteractions map[interaction.ID]struct{}
 	seenInteractions   map[interaction.ID]struct{}
 	interactionWG      sync.WaitGroup
@@ -442,12 +443,11 @@ func (run *Run) Suspend(ctx context.Context) error {
 
 // Resume continues a locally suspended run using its immutable plan snapshot.
 func (run *Run) Resume() error {
-	if run == nil {
-		return errors.New("agent run is nil")
+	prepared, err := run.PrepareLocalResume()
+	if err != nil {
+		return err
 	}
-	run.stateMu.Lock()
-	defer run.stateMu.Unlock()
-	return run.resumeLocked()
+	return prepared.Commit()
 }
 
 func (run *Run) resumeLocked() error {
@@ -1169,8 +1169,21 @@ func (run *Run) suspendAtBoundary(ctx context.Context) error {
 	waiter <- nil
 	select {
 	case <-ctx.Done():
+		run.stateMu.Lock()
+		prepared := run.localResume
+		if prepared == nil {
+			run.status = runStatusFinishing
+			run.stateMu.Unlock()
+			return ctx.Err()
+		}
+		decision := prepared.decision
+		run.stateMu.Unlock()
+		<-decision
 		return ctx.Err()
 	case <-resumeSignal:
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		return nil
 	}
 }

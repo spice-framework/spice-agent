@@ -101,6 +101,47 @@ Its deterministic concurrency, shutdown, overflow, aliasing, capacity, and
 secret-containment evidence is recorded in
 [`evidence/phase4-host-foundation.md`](evidence/phase4-host-foundation.md).
 No RPC server or local transport is claimed by this foundation.
+Session ownership now adds a bounded, reconnect-prioritized commit/stream gate.
+It fences mutation commits, joins old stream senders before a successful epoch
+advance, bounds every waiting claimant and active stream set, and drains those
+resources during shutdown without holding the store lock across waits or
+cancellation callbacks. Evidence is in
+[`evidence/phase4-session-gates.md`](evidence/phase4-session-gates.md).
+The local run-authority slice now supplies the OS-backed ownership boundary:
+private persistent scope/key material unrelated to endpoint tokens, signed
+durable run records, stable never-unlinked run locks, keyed suspended-snapshot
+matching, non-retryable consumed imports, and terminal tombstones. Import host
+ordering remains explicit: prepare authority and kernel resources, persist
+`IMPORTING`, commit the prepared kernel run, then persist `ACTIVE`. Evidence is
+strengthened by retained directory identity, handle-relative filesystem
+operations, full-ancestry rollback defense, concurrent first-open
+serialization, exclusive suspended ownership and local-resume invalidation,
+explicit close/drain lifecycle, and process-crash tests at suspension and both
+import durability boundaries. It is
+recorded in
+[`evidence/phase4-run-authority.md`](evidence/phase4-run-authority.md).
+The kernel's inert local-resume reservation now closes the ordering gap between
+that authority and suspended execution: reserve the exact kernel boundary,
+persist authority `ACTIVE` at the next local generation, then commit the
+reservation. A live abort restores the byte-identical snapshot; cancellation
+and shutdown remain latched until the decision. Evidence is in
+[`evidence/phase4-kernel-local-resume.md`](evidence/phase4-kernel-local-resume.md).
+The public transport-neutral `client` package now defines immutable negotiated
+connections and sessions, explicit event/interaction control frames, bounded
+secret-safe structured values, snapshot/health contracts, and lossless typed
+recovery using only the Go standard library. It deliberately does not claim a
+gRPC adapter, authentication, discovery, or OS endpoint. Evidence is in
+[`evidence/phase4-client-contract.md`](evidence/phase4-client-contract.md).
+The independent TUI repository now exposes an immutable UI-neutral session
+port and a public terminal shell while keeping Bubble Tea and presentation
+messages internal. Commit `82adb45` generates its renderer, theme, ordered key
+bindings, terminal I/O, accessibility settings, and shell through Spice. Its
+external acceptance constructs the generated application, starts it, runs the
+actual injected shell, and stops it on normal exit. Full verification passed in
+158.4 seconds at 90.1% handwritten-product coverage, including generation
+freshness, shuffled/race tests, and vendor-offline execution. This proves the
+compiled presentation boundary; it does not yet claim a daemon client adapter,
+managed startup, reconnect, or real Windows/Linux terminal workflow.
 Transactional `PrepareStart` and `PrepareResumeSnapshot` handles now provide the
 kernel seam required for authority-before-publish hosting. They acquire and
 validate the exact execution resources without engine registration, events, or

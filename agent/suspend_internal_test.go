@@ -3,9 +3,33 @@ package agent
 import (
 	"context"
 	"errors"
+	"math"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/spice-framework/spice-agent/interaction"
 )
+
+func TestPrepareLocalResumeRejectsSequenceOverflow(t *testing.T) {
+	t.Parallel()
+	resumeSignal := make(chan struct{})
+	run := &Run{
+		ctx:                context.Background(),
+		status:             LifecycleSuspended,
+		resumeSignal:       resumeSignal,
+		lastSequence:       math.MaxUint64,
+		activeInteractions: make(map[interaction.ID]struct{}),
+	}
+	if _, err := run.PrepareLocalResume(); err == nil || !strings.Contains(err.Error(), "exhausted") {
+		t.Fatalf("overflow preparation = %v", err)
+	}
+	select {
+	case <-resumeSignal:
+		t.Fatal("overflow preparation unblocked execution")
+	default:
+	}
+}
 
 func TestResumeMakesSnapshotImmediatelyNonExportable(t *testing.T) {
 	t.Parallel()

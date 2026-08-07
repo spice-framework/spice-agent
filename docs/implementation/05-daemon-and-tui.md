@@ -99,18 +99,55 @@ server definitions, root-owned reconnect CAS sessions, bounded per-client
 idempotency, and a stable-client-partitioned pending-interaction hub with
 explicit run-binding leases, independent complete-first revisions, reconnect
 fencing, global/per-client retention budgets, and joined observer shutdown. It
-adds no listener or RPC adapter. The kernel now also exposes transactional prepared
-start/resume handles: preparation yields a stable run ID and exact leased plan
-without registration or execution, then commit accepts the separately owned run
-root. This is the authority-acquisition seam, not an authority implementation.
+adds no listener or RPC adapter. Session ownership now has a bounded commit and
+stream gate: reconnect takes priority over queued old-epoch mutations, drains
+the active commit, cancels and joins every old stream, then alone advances the
+epoch. Mutation, reconnect, and stream-acquisition queues are bounded and
+participate in shutdown drain accounting. The OS-backed run authority now
+persists a distinct current-user scope and HMAC key, holds a stable per-run OS
+lock, and
+drives signed `ACTIVE`, `SUSPENDED`, `IMPORTING`, and terminal records through
+an explicit prepare/consume/activate transaction. Authority-key generation and
+local run-transition generation are deliberately separate. A consumed import
+cannot be retried after an uncertain failure. Its retained OS directory
+identity makes lock and state operations immune to pathname substitution, and
+full-ancestry trust validation prevents cross-lifetime rollback by another
+unprivileged principal. Suspended export retains ownership; authority resume
+durably invalidates the old snapshot before kernel execution resumes. Its
+explicit close/drain lifecycle is ready for generated singleton cleanup.
+The kernel now also exposes
+transactional prepared start/resume handles: preparation yields a stable run ID
+and exact leased plan without registration or execution, then commit accepts
+the separately owned run root. This is the authority-acquisition seam, not an
+authority implementation.
+Locally suspended runs additionally expose an inert prepared-resume boundary.
+The host can reserve the exact next event sequence, durably invalidate the old
+snapshot through `RunAuthority`, and only then release kernel execution.
+Cancellation and shutdown latch behind that decision; abort restores the exact
+suspended snapshot.
+The TUI composition half of slice 4 is implemented independently at
+`spice-agent-tui` commit `82adb45`: public APIs contain no Bubble Tea or daemon
+types, Spice generates the renderer/theme/binding/I/O/shell graph, cancellation
+has an independent control lane, and external acceptance executes the actual
+injected terminal shell through explicit application start and stop. Its full
+gate passed in 158.4 seconds at 90.1% product coverage. The high-level daemon
+client adapter and real terminal process workflow remain pending.
 The remainder of slices 2 through 6 stays pending,
 including OS transport, authentication, run hosting/translation, managed
-startup, Bubble Tea behavior, and real Windows/Linux reconnect acceptance. See
+startup, the daemon-to-TUI bridge, and real Windows/Linux reconnect acceptance. See
 [`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
 Foundation-specific evidence is in
 [`evidence/phase4-host-foundation.md`](evidence/phase4-host-foundation.md).
+Run-authority evidence is in
+[`evidence/phase4-run-authority.md`](evidence/phase4-run-authority.md).
 Kernel preparation evidence is in
 [`evidence/phase4-kernel-preparation.md`](evidence/phase4-kernel-preparation.md).
+Local-resume evidence is in
+[`evidence/phase4-kernel-local-resume.md`](evidence/phase4-kernel-local-resume.md).
+The standard-library-only public client contract is recorded in
+[`evidence/phase4-client-contract.md`](evidence/phase4-client-contract.md).
+Session gate evidence is in
+[`evidence/phase4-session-gates.md`](evidence/phase4-session-gates.md).
 
 The baseline remains intentionally provisional. The pre-host repair closes the
 schema and kernel seams for interaction discovery/run identity, reconnect CAS,

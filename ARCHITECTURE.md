@@ -80,6 +80,24 @@ per-client run, prompt, observer, and queue budgets bound retained state, and
 shutdown joins delivery while releasing every binding. These primitives contain
 no gRPC, Protobuf translation, listener, endpoint, or OS IPC behavior.
 
+Every client epoch also owns a bounded commit and stream gate. Mutating work
+crosses an exclusive FIFO commit boundary; a reconnect intent takes priority,
+waits for the active commit, cancels old stream contexts, and cannot publish the
+next epoch until every old sender has joined and released its stream lease.
+Queued mutation, reconnect, and stream-acquisition claimants are hard-bounded
+and included in shutdown drain accounting. Known stale owners receive exact
+expected/observed epochs, while an unknown identity exposes no invented facts.
+
+The public `client` package is the matching transport-independent consumer
+seam. It contains immutable negotiated connection, run, event, interaction,
+snapshot, health, and typed recovery values plus concurrent `Connector`,
+`Session`, and stream interfaces. It deliberately imports only the standard
+library. Successful replay/tail controls are explicit frames, arbitrary
+interaction JSON is bounded and secret-redacted by default, and every typed
+failure preserves the wire status's common safe facts. Authentication,
+discovery, gRPC translation, and OS endpoint ownership belong to an adapter,
+not this contract or the TUI.
+
 `common/v1` and `engine/v1` are the only initial Protobuf process boundary.
 They encode protocol negotiation, typed status, server-owned definitions,
 stable-owner reconnect, health, atomic run/event replay, complete-first pending
@@ -97,6 +115,24 @@ Construction requires a trusted signer and import requires a keyed verifier;
 the unkeyed validator checks structure and payload integrity only. Authority
 keys are not IPC authentication tokens and remain outside Protobuf, snapshots,
 events, logs, and errors.
+
+`daemon.RunAuthority` implements that signer/verifier seam with a distinct
+current-user persistent key and scope, signed lifecycle records, and stable
+per-run OS locks. It retains the validated authority-directory object for its
+whole lifetime: Unix child operations are descriptor-relative and Windows
+child operations are handle-relative. Store shutdown rejects new leases and
+drains existing run/import leases before closing the bound directory. Import
+is deliberately transactional—verify, persist `IMPORTING`, commit the prepared
+kernel run, then persist `ACTIVE`—and any ambiguous persistence attempt makes
+that transaction terminally uncertain until it releases its lock.
+
+Local resume has the inverse publication order needed to prevent snapshot
+replay without releasing execution early: `Run.PrepareLocalResume` reserves the
+exact suspended boundary, authority `Resume` durably invalidates its signed
+snapshot, and only then does the host commit the kernel reservation. Aborting
+the reservation before the authority transition restores the byte-identical
+suspended snapshot. Cancellation and engine shutdown latch behind the pending
+decision and cannot start post-boundary work.
 
 Every interaction broker call carries an immutable validated run scope. Prompt
 content and response values stay out of authoritative run events; process

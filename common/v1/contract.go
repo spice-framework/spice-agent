@@ -203,6 +203,12 @@ func ValidateHealth(value *Health) error {
 	if len(value.GetDegradedReasons()) > 64 {
 		return errors.New("degraded reason count exceeds 64")
 	}
+	if value.GetState() == HealthState_HEALTH_STATE_DEGRADED && len(value.GetDegradedReasons()) == 0 {
+		return errors.New("degraded health requires at least one reason")
+	}
+	if value.GetState() != HealthState_HEALTH_STATE_DEGRADED && len(value.GetDegradedReasons()) != 0 {
+		return errors.New("only degraded health may contain degraded reasons")
+	}
 	for index, reason := range value.GetDegradedReasons() {
 		if err := validateToken("degraded reason", reason, maximumStatusBytes); err != nil {
 			return fmt.Errorf("degraded reason %d: %w", index, err)
@@ -369,6 +375,9 @@ func validateToken(label, value string, maximum int) error {
 	if !utf8.ValidString(value) {
 		return fmt.Errorf("%s must be valid UTF-8", label)
 	}
+	if strings.ContainsAny(value, "\x00\r\n\t") {
+		return fmt.Errorf("%s must not contain control characters", label)
+	}
 	if len(value) > maximum {
 		return fmt.Errorf("%s exceeds %d bytes", label, maximum)
 	}
@@ -517,14 +526,20 @@ func validateCapabilityMismatch(value *CapabilityMismatch) error {
 }
 
 func validateReplayBounds(value *ReplayBounds) error {
-	if value.GetEarliestSequence() == 0 || value.GetLatestSequence() < value.GetEarliestSequence() ||
-		value.GetRecoverySequence()+1 != value.GetEarliestSequence() {
+	if value.GetEarliestSequence() == 0 || value.GetLatestSequence() < value.GetEarliestSequence() {
 		return errors.New("replay bounds contain an invalid retained window")
 	}
 	requested := value.GetRequestedAfterSequence()
 	if requested != ^uint64(0) && requested+1 >= value.GetEarliestSequence() &&
 		requested <= value.GetLatestSequence() {
 		return errors.New("replay bounds unexpectedly contain the requested cursor")
+	}
+	if requested < value.GetEarliestSequence() {
+		if value.GetRecoverySequence()+1 != value.GetEarliestSequence() {
+			return errors.New("replay bounds contain an invalid earliest recovery cursor")
+		}
+	} else if value.GetRecoverySequence() != value.GetLatestSequence() {
+		return errors.New("replay bounds contain an invalid latest recovery cursor")
 	}
 	return nil
 }

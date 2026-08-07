@@ -1,5 +1,7 @@
 # Spice Agent
 
+Unified documentation: [spiceframework.dev/agent](https://spiceframework.dev/agent/).
+
 Spice Agent is a Go-native agent SDK assembled by Spice's generated, exact-type
 dependency graph. The repository owns provider-neutral messages, model and tool
 contracts, deterministic execution, events, interactions, protocols, and
@@ -22,6 +24,15 @@ Protobuf contracts. These packages define daemon/client wire messages and
 validation; they do not implement a daemon and are not imported by the kernel.
 Normal generation and verification are offline. See
 [verification](docs/verification.md) for the one explicit bootstrap exception.
+
+The standard-library-only `client` package is the public high-level port for
+TUI and other local clients. It models one negotiated ownership epoch,
+concurrent operations, explicit replay/tail controls, pending interactions,
+snapshots, health, and lossless typed recovery without exposing gRPC or
+Protobuf. The `daemon` package contains the matching transport-independent host
+primitives, bounded reconnect-safe mutation/stream gates, and an OS-backed
+snapshot/run authority; local IPC and protocol translation remain separate
+adapters.
 
 Tool contracts fail closed: each definition declares `read_only` or `mutating`
 effect, replay safety, and a canonical capability set. Tools return ordinary

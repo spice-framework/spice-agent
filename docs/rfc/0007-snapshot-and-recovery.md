@@ -65,7 +65,44 @@ executable provider, stage, observer, broker, static tool, and decorator bean.
 Static compatibility mismatches are rejected before `LeaseGeneration` can
 launch or revive dynamic resources.
 
-HMAC authority is integrity and provenance, not encryption. Keys are separate
-from local IPC tokens, never serialized, and stored only by the future OS-backed
-authority implementation. This RFC slice defines the wire and trusted seam; it
-does not claim that OS key storage exists.
+HMAC authority is integrity and provenance, not encryption. The OS-backed
+authority stores a random scope ID and a distinct random key separately from
+local IPC tokens. Its authority-key generation is the generation signed on the
+wire; an independent per-run transition generation prevents replay without
+pretending the key rotated. A domain-separated per-run HMAC subkey binds the
+scope, run ID, and local transition generation, so even otherwise identical
+snapshots from different suspend generations have different claims. Stable
+per-run lock files are never unlinked. The authority binds and retains the
+validated authority-directory identity: Unix operations are descriptor-relative
+and Windows operations are handle-relative, so renaming or substituting a path
+cannot redirect authority state. Every open also validates the complete
+ancestry against OS ownership and delete/ACL-mutation rights and proves the
+walked final object is the retained object, preventing rollback by a different
+unprivileged principal after close/reopen. Windows trusts the volume namespace,
+current user, SYSTEM, Administrators, and TrustedInstaller; Unix trusts root and
+the current user, with sticky-directory semantics handled explicitly. Same-user
+and elevated compromise are outside the per-user authority boundary. Authority
+creation sets a newly created Unix leaf to `0700`; opening an existing leaf is
+validation-only and requires it already be exactly `0700`.
+Authority shutdown rejects new work and drains
+outstanding run/import leases before releasing that identity, then clears the
+canonical in-memory HMAC key. Proven cancellation at the final pre-write
+context check remains retryable; a failure after filesystem-writer invocation
+is uncertain even when the caller observes cancellation, because persistence
+or its final durability barrier may already have completed.
+`ACTIVE` cannot be imported, `SUSPENDED` records bind the exact digest and
+authority HMAC, `IMPORTING` is a durable consume point, and terminal records are
+non-resumable tombstones. Snapshot export remains logically read-only to kernel
+state but is authority-gated: signing `SUSPENDED` retains exclusive ownership,
+identical repeat export is idempotent, and a differing claim is rejected. Local
+resume durably writes `ACTIVE` at the next generation and invalidates the old
+claim while the kernel is still suspended; only then may the host resume the
+kernel. Import prepares and verifies while holding the lock,
+then the host consumes, commits its prepared kernel run, and activates. Failure
+before consume is abortable; failure after consume is explicitly uncertain and
+must not be retried automatically. In particular, an uncertain Activate after
+kernel commit retains the import transaction lock: the host must stop and join
+the committed kernel run before Abort/Close releases that lock, and execution
+must never continue without a returned active authority lease. Same-scope
+recovery is supported; copying a
+snapshot to another user scope fails closed.

@@ -103,12 +103,17 @@ func TestProtocolCapabilityAndHealthFailureBoundaries(t *testing.T) {
 	for _, state := range []commonv1.HealthState{
 		commonv1.HealthState_HEALTH_STATE_STARTING,
 		commonv1.HealthState_HEALTH_STATE_READY,
-		commonv1.HealthState_HEALTH_STATE_DEGRADED,
 		commonv1.HealthState_HEALTH_STATE_STOPPING,
 	} {
 		if err := commonv1.ValidateHealth(&commonv1.Health{State: state, Limits: limits(1024, 4, 2, 1024, 1, 1)}); err != nil {
 			t.Errorf("health state %s: %v", state, err)
 		}
+	}
+	if err := commonv1.ValidateHealth(&commonv1.Health{
+		State: commonv1.HealthState_HEALTH_STATE_DEGRADED, DegradedReasons: []string{"capacity"},
+		Limits: limits(1024, 4, 2, 1024, 1, 1),
+	}); err != nil {
+		t.Errorf("degraded health: %v", err)
 	}
 	for name, value := range map[string]*commonv1.Health{
 		"nil": nil,
@@ -123,9 +128,25 @@ func TestProtocolCapabilityAndHealthFailureBoundaries(t *testing.T) {
 			State:           commonv1.HealthState_HEALTH_STATE_DEGRADED,
 			DegradedReasons: []string{""}, Limits: limits(1024, 4, 2, 1024, 1, 1),
 		},
+		"degraded without reason": {
+			State: commonv1.HealthState_HEALTH_STATE_DEGRADED, Limits: limits(1024, 4, 2, 1024, 1, 1),
+		},
+		"ready with degraded reason": {
+			State: commonv1.HealthState_HEALTH_STATE_READY, DegradedReasons: []string{"capacity"},
+			Limits: limits(1024, 4, 2, 1024, 1, 1),
+		},
 	} {
 		if err := commonv1.ValidateHealth(value); err == nil {
 			t.Errorf("%s health succeeded", name)
+		}
+	}
+	for name, value := range map[string]*commonv1.BuildIdentity{
+		"newline": {Component: "client\nspoof", Version: "v1", Commit: "abc", GoVersion: "go1.26.5"},
+		"tab":     {Component: "client", Version: "v1\tspoof", Commit: "abc", GoVersion: "go1.26.5"},
+		"nul":     {Component: "client", Version: "v1", Commit: "abc\x00spoof", GoVersion: "go1.26.5"},
+	} {
+		if err := commonv1.ValidateBuildIdentity(value); err == nil {
+			t.Errorf("%s control-character build identity succeeded", name)
 		}
 	}
 }
@@ -149,6 +170,12 @@ func TestEveryTypedStatusDetailIsValidated(t *testing.T) {
 			Code: commonv1.ErrorCode_ERROR_CODE_OUT_OF_RANGE, Message: "replay gap",
 			Detail: &commonv1.Status_ReplayBounds{ReplayBounds: &commonv1.ReplayBounds{
 				RequestedAfterSequence: 8, EarliestSequence: 10, LatestSequence: 20, RecoverySequence: 9,
+			}},
+		},
+		{
+			Code: commonv1.ErrorCode_ERROR_CODE_OUT_OF_RANGE, Message: "future cursor",
+			Detail: &commonv1.Status_ReplayBounds{ReplayBounds: &commonv1.ReplayBounds{
+				RequestedAfterSequence: 21, EarliestSequence: 10, LatestSequence: 20, RecoverySequence: 20,
 			}},
 		},
 		{
