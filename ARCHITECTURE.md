@@ -87,6 +87,14 @@ daemon, client lifecycle, registry, or translation into kernel internals. The
 quality gate rejects gRPC, Protobuf, and generated protocol imports from kernel
 packages.
 
+Snapshot transfer is available only on protocol minor 1 with the negotiated
+`snapshot-authority-v1` capability. Every envelope carries a 32-byte authority
+scope, positive key generation, and HMAC-SHA256 over canonical semantic fields.
+Construction requires a trusted signer and import requires a keyed verifier;
+the unkeyed validator checks structure and payload integrity only. Authority
+keys are not IPC authentication tokens and remain outside Protobuf, snapshots,
+events, logs, and errors.
+
 Every interaction broker call carries an immutable validated run scope. Prompt
 content and response values stay out of authoritative run events; process
 clients discover them through an atomic complete pending snapshot followed by

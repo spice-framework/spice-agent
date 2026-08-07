@@ -1,6 +1,7 @@
 package enginev1_test
 
 import (
+	"context"
 	"testing"
 
 	commonv1 "github.com/spice-framework/spice-agent/common/v1"
@@ -205,17 +206,19 @@ func TestSuspendResumeAndSnapshotImportPreserveRunIdentity(t *testing.T) {
 	}
 	payload := []byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"run-1"}`)
 	snapshot, err := enginev1.NewSnapshotEnvelope(
+		context.Background(), snapshotAuthority(t),
 		"run-1", 7, enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED, payload,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = enginev1.ValidateImportSnapshotRequest(&enginev1.ImportSnapshotRequest{
+	if err = enginev1.ValidateImportSnapshotRequest(context.Background(), &enginev1.ImportSnapshotRequest{
 		ClientId: "client", OwnershipEpoch: 1, ClientOperationId: "import-1", Snapshot: snapshot,
-	}); err != nil {
+	}, snapshotAuthority(t)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = enginev1.NewSnapshotEnvelope(
+		context.Background(), snapshotAuthority(t),
 		"run-2", 7, enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED, payload,
 	); err == nil {
 		t.Fatal("snapshot envelope changed embedded run identity")

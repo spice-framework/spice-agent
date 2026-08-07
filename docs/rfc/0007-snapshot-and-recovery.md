@@ -23,6 +23,17 @@ after a run terminal. Duplicate message/call IDs, unmatched tool calls/results,
 unknown fields, unsupported versions, active state, pending interactions,
 unresolved tool mutations, invalid roles, and oversized content fail closed.
 
+Every process-boundary envelope is signed by a trusted snapshot authority. Its
+public claim contains an exact 32-byte scope ID, a positive key generation, and
+an exact 32-byte HMAC-SHA256. The canonical MAC input is a sequence of unsigned
+64-bit big-endian length-prefixed components: domain
+`spice.agent.run-authority/v1`, scope ID, generation encoded as eight-byte
+big-endian, format, run ID, last sequence encoded as eight-byte big-endian,
+lifecycle encoded as four-byte big-endian, and the already-validated payload
+SHA-256. The authority HMAC and unknown Protobuf fields are not self-signed.
+Construction cannot produce an unsigned envelope. Import requires a keyed
+verifier; structure and the unkeyed payload digest never establish authority.
+
 Only a suspended snapshot may resume. Compiled plan identities supplied by
 generated applications include the bean's module, version, and source identity.
 The leased definition fingerprints cover the exact tool contracts. Before event
@@ -33,7 +44,10 @@ exclusive ownership. In the same daemon, a known active, suspended, terminal,
 or tombstoned run ID conflicts deterministically; import never replaces that
 authority. Across processes, import is permitted only after the caller
 establishes that the original run authority is dead, and the destination engine
-must not have seen the embedded run ID. Resume
+must not have seen the embedded run ID. The destination additionally resolves
+the scope and generation to a server-owned key and verifies the HMAC before any
+lease, tombstone, event-log, or engine mutation. Unknown scopes, unavailable
+generations, and incorrect HMACs share one secret-safe failure. Resume
 does not emit a second `RunStarted`; it continues at `last_sequence+1`, starts
 the next turn, and derives run-scoped model/message identities so a fresh process
 cannot reuse earlier lifecycle IDs. Terminal snapshots are inspectable but never
@@ -50,3 +64,8 @@ one semantic compatibility identity and compiled identities for every
 executable provider, stage, observer, broker, static tool, and decorator bean.
 Static compatibility mismatches are rejected before `LeaseGeneration` can
 launch or revive dynamic resources.
+
+HMAC authority is integrity and provenance, not encryption. Keys are separate
+from local IPC tokens, never serialized, and stored only by the future OS-backed
+authority implementation. This RFC slice defines the wire and trusted seam; it
+does not claim that OS key storage exists.

@@ -339,7 +339,15 @@ message ResumeRunResponse {
   bool duplicate_operation = 4;
 }
 
-// SnapshotEnvelope carries one checksummed provider-neutral safe snapshot.
+// SnapshotAuthority proves one snapshot was issued by a trusted authority
+// generation without disclosing its signing key.
+message SnapshotAuthority {
+  bytes scope_id = 1;
+  uint64 generation = 2;
+  bytes hmac_sha256 = 3;
+}
+
+// SnapshotEnvelope carries one authenticated provider-neutral safe snapshot.
 message SnapshotEnvelope {
   string format = 1;
   string run_id = 2;
@@ -347,6 +355,7 @@ message SnapshotEnvelope {
   SnapshotLifecycle lifecycle = 4;
   bytes payload = 5;
   bytes sha256 = 6;
+  SnapshotAuthority authority = 7;
 }
 
 // ExportSnapshotRequest requests a safe completed-turn or terminal boundary.

@@ -2,6 +2,7 @@ package enginev1_test
 
 import (
 	"bytes"
+	"context"
 	"slices"
 	"testing"
 
@@ -18,7 +19,7 @@ func TestInitializeNegotiatesVersionCapabilitiesLimitsAndHealth(t *testing.T) {
 		request,
 		commonv1.SupportedProtocolRange(),
 		build("spice-agentd"),
-		capabilities("events", "plugins", "snapshots"),
+		capabilities("events", "plugins", enginev1.CapabilitySnapshotAuthorityV1, "snapshots"),
 		limits(4<<20, 128, 256, 8<<20, 8, 32),
 		health(),
 		definitionSet(),
@@ -28,7 +29,7 @@ func TestInitializeNegotiatesVersionCapabilitiesLimitsAndHealth(t *testing.T) {
 	if err := enginev1.ValidateInitializeResponse(response); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(response.GetCapabilities().GetNames(), []string{"events", "snapshots"}) ||
+	if !slices.Equal(response.GetCapabilities().GetNames(), []string{"events", enginev1.CapabilitySnapshotAuthorityV1, "snapshots"}) ||
 		response.GetLimits().GetMaxReplayEvents() != 128 ||
 		response.GetProtocol().GetMajor() != 1 || response.GetOwnershipEpoch() != 1 ||
 		response.GetDefinitions().GetRevision() != "catalog-v1" {
@@ -92,7 +93,7 @@ func TestInitializeFailsClosedForOldNewAndMissingCapability(t *testing.T) {
 				request,
 				commonv1.SupportedProtocolRange(),
 				build("spice-agentd"),
-				capabilities("events", "snapshots"),
+				capabilities("events", enginev1.CapabilitySnapshotAuthorityV1, "snapshots"),
 				limits(4<<20, 128, 256, 8<<20, 8, 32),
 				health(),
 				definitionSet(),
@@ -106,13 +107,48 @@ func TestInitializeFailsClosedForOldNewAndMissingCapability(t *testing.T) {
 	}
 }
 
+func TestSnapshotAuthorityRequiresProtocolMinorOneAndCapability(t *testing.T) {
+	t.Parallel()
+	request := validInitializeRequest()
+	request.Protocol = &commonv1.ProtocolRange{
+		Minimum: &commonv1.ProtocolVersion{Major: 1},
+		Maximum: &commonv1.ProtocolVersion{Major: 1},
+	}
+	response := enginev1.NegotiateInitialize(
+		request, commonv1.SupportedProtocolRange(), build("spice-agentd"),
+		capabilities("events", enginev1.CapabilitySnapshotAuthorityV1, "snapshots"),
+		protocolLimits(), health(), definitionSet(), "client-1", 1,
+	)
+	if response.GetStatus().GetCode() != commonv1.ErrorCode_ERROR_CODE_MISSING_CAPABILITY {
+		t.Fatalf("minor-zero authority status = %#v", response.GetStatus())
+	}
+
+	request.RequiredCapabilities = capabilities("events")
+	response = enginev1.NegotiateInitialize(
+		request, commonv1.SupportedProtocolRange(), build("spice-agentd"),
+		capabilities("events", enginev1.CapabilitySnapshotAuthorityV1, "snapshots"),
+		protocolLimits(), health(), definitionSet(), "client-1", 1,
+	)
+	if response.GetStatus().GetCode() != commonv1.ErrorCode_ERROR_CODE_OK ||
+		response.GetProtocol().GetMinor() != 0 ||
+		!slices.Equal(response.GetCapabilities().GetNames(), []string{"events"}) {
+		t.Fatalf("minor-zero negotiated authority = %#v", response)
+	}
+
+	response.Protocol = &commonv1.ProtocolVersion{Major: 1}
+	response.Capabilities = capabilities("events", "snapshots")
+	if err := enginev1.ValidateInitializeResponse(response); err == nil {
+		t.Fatal("client accepted snapshot transfer on protocol minor zero")
+	}
+}
+
 func TestInitializeReconnectClaimRequiresOwnershipEpochCompareAndSwap(t *testing.T) {
 	t.Parallel()
 	request := validInitializeRequest()
 	request.ReconnectClaim = &enginev1.ReconnectClaim{ClientId: "client-1", ExpectedOwnershipEpoch: 7}
 	response := enginev1.NegotiateInitialize(
 		request, commonv1.SupportedProtocolRange(), build("spice-agentd"),
-		capabilities("events", "snapshots"), protocolLimits(), health(), definitionSet(), "client-1", 8,
+		capabilities("events", enginev1.CapabilitySnapshotAuthorityV1, "snapshots"), protocolLimits(), health(), definitionSet(), "client-1", 8,
 	)
 	if err := enginev1.ValidateInitializeResponseForRequest(request, response); err != nil || response.GetOwnershipEpoch() != 8 {
 		t.Fatalf("reconnect response = %#v, %v", response, err)
@@ -133,7 +169,7 @@ func TestInitializeReconnectClaimRequiresOwnershipEpochCompareAndSwap(t *testing
 	} {
 		response = enginev1.NegotiateInitialize(
 			request, commonv1.SupportedProtocolRange(), build("spice-agentd"),
-			capabilities("events", "snapshots"), protocolLimits(), health(), definitionSet(), test.client, test.epoch,
+			capabilities("events", enginev1.CapabilitySnapshotAuthorityV1, "snapshots"), protocolLimits(), health(), definitionSet(), test.client, test.epoch,
 		)
 		if response.GetStatus().GetCode() == commonv1.ErrorCode_ERROR_CODE_OK {
 			t.Fatalf("invalid reconnect %q/%d succeeded", test.client, test.epoch)
@@ -248,6 +284,8 @@ func TestSnapshotDigestLifecycleAndImportSafety(t *testing.T) {
 	t.Parallel()
 	payload := []byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"run-1"}`)
 	snapshot, err := enginev1.NewSnapshotEnvelope(
+		context.Background(),
+		snapshotAuthority(t),
 		"run-1",
 		42,
 		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED,
@@ -273,7 +311,7 @@ func TestSnapshotDigestLifecycleAndImportSafety(t *testing.T) {
 		ClientId: "client-1", OwnershipEpoch: 1,
 		ClientOperationId: "import-1", Snapshot: snapshot,
 	}
-	if err = enginev1.ValidateImportSnapshotRequest(request); err != nil {
+	if err = enginev1.ValidateImportSnapshotRequest(context.Background(), request, snapshotAuthority(t)); err != nil {
 		t.Fatal(err)
 	}
 	snapshot.Sha256[0] ^= 0xff
@@ -281,6 +319,8 @@ func TestSnapshotDigestLifecycleAndImportSafety(t *testing.T) {
 		t.Fatal("snapshot with wrong digest succeeded")
 	}
 	snapshot, err = enginev1.NewSnapshotEnvelope(
+		context.Background(),
+		snapshotAuthority(t),
 		"run-1",
 		42,
 		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_COMPLETED,
@@ -290,7 +330,7 @@ func TestSnapshotDigestLifecycleAndImportSafety(t *testing.T) {
 		t.Fatal(err)
 	}
 	request.Snapshot = snapshot
-	if err = enginev1.ValidateImportSnapshotRequest(request); err == nil {
+	if err = enginev1.ValidateImportSnapshotRequest(context.Background(), request, snapshotAuthority(t)); err == nil {
 		t.Fatal("terminal snapshot import succeeded")
 	}
 }
@@ -334,6 +374,10 @@ func TestGeneratedServiceDescriptorFreezesOnlyTheProcessBoundary(t *testing.T) {
 }
 
 func FuzzEngineEnvelope(f *testing.F) {
+	codec, err := enginev1.NewHMACSnapshotAuthority(bytes.Repeat([]byte{0x11}, 32), 7, bytes.Repeat([]byte{0x22}, 32))
+	if err != nil {
+		f.Fatal(err)
+	}
 	seed, err := proto.Marshal(runEvent(1, enginev1.EventKind_EVENT_KIND_RUN_STARTED, false))
 	if err != nil {
 		f.Fatal(err)
@@ -348,6 +392,9 @@ func FuzzEngineEnvelope(f *testing.F) {
 		var snapshot enginev1.SnapshotEnvelope
 		if proto.Unmarshal(data, &snapshot) == nil {
 			_ = enginev1.ValidateSnapshotEnvelope(&snapshot)
+			_ = enginev1.ValidateImportSnapshotRequest(context.Background(), &enginev1.ImportSnapshotRequest{
+				ClientId: "client", OwnershipEpoch: 1, ClientOperationId: "fuzz-import", Snapshot: &snapshot,
+			}, codec)
 		}
 		var response enginev1.RespondInteractionRequest
 		if proto.Unmarshal(data, &response) == nil {
@@ -360,8 +407,8 @@ func validInitializeRequest() *enginev1.InitializeRequest {
 	return &enginev1.InitializeRequest{
 		Protocol:              commonv1.SupportedProtocolRange(),
 		Client:                build("spice-agent-tui"),
-		SupportedCapabilities: capabilities("events", "snapshots", "tools"),
-		RequiredCapabilities:  capabilities("events", "snapshots"),
+		SupportedCapabilities: capabilities("events", enginev1.CapabilitySnapshotAuthorityV1, "snapshots", "tools"),
+		RequiredCapabilities:  capabilities("events", enginev1.CapabilitySnapshotAuthorityV1, "snapshots"),
 		RequestedLimits:       limits(2<<20, 64, 128, 4<<20, 4, 8),
 	}
 }
@@ -402,6 +449,19 @@ func limits(messageBytes uint64, items, replayEvents uint32, replayBytes uint64,
 
 func protocolLimits() *commonv1.Limits {
 	return limits(4<<20, 128, 256, 8<<20, 8, 32)
+}
+
+func snapshotAuthority(t *testing.T) *enginev1.HMACSnapshotAuthority {
+	t.Helper()
+	codec, err := enginev1.NewHMACSnapshotAuthority(
+		bytes.Repeat([]byte{0x11}, 32),
+		7,
+		bytes.Repeat([]byte{0x22}, 32),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return codec
 }
 
 func health() *commonv1.Health {

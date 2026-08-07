@@ -13,8 +13,10 @@ import (
 const (
 	// ProtocolMajor is the architecture-proof wire major.
 	ProtocolMajor = uint32(1)
+	// ProtocolMinimumMinor is the oldest compatible architecture-proof wire minor.
+	ProtocolMinimumMinor = uint32(0)
 	// ProtocolMinor is the highest architecture-proof wire minor.
-	ProtocolMinor = uint32(0)
+	ProtocolMinor = uint32(1)
 	// ProtocolPatch is the architecture-proof wire patch.
 	ProtocolPatch      = uint32(0)
 	maximumTokenBytes  = 256
@@ -24,8 +26,10 @@ const (
 // SupportedProtocolRange returns a fresh immutable-by-convention range for the
 // versions implemented by this package.
 func SupportedProtocolRange() *ProtocolRange {
-	version := &ProtocolVersion{Major: ProtocolMajor, Minor: ProtocolMinor, Patch: ProtocolPatch}
-	return &ProtocolRange{Minimum: clone(version), Maximum: version}
+	return &ProtocolRange{
+		Minimum: &ProtocolVersion{Major: ProtocolMajor, Minor: ProtocolMinimumMinor, Patch: ProtocolPatch},
+		Maximum: &ProtocolVersion{Major: ProtocolMajor, Minor: ProtocolMinor, Patch: ProtocolPatch},
+	}
 }
 
 // OKStatus returns a fresh successful application status.

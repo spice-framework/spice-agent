@@ -85,6 +85,11 @@ protocol fuzzing are covered. No daemon, listener, transport authentication,
 managed startup, or TUI implementation is claimed by this slice. Reproducible
 commands are recorded in
 [`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
+The wire boundary advertises protocol 1.0-1.1 and makes snapshot transfer a
+minor-1 `snapshot-authority-v1` capability. Envelopes require a canonical
+HMAC-SHA256 authority claim; construction requires a trusted signer and import
+requires keyed verification. This is a wire and cryptographic seam, not an OS
+key store or daemon-host implementation.
 The first host-foundation slice now implements the transport-independent
 `daemon` named interface: exact immutable definition catalogs, root-owned
 stable-client reconnect CAS, bounded per-client idempotency with panic-safe
@@ -101,7 +106,7 @@ See
 [`evidence/phase4-kernel-preparation.md`](evidence/phase4-kernel-preparation.md).
 The schema is not the final Phase 4 freeze: the host slice must prove these
 repaired contracts over real RPCs, enforce same-daemon run tombstones and
-cross-process import authority, and ensure RPC contexts never own run lifetime
+OS-backed import-authority lifecycle, and ensure RPC contexts never own run lifetime
 before the baseline can be declared stable.
 
 ## Phase 5.0A execution prerequisite

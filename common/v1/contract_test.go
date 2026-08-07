@@ -30,6 +30,23 @@ func TestProtocolNegotiationSelectsGreatestCompatibleVersion(t *testing.T) {
 	}
 }
 
+func TestSupportedProtocolRangeRetainsMinorZeroAndAdvertisesMinorOne(t *testing.T) {
+	t.Parallel()
+	supported := commonv1.SupportedProtocolRange()
+	if supported.GetMinimum().GetMajor() != 1 || supported.GetMinimum().GetMinor() != 0 ||
+		supported.GetMaximum().GetMajor() != 1 || supported.GetMaximum().GetMinor() != 1 {
+		t.Fatalf("supported protocol range = %#v", supported)
+	}
+	selected, status := commonv1.NegotiateProtocol(protocolRange(1, 0, 1, 0), supported)
+	if status.GetCode() != commonv1.ErrorCode_ERROR_CODE_OK || selected.GetMinor() != 0 {
+		t.Fatalf("minor-zero negotiation = %#v, %#v", selected, status)
+	}
+	selected, status = commonv1.NegotiateProtocol(protocolRange(1, 0, 1, 1), supported)
+	if status.GetCode() != commonv1.ErrorCode_ERROR_CODE_OK || selected.GetMinor() != 1 {
+		t.Fatalf("minor-one negotiation = %#v, %#v", selected, status)
+	}
+}
+
 func TestProtocolNegotiationRejectsOldNewAndInvalidRanges(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct {

@@ -1,6 +1,7 @@
 package enginev1_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -27,7 +28,7 @@ func TestInitializeResponseAndServerFailureBoundaries(t *testing.T) {
 
 	validResponse := enginev1.NegotiateInitialize(
 		request, commonv1.SupportedProtocolRange(), build("spice-agentd"),
-		capabilities("events", "snapshots"), protocolLimits(), health(), definitionSet(), "client-1", 1,
+		capabilities("events", enginev1.CapabilitySnapshotAuthorityV1, "snapshots"), protocolLimits(), health(), definitionSet(), "client-1", 1,
 	)
 	for name, mutate := range map[string]func(*enginev1.InitializeResponse){
 		"build":        func(value *enginev1.InitializeResponse) { value.Server = nil },
@@ -175,7 +176,11 @@ func TestInteractionAndSnapshotFailureBoundaries(t *testing.T) {
 		t.Fatalf("wrong interaction correlation = %#v", status)
 	}
 
-	valid, err := enginev1.NewSnapshotEnvelope("run", 1, enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED, []byte(`{"safe":true,"run_id":"run"}`))
+	valid, err := enginev1.NewSnapshotEnvelope(
+		context.Background(), snapshotAuthority(t), "run", 1,
+		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED,
+		[]byte(`{"safe":true,"run_id":"run"}`),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,16 +195,19 @@ func TestInteractionAndSnapshotFailureBoundaries(t *testing.T) {
 			t.Errorf("invalid snapshot %s succeeded", name)
 		}
 	}
-	if _, err = enginev1.NewSnapshotEnvelope("", 0, enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_UNSPECIFIED, nil); err == nil {
+	if _, err = enginev1.NewSnapshotEnvelope(
+		context.Background(), snapshotAuthority(t), "", 0,
+		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_UNSPECIFIED, nil,
+	); err == nil {
 		t.Fatal("invalid snapshot construction succeeded")
 	}
-	if err = enginev1.ValidateImportSnapshotRequest(nil); err == nil {
+	if err = enginev1.ValidateImportSnapshotRequest(context.Background(), nil, snapshotAuthority(t)); err == nil {
 		t.Fatal("nil snapshot import succeeded")
 	}
-	if err = enginev1.ValidateImportSnapshotRequest(&enginev1.ImportSnapshotRequest{
+	if err = enginev1.ValidateImportSnapshotRequest(context.Background(), &enginev1.ImportSnapshotRequest{
 		ClientId: "client", OwnershipEpoch: 1, ClientOperationId: "import",
 		Snapshot: valid,
-	}); err != nil {
+	}, snapshotAuthority(t)); err != nil {
 		t.Fatal(err)
 	}
 }

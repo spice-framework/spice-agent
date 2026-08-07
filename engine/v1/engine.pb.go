@@ -2687,7 +2687,69 @@ func (x *ResumeRunResponse) GetDuplicateOperation() bool {
 	return false
 }
 
-// SnapshotEnvelope carries one checksummed provider-neutral safe snapshot.
+// SnapshotAuthority proves one snapshot was issued by a trusted authority
+// generation without disclosing its signing key.
+type SnapshotAuthority struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ScopeId       []byte                 `protobuf:"bytes,1,opt,name=scope_id,json=scopeId,proto3" json:"scope_id,omitempty"`
+	Generation    uint64                 `protobuf:"varint,2,opt,name=generation,proto3" json:"generation,omitempty"`
+	HmacSha256    []byte                 `protobuf:"bytes,3,opt,name=hmac_sha256,json=hmacSha256,proto3" json:"hmac_sha256,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SnapshotAuthority) Reset() {
+	*x = SnapshotAuthority{}
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SnapshotAuthority) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SnapshotAuthority) ProtoMessage() {}
+
+func (x *SnapshotAuthority) ProtoReflect() protoreflect.Message {
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SnapshotAuthority.ProtoReflect.Descriptor instead.
+func (*SnapshotAuthority) Descriptor() ([]byte, []int) {
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *SnapshotAuthority) GetScopeId() []byte {
+	if x != nil {
+		return x.ScopeId
+	}
+	return nil
+}
+
+func (x *SnapshotAuthority) GetGeneration() uint64 {
+	if x != nil {
+		return x.Generation
+	}
+	return 0
+}
+
+func (x *SnapshotAuthority) GetHmacSha256() []byte {
+	if x != nil {
+		return x.HmacSha256
+	}
+	return nil
+}
+
+// SnapshotEnvelope carries one authenticated provider-neutral safe snapshot.
 type SnapshotEnvelope struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Format        string                 `protobuf:"bytes,1,opt,name=format,proto3" json:"format,omitempty"`
@@ -2696,13 +2758,14 @@ type SnapshotEnvelope struct {
 	Lifecycle     SnapshotLifecycle      `protobuf:"varint,4,opt,name=lifecycle,proto3,enum=spice.agent.engine.v1.SnapshotLifecycle" json:"lifecycle,omitempty"`
 	Payload       []byte                 `protobuf:"bytes,5,opt,name=payload,proto3" json:"payload,omitempty"`
 	Sha256        []byte                 `protobuf:"bytes,6,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	Authority     *SnapshotAuthority     `protobuf:"bytes,7,opt,name=authority,proto3" json:"authority,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SnapshotEnvelope) Reset() {
 	*x = SnapshotEnvelope{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[33]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2714,7 +2777,7 @@ func (x *SnapshotEnvelope) String() string {
 func (*SnapshotEnvelope) ProtoMessage() {}
 
 func (x *SnapshotEnvelope) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[33]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2727,7 +2790,7 @@ func (x *SnapshotEnvelope) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SnapshotEnvelope.ProtoReflect.Descriptor instead.
 func (*SnapshotEnvelope) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{33}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *SnapshotEnvelope) GetFormat() string {
@@ -2772,6 +2835,13 @@ func (x *SnapshotEnvelope) GetSha256() []byte {
 	return nil
 }
 
+func (x *SnapshotEnvelope) GetAuthority() *SnapshotAuthority {
+	if x != nil {
+		return x.Authority
+	}
+	return nil
+}
+
 // ExportSnapshotRequest requests a safe completed-turn or terminal boundary.
 type ExportSnapshotRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
@@ -2784,7 +2854,7 @@ type ExportSnapshotRequest struct {
 
 func (x *ExportSnapshotRequest) Reset() {
 	*x = ExportSnapshotRequest{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[34]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2796,7 +2866,7 @@ func (x *ExportSnapshotRequest) String() string {
 func (*ExportSnapshotRequest) ProtoMessage() {}
 
 func (x *ExportSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[34]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2809,7 +2879,7 @@ func (x *ExportSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*ExportSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{34}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *ExportSnapshotRequest) GetClientId() string {
@@ -2844,7 +2914,7 @@ type ExportSnapshotResponse struct {
 
 func (x *ExportSnapshotResponse) Reset() {
 	*x = ExportSnapshotResponse{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[35]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2856,7 +2926,7 @@ func (x *ExportSnapshotResponse) String() string {
 func (*ExportSnapshotResponse) ProtoMessage() {}
 
 func (x *ExportSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[35]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2869,7 +2939,7 @@ func (x *ExportSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*ExportSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{35}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ExportSnapshotResponse) GetStatus() *v1.Status {
@@ -2899,7 +2969,7 @@ type ImportSnapshotRequest struct {
 
 func (x *ImportSnapshotRequest) Reset() {
 	*x = ImportSnapshotRequest{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[36]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2911,7 +2981,7 @@ func (x *ImportSnapshotRequest) String() string {
 func (*ImportSnapshotRequest) ProtoMessage() {}
 
 func (x *ImportSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[36]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2924,7 +2994,7 @@ func (x *ImportSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImportSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*ImportSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{36}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *ImportSnapshotRequest) GetClientId() string {
@@ -2968,7 +3038,7 @@ type ImportSnapshotResponse struct {
 
 func (x *ImportSnapshotResponse) Reset() {
 	*x = ImportSnapshotResponse{}
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[37]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2980,7 +3050,7 @@ func (x *ImportSnapshotResponse) String() string {
 func (*ImportSnapshotResponse) ProtoMessage() {}
 
 func (x *ImportSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[37]
+	mi := &file_spice_agent_engine_v1_engine_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2993,7 +3063,7 @@ func (x *ImportSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImportSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*ImportSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{37}
+	return file_spice_agent_engine_v1_engine_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *ImportSnapshotResponse) GetStatus() *v1.Status {
@@ -3206,14 +3276,22 @@ const file_spice_agent_engine_v1_engine_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\v2\x1d.spice.agent.common.v1.StatusR\x06status\x12\x18\n" +
 	"\aresumed\x18\x02 \x01(\bR\aresumed\x12#\n" +
 	"\rnext_sequence\x18\x03 \x01(\x04R\fnextSequence\x12/\n" +
-	"\x13duplicate_operation\x18\x04 \x01(\bR\x12duplicateOperation\"\xe0\x01\n" +
+	"\x13duplicate_operation\x18\x04 \x01(\bR\x12duplicateOperation\"o\n" +
+	"\x11SnapshotAuthority\x12\x19\n" +
+	"\bscope_id\x18\x01 \x01(\fR\ascopeId\x12\x1e\n" +
+	"\n" +
+	"generation\x18\x02 \x01(\x04R\n" +
+	"generation\x12\x1f\n" +
+	"\vhmac_sha256\x18\x03 \x01(\fR\n" +
+	"hmacSha256\"\xa8\x02\n" +
 	"\x10SnapshotEnvelope\x12\x16\n" +
 	"\x06format\x18\x01 \x01(\tR\x06format\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12#\n" +
 	"\rlast_sequence\x18\x03 \x01(\x04R\flastSequence\x12F\n" +
 	"\tlifecycle\x18\x04 \x01(\x0e2(.spice.agent.engine.v1.SnapshotLifecycleR\tlifecycle\x12\x18\n" +
 	"\apayload\x18\x05 \x01(\fR\apayload\x12\x16\n" +
-	"\x06sha256\x18\x06 \x01(\fR\x06sha256\"t\n" +
+	"\x06sha256\x18\x06 \x01(\fR\x06sha256\x12F\n" +
+	"\tauthority\x18\a \x01(\v2(.spice.agent.engine.v1.SnapshotAuthorityR\tauthority\"t\n" +
 	"\x15ExportSnapshotRequest\x12\x1b\n" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12'\n" +
 	"\x0fownership_epoch\x18\x02 \x01(\x04R\x0eownershipEpoch\x12\x15\n" +
@@ -3298,7 +3376,7 @@ func file_spice_agent_engine_v1_engine_proto_rawDescGZIP() []byte {
 }
 
 var file_spice_agent_engine_v1_engine_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_spice_agent_engine_v1_engine_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
+var file_spice_agent_engine_v1_engine_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
 var file_spice_agent_engine_v1_engine_proto_goTypes = []any{
 	(MessageRole)(0),                   // 0: spice.agent.engine.v1.MessageRole
 	(EventKind)(0),                     // 1: spice.agent.engine.v1.EventKind
@@ -3337,18 +3415,19 @@ var file_spice_agent_engine_v1_engine_proto_goTypes = []any{
 	(*SuspendRunResponse)(nil),         // 34: spice.agent.engine.v1.SuspendRunResponse
 	(*ResumeRunRequest)(nil),           // 35: spice.agent.engine.v1.ResumeRunRequest
 	(*ResumeRunResponse)(nil),          // 36: spice.agent.engine.v1.ResumeRunResponse
-	(*SnapshotEnvelope)(nil),           // 37: spice.agent.engine.v1.SnapshotEnvelope
-	(*ExportSnapshotRequest)(nil),      // 38: spice.agent.engine.v1.ExportSnapshotRequest
-	(*ExportSnapshotResponse)(nil),     // 39: spice.agent.engine.v1.ExportSnapshotResponse
-	(*ImportSnapshotRequest)(nil),      // 40: spice.agent.engine.v1.ImportSnapshotRequest
-	(*ImportSnapshotResponse)(nil),     // 41: spice.agent.engine.v1.ImportSnapshotResponse
-	(*v1.ProtocolRange)(nil),           // 42: spice.agent.common.v1.ProtocolRange
-	(*v1.BuildIdentity)(nil),           // 43: spice.agent.common.v1.BuildIdentity
-	(*v1.CapabilitySet)(nil),           // 44: spice.agent.common.v1.CapabilitySet
-	(*v1.Limits)(nil),                  // 45: spice.agent.common.v1.Limits
-	(*v1.Status)(nil),                  // 46: spice.agent.common.v1.Status
-	(*v1.ProtocolVersion)(nil),         // 47: spice.agent.common.v1.ProtocolVersion
-	(*v1.Health)(nil),                  // 48: spice.agent.common.v1.Health
+	(*SnapshotAuthority)(nil),          // 37: spice.agent.engine.v1.SnapshotAuthority
+	(*SnapshotEnvelope)(nil),           // 38: spice.agent.engine.v1.SnapshotEnvelope
+	(*ExportSnapshotRequest)(nil),      // 39: spice.agent.engine.v1.ExportSnapshotRequest
+	(*ExportSnapshotResponse)(nil),     // 40: spice.agent.engine.v1.ExportSnapshotResponse
+	(*ImportSnapshotRequest)(nil),      // 41: spice.agent.engine.v1.ImportSnapshotRequest
+	(*ImportSnapshotResponse)(nil),     // 42: spice.agent.engine.v1.ImportSnapshotResponse
+	(*v1.ProtocolRange)(nil),           // 43: spice.agent.common.v1.ProtocolRange
+	(*v1.BuildIdentity)(nil),           // 44: spice.agent.common.v1.BuildIdentity
+	(*v1.CapabilitySet)(nil),           // 45: spice.agent.common.v1.CapabilitySet
+	(*v1.Limits)(nil),                  // 46: spice.agent.common.v1.Limits
+	(*v1.Status)(nil),                  // 47: spice.agent.common.v1.Status
+	(*v1.ProtocolVersion)(nil),         // 48: spice.agent.common.v1.ProtocolVersion
+	(*v1.Health)(nil),                  // 49: spice.agent.common.v1.Health
 }
 var file_spice_agent_engine_v1_engine_proto_depIdxs = []int32{
 	4,  // 0: spice.agent.engine.v1.ContentPart.tool_call:type_name -> spice.agent.engine.v1.ToolCallPart
@@ -3357,73 +3436,74 @@ var file_spice_agent_engine_v1_engine_proto_depIdxs = []int32{
 	0,  // 3: spice.agent.engine.v1.Message.role:type_name -> spice.agent.engine.v1.MessageRole
 	7,  // 4: spice.agent.engine.v1.Message.parts:type_name -> spice.agent.engine.v1.ContentPart
 	10, // 5: spice.agent.engine.v1.DefinitionSet.definitions:type_name -> spice.agent.engine.v1.Definition
-	42, // 6: spice.agent.engine.v1.InitializeRequest.protocol:type_name -> spice.agent.common.v1.ProtocolRange
-	43, // 7: spice.agent.engine.v1.InitializeRequest.client:type_name -> spice.agent.common.v1.BuildIdentity
-	44, // 8: spice.agent.engine.v1.InitializeRequest.supported_capabilities:type_name -> spice.agent.common.v1.CapabilitySet
-	44, // 9: spice.agent.engine.v1.InitializeRequest.required_capabilities:type_name -> spice.agent.common.v1.CapabilitySet
-	45, // 10: spice.agent.engine.v1.InitializeRequest.requested_limits:type_name -> spice.agent.common.v1.Limits
+	43, // 6: spice.agent.engine.v1.InitializeRequest.protocol:type_name -> spice.agent.common.v1.ProtocolRange
+	44, // 7: spice.agent.engine.v1.InitializeRequest.client:type_name -> spice.agent.common.v1.BuildIdentity
+	45, // 8: spice.agent.engine.v1.InitializeRequest.supported_capabilities:type_name -> spice.agent.common.v1.CapabilitySet
+	45, // 9: spice.agent.engine.v1.InitializeRequest.required_capabilities:type_name -> spice.agent.common.v1.CapabilitySet
+	46, // 10: spice.agent.engine.v1.InitializeRequest.requested_limits:type_name -> spice.agent.common.v1.Limits
 	12, // 11: spice.agent.engine.v1.InitializeRequest.reconnect_claim:type_name -> spice.agent.engine.v1.ReconnectClaim
-	46, // 12: spice.agent.engine.v1.InitializeResponse.status:type_name -> spice.agent.common.v1.Status
-	47, // 13: spice.agent.engine.v1.InitializeResponse.protocol:type_name -> spice.agent.common.v1.ProtocolVersion
-	43, // 14: spice.agent.engine.v1.InitializeResponse.server:type_name -> spice.agent.common.v1.BuildIdentity
-	44, // 15: spice.agent.engine.v1.InitializeResponse.capabilities:type_name -> spice.agent.common.v1.CapabilitySet
-	45, // 16: spice.agent.engine.v1.InitializeResponse.limits:type_name -> spice.agent.common.v1.Limits
-	48, // 17: spice.agent.engine.v1.InitializeResponse.health:type_name -> spice.agent.common.v1.Health
+	47, // 12: spice.agent.engine.v1.InitializeResponse.status:type_name -> spice.agent.common.v1.Status
+	48, // 13: spice.agent.engine.v1.InitializeResponse.protocol:type_name -> spice.agent.common.v1.ProtocolVersion
+	44, // 14: spice.agent.engine.v1.InitializeResponse.server:type_name -> spice.agent.common.v1.BuildIdentity
+	45, // 15: spice.agent.engine.v1.InitializeResponse.capabilities:type_name -> spice.agent.common.v1.CapabilitySet
+	46, // 16: spice.agent.engine.v1.InitializeResponse.limits:type_name -> spice.agent.common.v1.Limits
+	49, // 17: spice.agent.engine.v1.InitializeResponse.health:type_name -> spice.agent.common.v1.Health
 	11, // 18: spice.agent.engine.v1.InitializeResponse.definitions:type_name -> spice.agent.engine.v1.DefinitionSet
-	46, // 19: spice.agent.engine.v1.HealthResponse.status:type_name -> spice.agent.common.v1.Status
-	43, // 20: spice.agent.engine.v1.HealthResponse.server:type_name -> spice.agent.common.v1.BuildIdentity
-	47, // 21: spice.agent.engine.v1.HealthResponse.protocol:type_name -> spice.agent.common.v1.ProtocolVersion
-	48, // 22: spice.agent.engine.v1.HealthResponse.health:type_name -> spice.agent.common.v1.Health
+	47, // 19: spice.agent.engine.v1.HealthResponse.status:type_name -> spice.agent.common.v1.Status
+	44, // 20: spice.agent.engine.v1.HealthResponse.server:type_name -> spice.agent.common.v1.BuildIdentity
+	48, // 21: spice.agent.engine.v1.HealthResponse.protocol:type_name -> spice.agent.common.v1.ProtocolVersion
+	49, // 22: spice.agent.engine.v1.HealthResponse.health:type_name -> spice.agent.common.v1.Health
 	9,  // 23: spice.agent.engine.v1.StartRunRequest.definition:type_name -> spice.agent.engine.v1.AgentDefinitionRef
 	8,  // 24: spice.agent.engine.v1.StartRunRequest.input:type_name -> spice.agent.engine.v1.Message
-	46, // 25: spice.agent.engine.v1.StartRunResponse.status:type_name -> spice.agent.common.v1.Status
+	47, // 25: spice.agent.engine.v1.StartRunResponse.status:type_name -> spice.agent.common.v1.Status
 	1,  // 26: spice.agent.engine.v1.RunEvent.kind:type_name -> spice.agent.engine.v1.EventKind
-	46, // 27: spice.agent.engine.v1.StreamControl.status:type_name -> spice.agent.common.v1.Status
+	47, // 27: spice.agent.engine.v1.StreamControl.status:type_name -> spice.agent.common.v1.Status
 	20, // 28: spice.agent.engine.v1.StreamEventsResponse.event:type_name -> spice.agent.engine.v1.RunEvent
 	21, // 29: spice.agent.engine.v1.StreamEventsResponse.control:type_name -> spice.agent.engine.v1.StreamControl
-	46, // 30: spice.agent.engine.v1.CancelRunResponse.status:type_name -> spice.agent.common.v1.Status
-	46, // 31: spice.agent.engine.v1.RespondInteractionResponse.status:type_name -> spice.agent.common.v1.Status
+	47, // 30: spice.agent.engine.v1.CancelRunResponse.status:type_name -> spice.agent.common.v1.Status
+	47, // 31: spice.agent.engine.v1.RespondInteractionResponse.status:type_name -> spice.agent.common.v1.Status
 	3,  // 32: spice.agent.engine.v1.InteractionDelta.kind:type_name -> spice.agent.engine.v1.InteractionDeltaKind
 	27, // 33: spice.agent.engine.v1.InteractionDelta.interaction:type_name -> spice.agent.engine.v1.PendingInteraction
 	27, // 34: spice.agent.engine.v1.InteractionSnapshot.pending:type_name -> spice.agent.engine.v1.PendingInteraction
-	46, // 35: spice.agent.engine.v1.InteractionStreamControl.status:type_name -> spice.agent.common.v1.Status
+	47, // 35: spice.agent.engine.v1.InteractionStreamControl.status:type_name -> spice.agent.common.v1.Status
 	29, // 36: spice.agent.engine.v1.StreamInteractionsResponse.snapshot:type_name -> spice.agent.engine.v1.InteractionSnapshot
 	28, // 37: spice.agent.engine.v1.StreamInteractionsResponse.delta:type_name -> spice.agent.engine.v1.InteractionDelta
 	31, // 38: spice.agent.engine.v1.StreamInteractionsResponse.control:type_name -> spice.agent.engine.v1.InteractionStreamControl
-	46, // 39: spice.agent.engine.v1.SuspendRunResponse.status:type_name -> spice.agent.common.v1.Status
-	46, // 40: spice.agent.engine.v1.ResumeRunResponse.status:type_name -> spice.agent.common.v1.Status
+	47, // 39: spice.agent.engine.v1.SuspendRunResponse.status:type_name -> spice.agent.common.v1.Status
+	47, // 40: spice.agent.engine.v1.ResumeRunResponse.status:type_name -> spice.agent.common.v1.Status
 	2,  // 41: spice.agent.engine.v1.SnapshotEnvelope.lifecycle:type_name -> spice.agent.engine.v1.SnapshotLifecycle
-	46, // 42: spice.agent.engine.v1.ExportSnapshotResponse.status:type_name -> spice.agent.common.v1.Status
-	37, // 43: spice.agent.engine.v1.ExportSnapshotResponse.snapshot:type_name -> spice.agent.engine.v1.SnapshotEnvelope
-	37, // 44: spice.agent.engine.v1.ImportSnapshotRequest.snapshot:type_name -> spice.agent.engine.v1.SnapshotEnvelope
-	46, // 45: spice.agent.engine.v1.ImportSnapshotResponse.status:type_name -> spice.agent.common.v1.Status
-	13, // 46: spice.agent.engine.v1.EngineService.Initialize:input_type -> spice.agent.engine.v1.InitializeRequest
-	15, // 47: spice.agent.engine.v1.EngineService.Health:input_type -> spice.agent.engine.v1.HealthRequest
-	17, // 48: spice.agent.engine.v1.EngineService.StartRun:input_type -> spice.agent.engine.v1.StartRunRequest
-	19, // 49: spice.agent.engine.v1.EngineService.StreamEvents:input_type -> spice.agent.engine.v1.StreamEventsRequest
-	30, // 50: spice.agent.engine.v1.EngineService.StreamInteractions:input_type -> spice.agent.engine.v1.StreamInteractionsRequest
-	23, // 51: spice.agent.engine.v1.EngineService.CancelRun:input_type -> spice.agent.engine.v1.CancelRunRequest
-	25, // 52: spice.agent.engine.v1.EngineService.RespondInteraction:input_type -> spice.agent.engine.v1.RespondInteractionRequest
-	33, // 53: spice.agent.engine.v1.EngineService.SuspendRun:input_type -> spice.agent.engine.v1.SuspendRunRequest
-	35, // 54: spice.agent.engine.v1.EngineService.ResumeRun:input_type -> spice.agent.engine.v1.ResumeRunRequest
-	38, // 55: spice.agent.engine.v1.EngineService.ExportSnapshot:input_type -> spice.agent.engine.v1.ExportSnapshotRequest
-	40, // 56: spice.agent.engine.v1.EngineService.ImportSnapshot:input_type -> spice.agent.engine.v1.ImportSnapshotRequest
-	14, // 57: spice.agent.engine.v1.EngineService.Initialize:output_type -> spice.agent.engine.v1.InitializeResponse
-	16, // 58: spice.agent.engine.v1.EngineService.Health:output_type -> spice.agent.engine.v1.HealthResponse
-	18, // 59: spice.agent.engine.v1.EngineService.StartRun:output_type -> spice.agent.engine.v1.StartRunResponse
-	22, // 60: spice.agent.engine.v1.EngineService.StreamEvents:output_type -> spice.agent.engine.v1.StreamEventsResponse
-	32, // 61: spice.agent.engine.v1.EngineService.StreamInteractions:output_type -> spice.agent.engine.v1.StreamInteractionsResponse
-	24, // 62: spice.agent.engine.v1.EngineService.CancelRun:output_type -> spice.agent.engine.v1.CancelRunResponse
-	26, // 63: spice.agent.engine.v1.EngineService.RespondInteraction:output_type -> spice.agent.engine.v1.RespondInteractionResponse
-	34, // 64: spice.agent.engine.v1.EngineService.SuspendRun:output_type -> spice.agent.engine.v1.SuspendRunResponse
-	36, // 65: spice.agent.engine.v1.EngineService.ResumeRun:output_type -> spice.agent.engine.v1.ResumeRunResponse
-	39, // 66: spice.agent.engine.v1.EngineService.ExportSnapshot:output_type -> spice.agent.engine.v1.ExportSnapshotResponse
-	41, // 67: spice.agent.engine.v1.EngineService.ImportSnapshot:output_type -> spice.agent.engine.v1.ImportSnapshotResponse
-	57, // [57:68] is the sub-list for method output_type
-	46, // [46:57] is the sub-list for method input_type
-	46, // [46:46] is the sub-list for extension type_name
-	46, // [46:46] is the sub-list for extension extendee
-	0,  // [0:46] is the sub-list for field type_name
+	37, // 42: spice.agent.engine.v1.SnapshotEnvelope.authority:type_name -> spice.agent.engine.v1.SnapshotAuthority
+	47, // 43: spice.agent.engine.v1.ExportSnapshotResponse.status:type_name -> spice.agent.common.v1.Status
+	38, // 44: spice.agent.engine.v1.ExportSnapshotResponse.snapshot:type_name -> spice.agent.engine.v1.SnapshotEnvelope
+	38, // 45: spice.agent.engine.v1.ImportSnapshotRequest.snapshot:type_name -> spice.agent.engine.v1.SnapshotEnvelope
+	47, // 46: spice.agent.engine.v1.ImportSnapshotResponse.status:type_name -> spice.agent.common.v1.Status
+	13, // 47: spice.agent.engine.v1.EngineService.Initialize:input_type -> spice.agent.engine.v1.InitializeRequest
+	15, // 48: spice.agent.engine.v1.EngineService.Health:input_type -> spice.agent.engine.v1.HealthRequest
+	17, // 49: spice.agent.engine.v1.EngineService.StartRun:input_type -> spice.agent.engine.v1.StartRunRequest
+	19, // 50: spice.agent.engine.v1.EngineService.StreamEvents:input_type -> spice.agent.engine.v1.StreamEventsRequest
+	30, // 51: spice.agent.engine.v1.EngineService.StreamInteractions:input_type -> spice.agent.engine.v1.StreamInteractionsRequest
+	23, // 52: spice.agent.engine.v1.EngineService.CancelRun:input_type -> spice.agent.engine.v1.CancelRunRequest
+	25, // 53: spice.agent.engine.v1.EngineService.RespondInteraction:input_type -> spice.agent.engine.v1.RespondInteractionRequest
+	33, // 54: spice.agent.engine.v1.EngineService.SuspendRun:input_type -> spice.agent.engine.v1.SuspendRunRequest
+	35, // 55: spice.agent.engine.v1.EngineService.ResumeRun:input_type -> spice.agent.engine.v1.ResumeRunRequest
+	39, // 56: spice.agent.engine.v1.EngineService.ExportSnapshot:input_type -> spice.agent.engine.v1.ExportSnapshotRequest
+	41, // 57: spice.agent.engine.v1.EngineService.ImportSnapshot:input_type -> spice.agent.engine.v1.ImportSnapshotRequest
+	14, // 58: spice.agent.engine.v1.EngineService.Initialize:output_type -> spice.agent.engine.v1.InitializeResponse
+	16, // 59: spice.agent.engine.v1.EngineService.Health:output_type -> spice.agent.engine.v1.HealthResponse
+	18, // 60: spice.agent.engine.v1.EngineService.StartRun:output_type -> spice.agent.engine.v1.StartRunResponse
+	22, // 61: spice.agent.engine.v1.EngineService.StreamEvents:output_type -> spice.agent.engine.v1.StreamEventsResponse
+	32, // 62: spice.agent.engine.v1.EngineService.StreamInteractions:output_type -> spice.agent.engine.v1.StreamInteractionsResponse
+	24, // 63: spice.agent.engine.v1.EngineService.CancelRun:output_type -> spice.agent.engine.v1.CancelRunResponse
+	26, // 64: spice.agent.engine.v1.EngineService.RespondInteraction:output_type -> spice.agent.engine.v1.RespondInteractionResponse
+	34, // 65: spice.agent.engine.v1.EngineService.SuspendRun:output_type -> spice.agent.engine.v1.SuspendRunResponse
+	36, // 66: spice.agent.engine.v1.EngineService.ResumeRun:output_type -> spice.agent.engine.v1.ResumeRunResponse
+	40, // 67: spice.agent.engine.v1.EngineService.ExportSnapshot:output_type -> spice.agent.engine.v1.ExportSnapshotResponse
+	42, // 68: spice.agent.engine.v1.EngineService.ImportSnapshot:output_type -> spice.agent.engine.v1.ImportSnapshotResponse
+	58, // [58:69] is the sub-list for method output_type
+	47, // [47:58] is the sub-list for method input_type
+	47, // [47:47] is the sub-list for extension type_name
+	47, // [47:47] is the sub-list for extension extendee
+	0,  // [0:47] is the sub-list for field type_name
 }
 
 func init() { file_spice_agent_engine_v1_engine_proto_init() }
@@ -3453,7 +3533,7 @@ func file_spice_agent_engine_v1_engine_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_spice_agent_engine_v1_engine_proto_rawDesc), len(file_spice_agent_engine_v1_engine_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   38,
+			NumMessages:   39,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

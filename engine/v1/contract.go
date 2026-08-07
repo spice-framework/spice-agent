@@ -1,12 +1,10 @@
 package enginev1
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
-	"slices"
 	"strings"
 
 	commonv1 "github.com/spice-framework/spice-agent/common/v1"
@@ -14,8 +12,6 @@ import (
 )
 
 const (
-	// SnapshotFormat is the only safe kernel snapshot format accepted by v1.
-	SnapshotFormat = "spice.agent.snapshot/v1alpha2"
 	// MaximumSnapshotBytes matches the bounded kernel snapshot contract.
 	MaximumSnapshotBytes    = 16 << 20
 	maximumJSONBytes        = 1 << 20
@@ -69,7 +65,7 @@ func NegotiateInitialize(
 	capabilities, negotiationStatus := commonv1.NegotiateCapabilities(
 		request.GetSupportedCapabilities(),
 		request.GetRequiredCapabilities(),
-		serverCapabilities,
+		snapshotCapabilitiesForProtocol(version, serverCapabilities),
 	)
 	if negotiationStatus.GetCode() != commonv1.ErrorCode_ERROR_CODE_OK {
 		return &InitializeResponse{Status: negotiationStatus}
@@ -113,6 +109,11 @@ func ValidateInitializeResponse(response *InitializeResponse) error {
 	}
 	if err := commonv1.ValidateCapabilities(response.GetCapabilities()); err != nil {
 		return err
+	}
+	if !protocolSupportsSnapshotAuthority(response.GetProtocol()) &&
+		(containsCapability(response.GetCapabilities(), CapabilitySnapshotAuthorityV1) ||
+			containsCapability(response.GetCapabilities(), "snapshots")) {
+		return errors.New("protocol minor 1 is required for snapshot transfer")
 	}
 	if err := commonv1.ValidateLimits(response.GetLimits()); err != nil {
 		return err
@@ -760,90 +761,6 @@ func ValidateInteractionResponse(
 		return protocolStatus(commonv1.ErrorCode_ERROR_CODE_INVALID_ARGUMENT, "interaction response must be bounded valid JSON")
 	}
 	return commonv1.OKStatus()
-}
-
-// ValidateSnapshotEnvelope checks format, safe lifecycle, bound, and digest.
-func ValidateSnapshotEnvelope(value *SnapshotEnvelope) error {
-	if value == nil {
-		return errors.New("snapshot envelope is required")
-	}
-	if value.GetFormat() != SnapshotFormat {
-		return fmt.Errorf("snapshot format %q is unsupported", value.GetFormat())
-	}
-	if err := token("snapshot run ID", value.GetRunId(), 128); err != nil {
-		return err
-	}
-	if value.GetLastSequence() == 0 || value.GetLastSequence() == math.MaxUint64 {
-		return errors.New("snapshot sequence must be positive and resumable")
-	}
-	switch value.GetLifecycle() {
-	case SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED,
-		SnapshotLifecycle_SNAPSHOT_LIFECYCLE_COMPLETED,
-		SnapshotLifecycle_SNAPSHOT_LIFECYCLE_FAILED,
-		SnapshotLifecycle_SNAPSHOT_LIFECYCLE_CANCELLED:
-	default:
-		return fmt.Errorf("snapshot lifecycle %d is unsafe", value.GetLifecycle())
-	}
-	if len(value.GetPayload()) == 0 || len(value.GetPayload()) > MaximumSnapshotBytes {
-		return fmt.Errorf("snapshot payload must be between 1 and %d bytes", MaximumSnapshotBytes)
-	}
-	digest := sha256.Sum256(value.GetPayload())
-	if !slices.Equal(value.GetSha256(), digest[:]) {
-		return errors.New("snapshot SHA-256 digest does not match its payload")
-	}
-	var identity struct {
-		RunID string `json:"run_id"`
-	}
-	if err := json.Unmarshal(value.GetPayload(), &identity); err != nil {
-		return errors.New("snapshot payload must be valid v1alpha2 JSON")
-	}
-	if identity.RunID != value.GetRunId() {
-		return errors.New("snapshot envelope run ID does not match its embedded run ID")
-	}
-	return nil
-}
-
-// NewSnapshotEnvelope constructs a checksummed immutable-by-convention wire value.
-func NewSnapshotEnvelope(
-	runID string,
-	lastSequence uint64,
-	lifecycle SnapshotLifecycle,
-	payload []byte,
-) (*SnapshotEnvelope, error) {
-	digest := sha256.Sum256(payload)
-	result := &SnapshotEnvelope{
-		Format:       SnapshotFormat,
-		RunId:        runID,
-		LastSequence: lastSequence,
-		Lifecycle:    lifecycle,
-		Payload:      slices.Clone(payload),
-		Sha256:       slices.Clone(digest[:]),
-	}
-	if err := ValidateSnapshotEnvelope(result); err != nil {
-		return nil, err
-	}
-	return result, nil
-}
-
-// ValidateImportSnapshotRequest rejects unsafe or mismatched resume requests.
-func ValidateImportSnapshotRequest(request *ImportSnapshotRequest) error {
-	if request == nil {
-		return errors.New("import snapshot request is required")
-	}
-	if err := validateClientMutation(
-		request.GetClientId(),
-		request.GetOwnershipEpoch(),
-		request.GetClientOperationId(),
-	); err != nil {
-		return err
-	}
-	if err := ValidateSnapshotEnvelope(request.GetSnapshot()); err != nil {
-		return err
-	}
-	if request.GetSnapshot().GetLifecycle() != SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED {
-		return errors.New("only a suspended snapshot may be imported")
-	}
-	return nil
 }
 
 func validateClientMutation(clientID string, epoch uint64, operationID string) error {

@@ -30,6 +30,12 @@ or dynamic plan fingerprint. Incompatible major versions or required
 capabilities fail before a run is created, with both observed and required
 values.
 
+The implementation advertises protocol range 1.0 through 1.1. Snapshot transfer
+is atomic with authenticated authority: minor-0 negotiation removes both
+`snapshots` and `snapshot-authority-v1`. A client requiring either receives a
+typed missing-capability result. A minor-1 client must require
+`snapshot-authority-v1` before relying on export or import.
+
 The transport-independent host represents this catalog as exact immutable
 `agent.Definition` values rather than reconstructing model or maximum-turn
 policy from wire data. Its stable client store derives every ownership epoch
@@ -68,7 +74,9 @@ does not erase committed operation outcomes.
   supported boundary. `ImportSnapshot` is a separate explicit mutation with
   idempotency and uncertain-outcome rules, accepts only suspended v1alpha2
   snapshots, and preserves the run ID embedded in the snapshot. Clients cannot
-  rename an imported run or assert a replacement plan.
+  rename an imported run or assert a replacement plan. Export requires a trusted
+  signer and import requires keyed HMAC verification before state mutation; an
+  unkeyed structural check is never import authority.
 
 The daemon adapter must use the kernel's transactional preparation boundary for
 both `StartRun` and `ImportSnapshot`. It first prepares the execution, uses the
@@ -92,7 +100,9 @@ Buf lint and breaking checks govern schemas. Additive optional fields are
 tolerated. Unknown enum values are retained only where a safe textual fallback
 exists; unknown lifecycle operations fail closed. Removed/renumbered fields and
 semantic reuse are breaking. Supported client/server ranges are machine-readable
-in compatibility manifests.
+in compatibility manifests. Security-significant additions to snapshot authority
+require a new MAC domain and versioned capability because older peers ignore
+unknown Protobuf fields by design.
 
 ## Security boundary
 
@@ -101,6 +111,11 @@ and endpoint metadata are current-user only. A random metadata token protects ag
 accidental/ambient local connections but does not defend against code already
 running as the same user. Remote access requires a new threat model and protocol
 extension.
+
+Snapshot authority uses a distinct server-owned key. The public 32-byte scope ID
+and positive generation select that key; neither is a secret. The HMAC proves
+integrity and authority but does not encrypt conversation content. Scope keys
+must never be derived from or reused as endpoint authentication tokens.
 
 ## Failure semantics
 

@@ -17,6 +17,11 @@ revisioned deltas, cancellation, interaction responses, suspend/resume, safe
 snapshot import, and bounded replay diagnostics. Authentication is transport
 metadata, never an application payload.
 
+Protocol minor 1 makes snapshot transfer authenticated and atomic with the
+`snapshot-authority-v1` capability. Signed construction and keyed import
+verification are mandatory. Minor-0 connections receive neither snapshot
+capability; unkeyed SHA-256 validation is payload integrity, not authority.
+
 Every request has count, byte, and deadline limits. Unknown fields follow the
 documented additive-compatibility rule. Protocol errors distinguish invalid
 argument, unauthenticated, incompatible version, out-of-range cursor, resource
@@ -107,8 +112,9 @@ Kernel preparation evidence is in
 
 The baseline remains intentionally provisional. The pre-host repair closes the
 schema and kernel seams for interaction discovery/run identity, reconnect CAS,
-suspend/resume/import identity, and atomic replay bounds. Before the final Phase
-4 freeze, the daemon host must prove them over real RPCs, enforce run tombstones
-and import authority, and separate RPC contexts from run lifetime. Buf protects
+suspend/resume/import identity, authenticated snapshot envelopes, and atomic
+replay bounds. Before the final Phase 4 freeze, the daemon host must prove them
+over real RPCs, enforce run tombstones and OS-backed authority-key lifecycle,
+and separate RPC contexts from run lifetime. Buf protects
 changes against the committed baseline; it does not imply those host semantics
 are already implemented.
