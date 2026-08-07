@@ -147,6 +147,28 @@ func TestInitializeValidationFailsClosedAndDoesNotReflectSecrets(t *testing.T) {
 	}
 }
 
+func TestValidateBuildIdentity(t *testing.T) {
+	t.Parallel()
+	valid := validInitializeRequest().GetHost()
+	if err := pluginv1.ValidateBuildIdentity(valid); err != nil {
+		t.Fatal(err)
+	}
+	for name, value := range map[string]*pluginv1.BuildIdentity{
+		"nil":       nil,
+		"component": {Version: "v1", Commit: "commit", Runtime: "go1.26.5"},
+		"version":   {Component: "host", Commit: "commit", Runtime: "go1.26.5"},
+		"commit":    {Component: "host", Version: "v1", Runtime: "go1.26.5"},
+		"runtime":   {Component: "host", Version: "v1", Commit: "commit"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if err := pluginv1.ValidateBuildIdentity(value); err == nil {
+				t.Fatal("invalid plugin build identity was accepted")
+			}
+		})
+	}
+}
+
 func TestInitializeResponseRejectsIncompleteSuccessShapes(t *testing.T) {
 	t.Parallel()
 	request := validInitializeRequest()

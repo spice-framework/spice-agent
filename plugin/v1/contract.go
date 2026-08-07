@@ -136,7 +136,7 @@ func ValidateInitializeRequest(value *InitializeRequest) error {
 	if err := commonv1.ValidateProtocolRange(value.GetProtocol()); err != nil {
 		return fmt.Errorf("plugin protocol range: %w", err)
 	}
-	if err := validateBuildIdentity(value.GetHost()); err != nil {
+	if err := ValidateBuildIdentity(value.GetHost()); err != nil {
 		return fmt.Errorf("plugin host build: %w", err)
 	}
 	if err := validateCapabilityRequest(
@@ -236,7 +236,7 @@ func validateInitializeResponse(value *InitializeResponse) error {
 	if err := commonv1.ValidateStatus(value.GetStatus()); err != nil {
 		return fmt.Errorf("plugin initialize status: %w", err)
 	}
-	if err := validateBuildIdentity(value.GetPlugin()); err != nil {
+	if err := ValidateBuildIdentity(value.GetPlugin()); err != nil {
 		return fmt.Errorf("plugin build identity: %w", err)
 	}
 	if len(value.GetLaunchId()) != LaunchIDBytes ||
@@ -839,7 +839,9 @@ func token(label, value string, maximum int) error {
 	return nil
 }
 
-func validateBuildIdentity(value *BuildIdentity) error {
+// ValidateBuildIdentity rejects incomplete, malformed, or unbounded runtime
+// plugin build provenance without reflecting any field value in an error.
+func ValidateBuildIdentity(value *BuildIdentity) error {
 	if value == nil {
 		return errors.New("plugin build identity is required")
 	}

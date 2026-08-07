@@ -133,6 +133,9 @@ reuse transcript v1.
 Build identity names a language-neutral runtime string (for example,
 `go1.26.5` or `python3.12`) rather than a Go-only field, so independent Python
 fixtures implement the same schema without inventing provenance.
+`plugin/v1.ValidateBuildIdentity` is the public, value-redacting validation
+boundary for application adapters that construct host or plugin provenance;
+callers do not need to fabricate an initialization request to validate it.
 
 ## Generation lifecycle
 
