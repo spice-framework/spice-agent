@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"slices"
 	"sync"
@@ -134,6 +135,122 @@ func TestRunHostCapacityFailureCanRetrySameOperation(t *testing.T) {
 		t.Fatal("retry of abandoned capacity operation was marked duplicate")
 	}
 	<-fixture.authority.issued
+}
+
+func TestRunHostMapsEngineIdentityCapacityAndRetriesAfterDurableRetirement(t *testing.T) {
+	t.Parallel()
+	provider := &sequenceHostProvider{firstStarted: make(chan struct{})}
+	pending, err := NewPendingHub(DefaultPendingLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	dispatcher, _ := stage.NewDispatcher(nil)
+	source, _ := stage.NewStaticToolPlanSource(dispatcher)
+	options := agent.DefaultEngineOptions()
+	options.SnapshotCompatibilityIdentity = "run-host-tests:v1"
+	options.RunIdentityLimits, _ = agent.NewRunIdentityLimits(1, 1<<20)
+	fixture := newRunHostFixtureWithPlanSourceAndPendingTurnsAndOptions(
+		t, provider, pending, source, 2, 2, 2, options,
+	)
+	first := hostStartRequest(t, "identity-first", fixture.definition, "identity-input-first")
+	firstResult, err := fixture.host.Start(t.Context(), fixture.session, first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-provider.firstStarted
+
+	second := hostStartRequest(t, "identity-second", fixture.definition, "identity-input-second")
+	if _, err = fixture.host.Start(t.Context(), fixture.session, second); !errors.Is(err, ErrRunHostCapacity) {
+		t.Fatalf("mapped identity capacity = %v", err)
+	}
+	capacity, ok := errors.AsType[*RunHostCapacityError](err)
+	if !ok || capacity.Resource() != "run identities" || capacity.Limit() != 1 || capacity.Observed() != 2 {
+		t.Fatalf("mapped identity capacity = %#v", capacity)
+	}
+
+	cancelOperation, _ := client.NewOperationID("cancel-identity-first")
+	cancelRequest, _ := client.NewCancelRequest(firstResult.Run(), cancelOperation, "retire identity")
+	if _, err = fixture.host.Cancel(t.Context(), fixture.session, cancelRequest); err != nil {
+		t.Fatal(err)
+	}
+	<-fixture.authority.issued
+	waitForNoHostActive(t, fixture.host)
+	waitForIdentityEntries(t, fixture.host.engine, 0)
+	result, err := fixture.host.Start(t.Context(), fixture.session, second)
+	if err != nil || result.DuplicateOperation() {
+		t.Fatalf("retry after durable retirement = %#v, %v", result, err)
+	}
+	<-fixture.authority.issued
+}
+
+func TestRunHostIdentityCapacityWithCleanupFailureIsUncertain(t *testing.T) {
+	t.Parallel()
+	fixture := newRunHostFixture(t, immediateHostProvider{}, 1, 2)
+	outcome := fixture.host.preparationFailure(errors.Join(
+		agent.ErrRunIdentityCapacity,
+		errors.New("plan release failed"),
+	))
+	if outcome.Kind() != OutcomeUncertain {
+		t.Fatalf("capacity plus cleanup outcome = %s", outcome.Kind())
+	}
+	health, err := fixture.host.Health(t.Context(), fixture.session)
+	if err != nil || !containsString(health.Reasons(), degradedLifecycleCleanup) {
+		t.Fatalf("capacity cleanup health = %#v, %v", health, err)
+	}
+}
+
+func TestRunHostRetainsIdentityWhenTerminalAuthorityOrCleanupIsUncertain(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		configure func(*recordingHostAuthority)
+	}{
+		{"authority", func(authority *recordingHostAuthority) { authority.issueErr = ErrRunAuthorityUncertain }},
+		{"cleanup", func(authority *recordingHostAuthority) { authority.activeCloseErr = errors.New("close failed") }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fixture := newRunHostFixture(t, immediateHostProvider{}, 1, 2)
+			test.configure(fixture.authority)
+			_, err := fixture.host.Start(
+				t.Context(), fixture.session,
+				hostStartRequest(t, "retain-"+test.name, fixture.definition, "input-"+test.name),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			waitForNoHostActive(t, fixture.host)
+			waitForIdentityEntries(t, fixture.host.engine, 1)
+			stats := fixture.host.engine.RunIdentityStats()
+			if stats.Tombstones() != 1 || stats.Reserved() != 0 || stats.Active() != 0 {
+				t.Fatalf("retained identity = %#v", stats)
+			}
+			health, healthErr := fixture.host.Health(t.Context(), fixture.session)
+			if healthErr != nil || health.State() != client.HealthDegraded {
+				t.Fatalf("retained identity health = %#v, %v", health, healthErr)
+			}
+		})
+	}
+}
+
+func TestRunHostDurableTerminalRetirementStaysBoundedAcrossManyRuns(t *testing.T) {
+	t.Parallel()
+	fixture := newRunHostFixture(t, immediateHostProvider{}, 2, 2)
+	for index := range 64 {
+		operation := fmt.Sprintf("bounded-retirement-%d", index)
+		input := fmt.Sprintf("bounded-input-%d", index)
+		if _, err := fixture.host.Start(
+			t.Context(), fixture.session, hostStartRequest(t, operation, fixture.definition, input),
+		); err != nil {
+			t.Fatalf("run %d: %v", index, err)
+		}
+		<-fixture.authority.issued
+		<-fixture.authority.envelopes
+		waitForNoHostActive(t, fixture.host)
+	}
+	waitForIdentityEntries(t, fixture.host.engine, 0)
+	stats := fixture.host.engine.RunIdentityStats()
+	if stats.Bytes() != 0 || stats.Reserved() != 0 || stats.Active() != 0 || stats.Tombstones() != 0 {
+		t.Fatalf("many-run identity retention = %#v", stats)
+	}
 }
 
 func TestRunHostUncertainAuthorityStartNeverActivatesKernel(t *testing.T) {
@@ -737,6 +854,22 @@ func newRunHostFixtureWithPlanSourceAndPendingTurns(
 	t.Helper()
 	options := agent.DefaultEngineOptions()
 	options.SnapshotCompatibilityIdentity = "run-host-tests:v1"
+	return newRunHostFixtureWithPlanSourceAndPendingTurnsAndOptions(
+		t, provider, pending, source, activeRuns, terminalRuns, maxTurns, options,
+	)
+}
+
+func newRunHostFixtureWithPlanSourceAndPendingTurnsAndOptions(
+	t *testing.T,
+	provider model.Provider,
+	pending *PendingHub,
+	source stage.ToolPlanSource,
+	activeRuns uint32,
+	terminalRuns int,
+	maxTurns uint32,
+	options agent.EngineOptions,
+) *runHostFixture {
+	t.Helper()
 	engine, err := agent.NewEngineWithToolPlanSourceAndInteractionBroker(
 		provider, source, pending, &agent.AtomicIDSource{},
 		func() time.Time { return time.Unix(1, 0).UTC() }, nil, nil, options,
@@ -996,6 +1129,7 @@ type recordingHostAuthority struct {
 	nilImport         bool
 	importAbortErr    error
 	issueErr          error
+	activeCloseErr    error
 	resumeErr         error
 	consumeErr        error
 	issueEntered      chan struct{}
@@ -1102,7 +1236,7 @@ func (active *recordingHostActive) IssueSnapshotEnvelope(
 }
 
 func (*recordingHostActive) Terminal(context.Context, TerminalPhase) error { return nil }
-func (*recordingHostActive) Close() error                                  { return nil }
+func (active *recordingHostActive) Close() error                           { return active.owner.activeCloseErr }
 
 type recordingHostImport struct{ owner *recordingHostAuthority }
 
@@ -1141,6 +1275,21 @@ func waitForNoHostActive(t *testing.T, host *RunHost) {
 		}
 		if time.Now().After(deadline) {
 			t.Fatalf("active run count = %d, want 0", active)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+func waitForIdentityEntries(t *testing.T, engine *agent.Engine, count uint32) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for {
+		stats := engine.RunIdentityStats()
+		if stats.Entries() == count {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("run identity entries = %d, want %d", stats.Entries(), count)
 		}
 		time.Sleep(time.Millisecond)
 	}

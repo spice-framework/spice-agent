@@ -284,25 +284,25 @@ func TestPreparedDuplicateCommitAndEngineCloseFailClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 	second, err := engine.PrepareResumeSnapshot(t.Context(), snapshot)
-	if err != nil {
-		t.Fatal(err)
+	if err == nil || !strings.Contains(err.Error(), "already imported") {
+		t.Fatalf("duplicate preparation = %#v, %v", second, err)
 	}
-	if source.generationCallCount() != 2 {
+	if source.generationCallCount() != 1 {
 		t.Fatalf("parallel preparation acquisitions = %d", source.generationCallCount())
 	}
 	run, err := first.Commit(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = second.Commit(t.Context()); err == nil || !strings.Contains(err.Error(), "already imported") || source.releaseCount(id) != 1 {
-		t.Fatalf("duplicate commit = %v, releases=%d", err, source.releaseCount(id))
+	if source.releaseCount(id) != 0 {
+		t.Fatalf("duplicate preparation releases=%d", source.releaseCount(id))
 	}
-	if _, err = engine.PrepareResumeSnapshot(t.Context(), snapshot); err == nil || source.generationCallCount() != 2 {
+	if _, err = engine.PrepareResumeSnapshot(t.Context(), snapshot); err == nil || source.generationCallCount() != 1 {
 		t.Fatalf("postcommit preparation = %v, acquisitions=%d", err, source.generationCallCount())
 	}
 	run.Cancel()
 	_ = run.Wait(t.Context())
-	if source.releaseCount(id) != 2 {
+	if source.releaseCount(id) != 1 {
 		t.Fatalf("duplicate ownership releases = %d", source.releaseCount(id))
 	}
 

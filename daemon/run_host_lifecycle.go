@@ -93,19 +93,29 @@ func (host *RunHost) monitor(value *hostedRun) {
 	} else if issueErr != nil {
 		host.classifyAuthorityFailure(issueErr, degradedTerminalSnapshot)
 	}
-	if err := value.authority.Close(); err != nil {
-		host.classifyAuthorityFailure(err, degradedLifecycleCleanup)
+	closeErr := value.authority.Close()
+	if closeErr != nil {
+		host.classifyAuthorityFailure(closeErr, degradedLifecycleCleanup)
 	}
 	host.finishRun(value, snapshot, envelope, exportErr, issueErr)
 	value.transition.Unlock()
 
 	value.binding.Release()
-	_ = value.binding.WaitReleased(context.Background())
+	bindingErr := value.binding.WaitReleased(context.Background())
+	if bindingErr != nil {
+		host.degrade(degradedLifecycleCleanup)
+	}
 	host.mu.Lock()
 	if host.owners[value.run.ID()] == value.clientID {
 		delete(host.owners, value.run.ID())
 	}
 	host.mu.Unlock()
+	if exportErr == nil && issueErr == nil && closeErr == nil && bindingErr == nil {
+		retirement := value.run.TerminalIdentityRetirement()
+		if retirement == nil || retirement.Retire() != nil {
+			host.degrade(degradedLifecycleCleanup)
+		}
+	}
 }
 
 func (host *RunHost) finishRun(

@@ -149,10 +149,16 @@ another client's run indistinguishable. Completed runs retain authority-issued e
 deterministic count-and-byte-bounded cache, and fixed secret-safe degradation
 reasons make authority, snapshot, and cleanup failures visible through Health.
 RunHost capacity, terminal-envelope retention, pending interactions, sessions,
-and idempotency are bounded. The kernel's internal service-lifetime seen-run
-identity tombstones are still unbounded; terminal-cache eviction does not bound
-that identity history, and a later lifecycle policy must address it before a
-long-lived daemon contract is frozen.
+and idempotency are bounded. The kernel also owns an exact count-and-byte
+bounded run-identity ledger covering prepared/inert reservations, active runs,
+and terminal tombstones. Inert abort reclaims its reservation; activation is
+the exact reservation-to-active boundary. The ledger never uses TTL, LRU eviction, approximate membership,
+or disk access. A run exposes one opaque generation-fenced retirement
+capability only after registration. RunHost invokes it only after terminal
+authority is durably committed, authority and interaction cleanup succeed, and
+old snapshots are therefore non-importable. Any uncertain path retains the
+tombstone and degrades health; identity-capacity exhaustion maps to the host's
+ordinary typed capacity surface and is retryable only after proven retirement.
 
 `RunHost.Describe` exposes one validated, immutable pre-session view containing
 the exact generated `DefinitionSet` and daemon `client.Health`. It snapshots all

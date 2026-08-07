@@ -182,11 +182,12 @@ checks ownership first and then uses the same readiness snapshot implementation.
 
 This lifecycle core does not include gRPC, Protobuf/RPC translation, event or
 interaction stream delivery, endpoint authentication, Unix sockets, Windows
-named pipes, endpoint discovery, or managed daemon startup. Although RunHost
-bounds retained terminal envelopes, `agent.Engine` still retains unbounded
-service-lifetime seen-run identity tombstones. That limitation is explicit and
-must be resolved or accepted by a bounded-lifetime daemon policy before the
-Phase 4 contract freezes.
+named pipes, endpoint discovery, or managed daemon startup. `agent.Engine` now
+bounds exact prepared, active, and terminal run identities by count and charged
+bytes. RunHost retires a terminal tombstone only after durable authority and
+cleanup make prior snapshots non-importable; uncertain paths retain identity
+and degrade health. See
+[`evidence/phase4-run-identity-ledger.md`](evidence/phase4-run-identity-ledger.md).
 
 The endpoint-authentication prerequisite now lives in the separate
 `daemon/grpcserver` package. It generates opaque 256-bit credentials, accepts
@@ -301,6 +302,5 @@ local-client libraries plus both generated distribution targets prove protocol,
 authority, IPC, explicit attach, managed startup, and owned process containment.
 Before the final Phase 4 freeze, installed Windows/Linux terminals must still
 prove one-command startup, explicit serve/attach, resize, reconnect, and clean
-shutdown, and the engine's service-lifetime run-identity tombstones must be
-resolved or formally bounded. Exact distribution evidence is in
+shutdown. Exact distribution evidence is in
 [`evidence/phase4-distribution-targets.md`](evidence/phase4-distribution-targets.md).

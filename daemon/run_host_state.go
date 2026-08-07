@@ -509,6 +509,9 @@ func publicRunHostError(err error) error {
 	if hostCapacity, ok := errors.AsType[*RunHostCapacityError](err); ok {
 		return hostCapacity
 	}
+	if identityCapacity, ok := errors.AsType[*agent.RunIdentityCapacityError](err); ok {
+		return newRunHostCapacity("run identities", identityCapacity.Limit(), identityCapacity.Observed())
+	}
 	return publicRunHostOwnerError(err)
 }
 

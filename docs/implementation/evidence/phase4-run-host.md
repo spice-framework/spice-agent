@@ -86,10 +86,14 @@ operations, shuts down the kernel, joins terminal monitors and binding drains,
 shuts down session resources, and closes run authority last. A caller deadline
 bounds only that caller's wait; cleanup continues in the background.
 
-The RunHost terminal-envelope cache is bounded, but `agent.Engine` retains
-seen-run identity tombstones for its entire service lifetime without a bound.
-Terminal eviction therefore does not bound total process-lifetime identity
-retention. This remains an explicit pre-freeze daemon lifecycle limitation.
+The RunHost terminal-envelope cache and `agent.Engine` identity ledger have
+independent exact count-and-byte bounds. A terminal cache eviction cannot retire
+an engine identity. RunHost invokes the run's opaque generation-fenced
+retirement capability only after durable terminal authority plus authority and
+interaction cleanup succeed. Uncertainty retains the tombstone and degrades
+health. Identity-ledger capacity maps to typed host capacity so an abandoned
+operation can retry after a later proven retirement. Detailed evidence is in
+[`phase4-run-identity-ledger.md`](phase4-run-identity-ledger.md).
 
 ## Exclusions
 

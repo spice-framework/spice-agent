@@ -204,12 +204,13 @@ form the transport-neutral read boundary. Snapshot-only interaction reads do
 not allocate observers. Opaque observations enforce configured stream capacity,
 merge request, session, and host lifetimes, and retain their reconnect fence
 until the eventual transport joins every sender and calls `Close`.
-The kernel's service-lifetime seen-run identity tombstones remain unbounded even
-when RunHost evicts a terminal envelope. No gRPC/Protobuf adapter, IPC listener,
-stream bridge, endpoint authentication, discovery, or managed startup is
-part of the transport-independent RunHost itself. Focused evidence and
-remaining exclusions are recorded in
-[`evidence/phase4-run-host.md`](evidence/phase4-run-host.md).
+The kernel's exact run-identity ledger is now bounded by count and charged
+bytes. Preparation reserves identity, terminal completion creates a tombstone
+before `Wait` returns, and only an opaque exact-generation capability can retire
+it. RunHost exercises that capability solely after durable terminal authority
+and cleanup succeed; uncertain paths retain identity and degrade. Focused
+evidence is in
+[`evidence/phase4-run-identity-ledger.md`](evidence/phase4-run-identity-ledger.md).
 `RunHost.Describe` now supplies the initialization boundary with one immutable,
 validated, sessionless snapshot of the generated definition catalog and daemon
 readiness. Session-bound Health reuses that exact snapshot implementation after
@@ -324,8 +325,7 @@ managed-candidate libraries, and generated explicit-serve daemon now prove
 those repaired contracts. The distribution must still route every compiled
 coding-tool process through its injected resolver/launcher, generate the
 managed-client/TUI application, exercise one-command and explicit attach
-through installed Windows/Linux processes and terminals, and resolve or bound
-the engine's service-lifetime run-identity tombstones.
+through installed Windows/Linux processes and terminals.
 
 ## Phase 5.0A execution prerequisite
 
