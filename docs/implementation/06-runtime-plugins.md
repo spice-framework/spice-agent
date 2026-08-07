@@ -139,15 +139,19 @@ the active/failed generation; no partial generated tree is activated.
    bounded stderr, restart policy, drain, and cleanup. **Complete in core,
    including bounded whole-set recovery and public health.**
 4. Provide optional Spice auto-configuration that decorates/injects the dynamic
-   tool source through normal static DI. **Core adapter and generated reference
-   distribution Host cutover complete; explicit distribution Set construction
-   and activation remain pending.**
+   tool source through normal static DI. **Complete through the core adapter,
+   generated reference-distribution Host cutover, explicit typed Set
+   construction, pre-publication activation, fixed-code health, and generated
+   bounded cleanup.**
 5. Ship Go and Python echo/filesystem-neutral fixture tools and conformance CLI.
    **Complete for the initial runtime-tool profile.**
 6. Integrate last-known-good `spice dev` for generated daemon/TUI targets.
-   **Package-main targets and independent supervisors are complete; real
-   invalid-edit, last-known-good continuity, independent restart, and reconnect
-   fault injection remain pending.**
+   **Package-main targets and independent supervisors are complete. A real
+   vendored-CLI fixture proves invalid-edit diagnostics, unchanged
+   last-known-good identity, deterministic debounce, graceful replacement,
+   process containment, and byte-identical source/generated restoration. The
+   simultaneous installed daemon/TUI independent-restart and Bubble Tea
+   reconnect workflow remains pending.**
 
 ## Exclusions
 
@@ -183,6 +187,8 @@ independent Go/Python fixtures, digest/process ownership, local candidate
 handshake, and remote execution translation are implemented. Atomic generation
 management, exact run leases, graceful lifecycle, bounded recovery, and public
 health are implemented. The generated distribution Host cutover and
-package-main development supervisors are implemented. Explicit plugin
-configuration/activation, real process activation acceptance, and the
-dual-process developer-loop fault injection remain pending.
+explicit plugin configuration/activation, real process
+activation/cancellation acceptance, package-main development supervisors, and
+one real last-known-good developer loop are implemented. Only the simultaneous
+installed daemon/TUI fault, independent restart, and Bubble Tea reconnect proof
+remains for the Phase 5 developer-loop boundary.

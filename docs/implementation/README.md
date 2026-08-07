@@ -10,7 +10,7 @@ Repository roadmaps link here and must not duplicate status.
 | 2 — deterministic kernel | Complete for preview | `841edd3`; deterministic lifecycle, interaction, snapshot, race/fuzz proof |
 | 3 — provider and coding tools | In progress | generated cross-repository continuation and opt-in live acceptance |
 | 4 — daemon and TUI | In progress | generated daemon/TUI distribution targets and managed local composition proven; installed Windows/Linux terminal interaction pending |
-| 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, bounded recovery/health, generated distribution Host cutover, and package-main dev supervisors complete; explicit plugin activation and installed fault injection pending |
+| 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, bounded recovery/health, generated distribution activation, real-process cancellation, and real `spice dev` last-known-good proof complete; simultaneous installed daemon/TUI fault-reconnect proof pending |
 | 6 — architecture proof | Planned | signed `v0.1.0-preview.1` distribution |
 | 7 — stress prototypes | Planned | permission, SQLite, alternate UI, two-worker experiments |
 | 8 — stabilization | Planned | external authors and frozen compatibility policy |
@@ -43,8 +43,14 @@ in core and leaf auto-configuration; the reference distribution must explicitly
 contribute the default policy. Distribution commit `997ab02` injects the exact
 Host as the daemon's generated `ToolPlanSource`, and `e58ab17` moves both public
 commands to package-main Spice targets with independent `spice dev`
-supervisors. Explicit plugin configuration/activation, installed process
-acceptance, and the dual-process invalid-edit/reconnect workflow remain
+supervisors. Distribution commit `6df45fa` adds explicit typed single-plugin
+configuration, required/optional activation policy, generated pre-publication
+lifecycle, fixed-code health, and bounded generated cleanup. Commit `73f1c4f`
+proves the real digest-pinned process, cancellation with subsequent generation
+reuse, generated daemon composition, authenticated local IPC, in-flight
+reconnect, production-limit replay, compiled/runtime tool continuation, secret
+redaction, and one real `spice dev` last-known-good/debounce workflow. The
+simultaneous installed daemon plus Bubble Tea fault/reconnect workflow remains
 pending. Detailed evidence and the
 pathname-to-exec limitation are recorded in
 [`evidence/phase5-host-security-foundation.md`](evidence/phase5-host-security-foundation.md)
@@ -56,6 +62,8 @@ recovery/health evidence in
 [`evidence/phase5-recovery-and-health.md`](evidence/phase5-recovery-and-health.md),
 and auto-configuration evidence in
 [`evidence/phase5-runtime-autoconfiguration.md`](evidence/phase5-runtime-autoconfiguration.md).
+Distribution activation and developer-loop evidence is in
+[`evidence/phase5-distribution-activation-and-devloop.md`](evidence/phase5-distribution-activation-and-devloop.md).
 
 ## Phase 2 preview boundary
 
@@ -406,9 +414,12 @@ not be dismissed, although their tools modules already pin v1.82.1 and local
 Development catalog commit `a8990e3f` adds topological concurrent
 five-repository fast verification, an exact compatibility snapshot, and
 vendor-only macOS amd64/arm64 compile proof; its `make verify` passed at 85.6%
-coverage. Organization-profile commit `3ee0039d` records reusable workflow and
-Actions-queue governance. macOS remains compile-only: real race, UI, process,
-and runtime acceptance still requires a macOS runner.
+coverage. Follow-up `379a375` adds strict generic Go-module and distribution
+release profiles without changing the existing starter release contract; its
+`make verify` passed in 107.9 seconds at 85.2% coverage. Organization-profile
+commit `3ee0039d` records reusable workflow and Actions-queue governance. macOS
+remains compile-only: real race, UI, process, and runtime acceptance still
+requires a macOS runner.
 
 ## Completed evidence
 
@@ -417,6 +428,8 @@ and runtime acceptance still requires a macOS runner.
 - Phase 0 catalog/governance follow-up: development `a8990e3f` (85.6% coverage,
   concurrent five-repository fast and macOS vendor compile), organization
   profile `3ee0039d`.
+- Strict agent module/distribution release profiles: development `379a375`;
+  `make verify` 107.9s, 85.2% coverage.
 - Core foundation: `spice-agent` `218ffbb`.
 - Professional quality baseline: `829dd0a`; `make verify` 27.6s, 87.7% coverage.
 - Hardened deterministic kernel: `eaf1918`; `make verify` 23.9s, 88.4% coverage.
@@ -439,6 +452,11 @@ and runtime acceptance still requires a macOS runner.
   `make verify` 128.4s, 87.0% coverage.
 - Package-main daemon/terminal development supervisors: `spice-agent-coding`
   `e58ab17`; `make verify` 129s, 87.0% coverage.
+- Explicit generated runtime-plugin activation: `spice-agent-coding`
+  `6df45fa`; `make verify` 128.2s, 87.1% coverage.
+- Generated architecture, runtime cancellation, and real `spice dev`
+  last-known-good acceptance: `spice-agent-coding` `73f1c4f`; `make fast`
+  20.4s, `make check` 69.4s, and `make verify` 183.1s at 87.1% coverage.
 - Public-facade Bubble Tea interaction proof: `spice-agent-tui` `a9c2bc3`;
   `make verify` 90.1s, 90.2% coverage.
 
