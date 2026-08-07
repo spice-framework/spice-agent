@@ -193,7 +193,14 @@ func (host *RunHost) Health(ctx context.Context, session Session) (client.Health
 	if err := host.sessions.Check(session.ClientID(), session.Epoch()); err != nil {
 		return client.Health{}, publicRunHostError(err)
 	}
-	host.mu.Lock()
+	description, err := host.snapshotDescription()
+	if err != nil {
+		return client.Health{}, err
+	}
+	return description.Health(), nil
+}
+
+func (host *RunHost) healthAssumingLocked() (client.Health, error) {
 	state := client.HealthReady
 	reasons := slices.Sorted(maps.Keys(host.degraded))
 	if host.closing {
@@ -204,10 +211,9 @@ func (host *RunHost) Health(ctx context.Context, session Session) (client.Health
 	}
 	active := host.activeReserved
 	limits := host.limits
-	host.mu.Unlock()
 	health, err := client.NewHealth(state, reasons, active, limits)
 	if err != nil {
-		return client.Health{}, ErrRunHostUnavailable
+		return client.Health{}, err
 	}
 	return health, nil
 }

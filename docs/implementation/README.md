@@ -163,6 +163,20 @@ when RunHost evicts a terminal envelope. No gRPC/Protobuf adapter, IPC listener,
 stream bridge, endpoint authentication, discovery, or managed startup is
 claimed. Focused evidence and remaining exclusions are recorded in
 [`evidence/phase4-run-host.md`](evidence/phase4-run-host.md).
+`RunHost.Describe` now supplies the initialization boundary with one immutable,
+validated, sessionless snapshot of the generated definition catalog and daemon
+readiness. Session-bound Health reuses that exact snapshot implementation after
+ownership validation. Evidence is in
+[`evidence/phase4-run-host-description.md`](evidence/phase4-run-host-description.md).
+The first independent gRPC security prerequisite is now implemented in
+`daemon/grpcserver`: canonical random 256-bit endpoint credentials, exhaustive
+format redaction, exact single-value Bearer metadata authentication, and
+matching unary/stream fail-closed middleware proven over `bufconn`. The
+middleware is not exported independently, preventing consumers from treating a
+partially authenticated server as supported. No OS endpoint, metadata-file
+permission handling, session negotiation, or engine RPC translation is claimed.
+Evidence is in
+[`evidence/phase4-grpc-authentication.md`](evidence/phase4-grpc-authentication.md).
 The independent TUI repository now exposes an immutable UI-neutral session
 port and a public terminal shell while keeping Bubble Tea and presentation
 messages internal. Commit `82adb45` generates its renderer, theme, ordered key

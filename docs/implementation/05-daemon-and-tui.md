@@ -154,6 +154,12 @@ inert candidates, cancels kernel work, drains accepted operations and pending
 bindings, joins finalizers, and closes authority last; cleanup continues even
 if an individual caller stops waiting.
 
+`RunHost.Describe` provides a validated sessionless initialization snapshot of
+the immutable generated definitions and readiness facts observed at one host
+synchronization boundary. It honors cancellation without creating session
+state. The session-bound Health path checks ownership first and then uses the
+same readiness snapshot implementation.
+
 This lifecycle core does not include gRPC, Protobuf/RPC translation, event or
 interaction stream delivery, endpoint authentication, Unix sockets, Windows
 named pipes, endpoint discovery, or managed daemon startup. Although RunHost
@@ -161,6 +167,17 @@ bounds retained terminal envelopes, `agent.Engine` still retains unbounded
 service-lifetime seen-run identity tombstones. That limitation is explicit and
 must be resolved or accepted by a bounded-lifetime daemon policy before the
 Phase 4 contract freezes.
+
+The endpoint-authentication prerequisite now lives in the separate
+`daemon/grpcserver` package. It generates opaque 256-bit credentials, accepts
+only canonical unpadded base64url values carried as one exact `Bearer` metadata
+entry, compares fixed-size values in constant time, and marks authenticated
+handler contexts privately. Unary and streaming middleware reject before
+application handling and never echo credential material through statuses,
+headers, trailers, formatting, structured logs, or JSON. The middleware factory
+is intentionally private until the complete server constructor can install both
+paths. This slice has no OS listener, endpoint metadata file, negotiated session,
+or RPC adapter; those remain pending.
 The TUI composition half of slice 4 is implemented independently at
 `spice-agent-tui` commit `82adb45`: public APIs contain no Bubble Tea or daemon
 types, Spice generates the renderer/theme/binding/I/O/shell graph, cancellation
@@ -190,6 +207,10 @@ Kernel activation-gate evidence is in
 [`evidence/phase4-kernel-activation-gate.md`](evidence/phase4-kernel-activation-gate.md).
 RunHost lifecycle-core evidence is in
 [`evidence/phase4-run-host.md`](evidence/phase4-run-host.md).
+RunHost description evidence is in
+[`evidence/phase4-run-host-description.md`](evidence/phase4-run-host-description.md).
+Endpoint-authentication prerequisite evidence is in
+[`evidence/phase4-grpc-authentication.md`](evidence/phase4-grpc-authentication.md).
 
 The baseline remains intentionally provisional. The pre-host repair closes the
 schema and kernel seams for interaction discovery/run identity, reconnect CAS,

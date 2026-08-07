@@ -121,10 +121,29 @@ identity tombstones are still unbounded; terminal-cache eviction does not bound
 that identity history, and a later lifecycle policy must address it before a
 long-lived daemon contract is frozen.
 
+`RunHost.Describe` exposes one validated, immutable pre-session view containing
+the exact generated `DefinitionSet` and daemon `client.Health`. It snapshots all
+mutable readiness facts at one host-lock boundary, needs no client session, and
+defensively copies the definition catalog. Session-bound `Health` performs its
+ownership check and then reuses the same private snapshot path, preventing the
+initialization adapter and later health RPC from inventing separate readiness
+models.
+
 RunHost contains no gRPC server, Protobuf/RPC translation, event or interaction
 stream adapter, listener, endpoint authentication, Unix socket, Windows named
 pipe, discovery, or managed-startup implementation. Those remain the next
 Phase 4 transport slices.
+
+The sibling `daemon/grpcserver` package now owns the first transport-security
+prerequisite: an opaque random 256-bit endpoint credential and matching unary
+and streaming gRPC authentication middleware. The credential has one canonical
+unpadded base64url representation, is accepted only as exactly one case-sensitive
+`Bearer` metadata value, uses constant-time comparison, and redacts every
+formatting path. Authentication completes after gRPC framing and decode but
+before an application handler can inspect daemon state. The middleware
+constructor remains private until the package exposes a server constructor that
+installs both paths unconditionally. This prerequisite opens no listener,
+persists no endpoint metadata, and does not yet translate an engine RPC.
 
 Every client epoch also owns a bounded commit and stream gate. Mutating work
 crosses an exclusive FIFO commit boundary; a reconnect intent takes priority,
