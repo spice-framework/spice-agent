@@ -200,18 +200,40 @@ func (host *RunHost) Health(ctx context.Context, session Session) (client.Health
 	return description.Health(), nil
 }
 
-func (host *RunHost) healthAssumingLocked() (client.Health, error) {
+type runHostHealthSnapshot struct {
+	stopping bool
+	reasons  []string
+	active   uint64
+	limits   client.Limits
+}
+
+func (host *RunHost) healthSnapshotAssumingLocked() runHostHealthSnapshot {
+	return runHostHealthSnapshot{
+		stopping: host.closing,
+		reasons:  slices.Sorted(maps.Keys(host.degraded)),
+		active:   host.activeReserved,
+		limits:   host.limits,
+	}
+}
+
+func (snapshot runHostHealthSnapshot) health(sources []HealthSource) (client.Health, error) {
+	if snapshot.stopping {
+		return client.NewHealth(client.HealthStopping, nil, snapshot.active, snapshot.limits)
+	}
+	reasons := slices.Clone(snapshot.reasons)
+	for _, source := range sources {
+		contribution := sampleHealthSource(source)
+		for _, reason := range contribution.reasons {
+			reasons = append(reasons, string(reason))
+		}
+	}
+	slices.Sort(reasons)
+	reasons = slices.Compact(reasons)
 	state := client.HealthReady
-	reasons := slices.Sorted(maps.Keys(host.degraded))
-	if host.closing {
-		state = client.HealthStopping
-		reasons = nil
-	} else if len(reasons) != 0 {
+	if len(reasons) != 0 {
 		state = client.HealthDegraded
 	}
-	active := host.activeReserved
-	limits := host.limits
-	health, err := client.NewHealth(state, reasons, active, limits)
+	health, err := client.NewHealth(state, reasons, snapshot.active, snapshot.limits)
 	if err != nil {
 		return client.Health{}, err
 	}

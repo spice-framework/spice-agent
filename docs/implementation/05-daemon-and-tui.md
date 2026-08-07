@@ -165,16 +165,20 @@ or legacy details fail closed to their stable public error class. Active reserva
 count-and-byte-bounded terminal-envelope cache, whose eviction follows terminal
 completion order. Ownership lookup does not distinguish unknown runs from runs
 owned by another client. Health reports immutable configured limits and fixed
-secret-safe degraded reasons. Shutdown synchronously fences admission, aborts
+secret-safe degraded reasons. Generated applications may inject a bounded
+ordered `[]HealthSource`; each source returns only an immutable fixed-code
+`HealthContribution`, is sampled outside the RunHost lock, and cannot return an
+error or arbitrary text. Contributions are cloned, sorted, and deduplicated;
+stopping state suppresses extension sampling and all degraded reasons. Shutdown synchronously fences admission, aborts
 inert candidates, cancels kernel work, drains accepted operations and pending
 bindings, joins finalizers, and closes authority last; cleanup continues even
 if an individual caller stops waiting.
 
 `RunHost.Describe` provides a validated sessionless initialization snapshot of
 the immutable generated definitions and readiness facts observed at one host
-synchronization boundary. It honors cancellation without creating session
-state. The session-bound Health path checks ownership first and then uses the
-same readiness snapshot implementation.
+synchronization boundary before passive sources are sampled. It honors
+cancellation without creating session state. The session-bound Health path
+checks ownership first and then uses the same readiness snapshot implementation.
 
 This lifecycle core does not include gRPC, Protobuf/RPC translation, event or
 interaction stream delivery, endpoint authentication, Unix sockets, Windows

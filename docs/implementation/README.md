@@ -213,7 +213,11 @@ remaining exclusions are recorded in
 `RunHost.Describe` now supplies the initialization boundary with one immutable,
 validated, sessionless snapshot of the generated definition catalog and daemon
 readiness. Session-bound Health reuses that exact snapshot implementation after
-ownership validation. Evidence is in
+ownership validation. A generic constructor-injected `HealthSource` seam now
+adds bounded passive readiness without holding the host lock or accepting
+arbitrary dependency text; immutable contributions use a closed fixed-code
+vocabulary with deterministic clone/sort/dedup behavior and stopping
+precedence. Evidence is in
 [`evidence/phase4-run-host-description.md`](evidence/phase4-run-host-description.md).
 The first independent gRPC security prerequisite is now implemented in
 `daemon/grpcserver`: canonical random 256-bit endpoint credentials, exhaustive

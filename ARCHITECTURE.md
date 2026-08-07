@@ -157,10 +157,15 @@ long-lived daemon contract is frozen.
 `RunHost.Describe` exposes one validated, immutable pre-session view containing
 the exact generated `DefinitionSet` and daemon `client.Health`. It snapshots all
 mutable readiness facts at one host-lock boundary, needs no client session, and
-defensively copies the definition catalog. Session-bound `Health` performs its
-ownership check and then reuses the same private snapshot path, preventing the
-initialization adapter and later health RPC from inventing separate readiness
-models.
+defensively copies the definition catalog. Constructor-injected passive
+`HealthSource` beans are sampled only after that lock is released. Their
+immutable bounded contributions contain only a closed vocabulary of fixed
+reason codes; arbitrary errors and dependency-controlled text cannot enter the
+wire health surface. Codes are defensively cloned, sorted, and deduplicated,
+and stopping state has precedence without sampling extensions. Session-bound
+`Health` performs its ownership check and then reuses the same private snapshot
+path, preventing the initialization adapter and later health RPC from
+inventing separate readiness models.
 
 RunHost itself contains no gRPC server, Protobuf/RPC translation, event or
 interaction stream adapter, listener, endpoint authentication, Unix socket,

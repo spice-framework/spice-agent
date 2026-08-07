@@ -21,12 +21,14 @@ func TestSpiceAutoConfigurationIsDeterministic(t *testing.T) {
 	wantNames := []string{
 		"runtimePluginCompiledDispatcher",
 		"runtimePluginEndpointFactory",
+		"runtimePluginRestartPolicy",
 		"runtimePluginHost",
 		"runtimePluginToolPlanSource",
 	}
 	wantFactories := []any{
 		DefaultCompiledDispatcher,
 		DefaultCurrentUserEndpointFactory,
+		DefaultDisabledRestartPolicy,
 		DefaultHost,
 		DefaultToolPlanSource,
 	}
@@ -41,6 +43,39 @@ func TestSpiceAutoConfigurationIsDeterministic(t *testing.T) {
 		if reflect.ValueOf(bean.Factory).Pointer() != reflect.ValueOf(wantFactories[index]).Pointer() {
 			t.Fatalf("SpiceAutoConfiguration().Beans[%d].Factory = %T", index, bean.Factory)
 		}
+	}
+}
+
+func TestDefaultDisabledRestartPolicy(t *testing.T) {
+	t.Parallel()
+	policy := DefaultDisabledRestartPolicy()
+	if policy.Enabled() || policy.MaximumAttempts() != 0 {
+		t.Fatalf("DefaultDisabledRestartPolicy() = %#v, want disabled", policy)
+	}
+	if err := policy.Validate(); err != nil {
+		t.Fatalf("DefaultDisabledRestartPolicy().Validate(): %v", err)
+	}
+}
+
+func TestDefaultHostReceivesExplicitRestartPolicy(t *testing.T) {
+	t.Parallel()
+	dispatcher, err := DefaultCompiledDispatcher(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy := pluginhost.DefaultRestartPolicy()
+	host, cleanup, err := DefaultHost(
+		validHostIdentity(), dispatcher, nil, policy,
+		inertLauncher(), DefaultCurrentUserEndpointFactory(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := host.Health().RestartLimit(); got != policy.MaximumAttempts() {
+		t.Fatalf("host restart limit = %d, want %d", got, policy.MaximumAttempts())
+	}
+	if err = cleanup(t.Context()); err != nil {
+		t.Fatalf("cleanup: %v", err)
 	}
 }
 
@@ -78,13 +113,14 @@ func TestDefaultHostRejectsMissingMandatoryDependencies(t *testing.T) {
 	tests := map[string]struct {
 		identity   *pluginv1.BuildIdentity
 		dispatcher stage.ToolDispatcher
+		restart    pluginhost.RestartPolicy
 		launcher   process.Launcher
 		endpoints  pluginhost.LocalEndpointFactory
 	}{
-		"identity":   {nil, dispatcher, launcher, endpoints},
-		"dispatcher": {identity, nil, launcher, endpoints},
-		"launcher":   {identity, dispatcher, nil, endpoints},
-		"endpoints":  {identity, dispatcher, launcher, nil},
+		"identity":   {nil, dispatcher, pluginhost.RestartPolicy{}, launcher, endpoints},
+		"dispatcher": {identity, nil, pluginhost.RestartPolicy{}, launcher, endpoints},
+		"launcher":   {identity, dispatcher, pluginhost.RestartPolicy{}, nil, endpoints},
+		"endpoints":  {identity, dispatcher, pluginhost.RestartPolicy{}, launcher, nil},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -93,6 +129,7 @@ func TestDefaultHostRejectsMissingMandatoryDependencies(t *testing.T) {
 				test.identity,
 				test.dispatcher,
 				nil,
+				test.restart,
 				test.launcher,
 				test.endpoints,
 			)
@@ -113,11 +150,15 @@ func TestDefaultHostProvidesInitialPlanAdapterAndCleanup(t *testing.T) {
 		validHostIdentity(),
 		dispatcher,
 		nil,
+		DefaultDisabledRestartPolicy(),
 		inertLauncher(),
 		DefaultCurrentUserEndpointFactory(),
 	)
 	if err != nil || host == nil || cleanup == nil {
 		t.Fatalf("DefaultHost() = (%p, %v, %v)", host, cleanup, err)
+	}
+	if got := host.Health().RestartLimit(); got != 0 {
+		t.Fatalf("blank-import default restart limit = %d, want disabled", got)
 	}
 	source, err := DefaultToolPlanSource(host)
 	if err != nil {
