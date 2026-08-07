@@ -1,0 +1,61 @@
+{
+  "$schema": "https://spiceframework.dev/schemas/spice-docs.schema.json",
+  "schema": 1,
+  "product": {
+    "id": "agent",
+    "title": "Spice Agent",
+    "family": "agent",
+    "summary": "A Go-native agent SDK and deterministic kernel assembled through Spice's generated exact-type extension graph.",
+    "maturity": "experimental",
+    "audience": [
+      "application-developer",
+      "extension-author",
+      "evaluator"
+    ]
+  },
+  "content": [
+    {
+      "source": "README.md",
+      "route": "index",
+      "kind": "concept",
+      "order": 0,
+      "search": true
+    },
+    {
+      "source": "ARCHITECTURE.md",
+      "route": "architecture",
+      "kind": "concept",
+      "order": 10,
+      "search": true
+    },
+    {
+      "source": "docs/**/*.md",
+      "routeFrom": "docs",
+      "order": 20,
+      "search": true,
+      "exclude": [
+        "docs/implementation/evidence/**"
+      ]
+    },
+    {
+      "source": "docs/implementation/evidence/**/*.md",
+      "routeFrom": "docs/implementation/evidence",
+      "kind": "status",
+      "order": 900,
+      "search": false
+    }
+  ],
+  "snippets": [
+    {
+      "root": ".",
+      "include": [
+        "**/*.go"
+      ],
+      "exclude": [
+        "vendor/**",
+        "internal/spicegen/**",
+        ".generated/**"
+      ]
+    }
+  ]
+}
