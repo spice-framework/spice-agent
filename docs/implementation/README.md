@@ -10,7 +10,7 @@ Repository roadmaps link here and must not duplicate status.
 | 2 — deterministic kernel | Complete for preview | `841edd3`; deterministic lifecycle, interaction, snapshot, race/fuzz proof |
 | 3 — provider and coding tools | In progress | generated cross-repository continuation and opt-in live acceptance |
 | 4 — daemon and TUI | In progress | generated daemon/TUI distribution targets and managed local composition proven; installed Windows/Linux terminal interaction pending |
-| 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, and core auto-configuration complete; recovery, distribution cutover, and developer loop pending |
+| 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, bounded recovery/health, generated distribution Host cutover, and package-main dev supervisors complete; explicit plugin activation and installed fault injection pending |
 | 6 — architecture proof | Planned | signed `v0.1.0-preview.1` distribution |
 | 7 — stress prototypes | Planned | permission, SQLite, alternate UI, two-worker experiments |
 | 8 — stabilization | Planned | external authors and frozen compatibility policy |
@@ -32,15 +32,28 @@ complete merged generation, leases exact current or retained generations,
 fails closed after an active crash, and performs bounded reverse graceful
 lifecycle and containment without blocking lease release. The optional leaf
 auto-configuration exposes that same Host through ordinary named fallback Spice
-beans with generated cleanup. Bounded recovery, public health, reference
-distribution cutover, installed process acceptance, and
-`spice dev` remain pending. Detailed evidence and the
+beans with generated cleanup. A validated immutable `RestartPolicy` now drives
+one host-owned whole-set recovery controller: current failure closes new lease
+admission immediately, attempt one is immediate, later attempts use bounded
+backoff/deadlines, and only a complete still-current desired set may publish a
+distinct generation. Explicit activation always takes precedence. Public
+`Health` is a passive immutable snapshot containing only fixed states/issues,
+plan identity, and bounded ownership counters. The zero policy remains disabled
+in core and leaf auto-configuration; the reference distribution must explicitly
+contribute the default policy. Distribution commit `997ab02` injects the exact
+Host as the daemon's generated `ToolPlanSource`, and `e58ab17` moves both public
+commands to package-main Spice targets with independent `spice dev`
+supervisors. Explicit plugin configuration/activation, installed process
+acceptance, and the dual-process invalid-edit/reconnect workflow remain
+pending. Detailed evidence and the
 pathname-to-exec limitation are recorded in
 [`evidence/phase5-host-security-foundation.md`](evidence/phase5-host-security-foundation.md)
 and
 [`evidence/phase5-candidate-and-remote-tools.md`](evidence/phase5-candidate-and-remote-tools.md),
 with generation/lifecycle evidence in
-[`evidence/phase5-generations-and-lifecycle.md`](evidence/phase5-generations-and-lifecycle.md)
+[`evidence/phase5-generations-and-lifecycle.md`](evidence/phase5-generations-and-lifecycle.md),
+recovery/health evidence in
+[`evidence/phase5-recovery-and-health.md`](evidence/phase5-recovery-and-health.md),
 and auto-configuration evidence in
 [`evidence/phase5-runtime-autoconfiguration.md`](evidence/phase5-runtime-autoconfiguration.md).
 
@@ -418,6 +431,12 @@ and runtime acceptance still requires a macOS runner.
   `make verify` 152.5s, 85.2% coverage.
 - Generated explicit-serve daemon and managed process boundary:
   `spice-agent-coding` `4c13deb`; `make verify` 99.9s, 89.5% coverage.
+- Generated runtime-plugin Host cutover: `spice-agent-coding` `997ab02`;
+  `make verify` 128.4s, 87.0% coverage.
+- Package-main daemon/terminal development supervisors: `spice-agent-coding`
+  `e58ab17`; `make verify` 129s, 87.0% coverage.
+- Public-facade Bubble Tea interaction proof: `spice-agent-tui` `a9c2bc3`;
+  `make verify` 90.1s, 90.2% coverage.
 
 Active follow-up slices are not recorded as completed evidence until their
 repositories publish green commits.

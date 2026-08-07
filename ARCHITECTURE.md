@@ -53,6 +53,15 @@ makes new leases fail closed without changing existing lease identity or
 replaying calls. The host never exposes a registry and never mutates the Spice
 bean graph.
 
+Optional automatic recovery is one host-owned bounded controller over the last
+successfully activated complete `Set`. It starts the first attempt immediately,
+bounds later backoff and every staging attempt, and publishes only when current
+generation identity plus desired and explicit-activation revisions still
+match. Explicit activation has precedence. Recovery never redirects a lease or
+replays a call. Its zero policy is disabled. Public host health is a passive
+lock-only immutable projection of fixed state/issue codes and ownership counts;
+it performs no process callback and exposes no arbitrary dependency detail.
+
 Applications opt in by blank-importing `plugin/host/autoconfigure`. That leaf
 package contributes the compiled named-tool dispatcher, current-user endpoint
 factory, concrete Host with generated cleanup, and exact `ToolPlanSource`

@@ -69,7 +69,19 @@ graph. Accepted candidates close local admission, join active calls, perform
 validated bounded Drain and Shutdown, allow bounded graceful process exit, and
 retain endpoint/executable ownership until containment is proved. Host shutdown
 joins staging and leases and supports explicit ownership-cleanup retry. Bounded
-recovery and public health remain pending. Optional leaf auto-configuration now
+whole-set recovery and passive public health are now implemented. A zero
+`RestartPolicy` disables recovery; the default policy is an explicit
+application/distribution choice, not a side effect of blank-importing
+auto-configuration. Attempt one starts immediately, later attempts use bounded
+exponential backoff, and every attempt has its own deadline. A successful
+explicit activation retains a defensive clone of the complete desired `Set`.
+Only a recovery whose current generation pointer/identity, desired revision,
+and explicit-activation revision still match may atomically publish a distinct
+generation. A newer explicit activation cancels or stales recovery, while a
+failed explicit replacement re-arms the last successful desired set. Recovery
+never redirects a lease or replays a call. `Health` performs no plugin callback
+or transition and emits only fixed secret-safe state/issue values and ownership
+counts. Optional leaf auto-configuration now
 contributes the compiled dispatcher, current-user endpoint factory, concrete
 Host with generated cleanup, and exact `stage.ToolPlanSource` adapter as
 ordinary named fallback beans. Evidence is in
@@ -78,6 +90,8 @@ and
 [`evidence/phase5-candidate-and-remote-tools.md`](evidence/phase5-candidate-and-remote-tools.md),
 with generation/lifecycle evidence in
 [`evidence/phase5-generations-and-lifecycle.md`](evidence/phase5-generations-and-lifecycle.md)
+and recovery/health evidence in
+[`evidence/phase5-recovery-and-health.md`](evidence/phase5-recovery-and-health.md)
 and auto-configuration evidence in
 [`evidence/phase5-runtime-autoconfiguration.md`](evidence/phase5-runtime-autoconfiguration.md).
 
@@ -122,14 +136,18 @@ the active/failed generation; no partial generated tree is activated.
    **Complete through authenticated candidate launch and manifest validation;
    public fallback source composition remains in slice 4.**
 3. Add generation manager, candidate handshake, atomic activation, leases,
-   bounded stderr, restart policy, drain, and cleanup. **Complete except bounded
-   restart/recovery policy and its public health projection.**
+   bounded stderr, restart policy, drain, and cleanup. **Complete in core,
+   including bounded whole-set recovery and public health.**
 4. Provide optional Spice auto-configuration that decorates/injects the dynamic
-   tool source through normal static DI. **Core adapter complete; reference
-   distribution cutover pending.**
+   tool source through normal static DI. **Core adapter and generated reference
+   distribution Host cutover complete; explicit distribution Set construction
+   and activation remain pending.**
 5. Ship Go and Python echo/filesystem-neutral fixture tools and conformance CLI.
    **Complete for the initial runtime-tool profile.**
 6. Integrate last-known-good `spice dev` for generated daemon/TUI targets.
+   **Package-main targets and independent supervisors are complete; real
+   invalid-edit, last-known-good continuity, independent restart, and reconnect
+   fault injection remain pending.**
 
 ## Exclusions
 
@@ -163,6 +181,8 @@ Status is **in progress**. The execution-outcome and kernel plan-lease
 prerequisites, initial runtime-tool protocol, reusable conformance harness,
 independent Go/Python fixtures, digest/process ownership, local candidate
 handshake, and remote execution translation are implemented. Atomic generation
-management, exact run leases, and graceful lifecycle are implemented. Bounded
-recovery/public health, distribution cutover, real
-process activation acceptance, and the developer loop remain pending.
+management, exact run leases, graceful lifecycle, bounded recovery, and public
+health are implemented. The generated distribution Host cutover and
+package-main development supervisors are implemented. Explicit plugin
+configuration/activation, real process activation acceptance, and the
+dual-process developer-loop fault injection remain pending.
