@@ -111,8 +111,12 @@ Mutation operation IDs are deduplicated by the bounded per-client ledger.
 Failures proved to occur before any visible or durable boundary abandon their
 ledger entry, allowing the same operation ID to retry; committed failures and
 uncertain outcomes remain replayable and may not be guessed or replayed as new
-work. Run ownership deliberately makes an unknown run and another client's run
-indistinguishable. Completed runs retain authority-issued envelopes in a
+work. Durable failure outcomes preserve bounded typed recovery facts for stale
+ownership and host/session-gate capacity, including across abandonment, so the
+transport can render actionable statuses without parsing error text or
+recomputing daemon state. Corrupt or legacy outcome details fail closed to the
+matching public sentinel. Run ownership deliberately makes an unknown run and
+another client's run indistinguishable. Completed runs retain authority-issued envelopes in a
 deterministic count-and-byte-bounded cache, and fixed secret-safe degradation
 reasons make authority, snapshot, and cleanup failures visible through Health.
 RunHost capacity, terminal-envelope retention, pending interactions, sessions,
@@ -183,7 +187,13 @@ Snapshot transfer is available only on protocol minor 1 with the negotiated
 `snapshot-authority-v1` capability. Every envelope carries a 32-byte authority
 scope, positive key generation, and HMAC-SHA256 over canonical semantic fields.
 Construction requires a trusted signer and import requires a keyed verifier;
-the unkeyed validator checks structure and payload integrity only. Authority
+the exported unkeyed validator checks the complete request identity, negotiated
+size, envelope, digest, authority shape, and suspended lifecycle only. It does
+not authenticate the HMAC. Unsigned root-envelope extensions and envelopes over
+the opaque client bound fail closed; compatible request and authority unknown
+fields remain included in the negotiated message-size accounting. The gRPC adapter may use that structural validator
+before translation, but `RunHost.Import` remains the sole admission path and
+performs keyed verification through prepared daemon authority. Authority
 keys are not IPC authentication tokens and remain outside Protobuf, snapshots,
 events, logs, and errors.
 

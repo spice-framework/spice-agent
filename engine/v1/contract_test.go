@@ -392,9 +392,11 @@ func FuzzEngineEnvelope(f *testing.F) {
 		var snapshot enginev1.SnapshotEnvelope
 		if proto.Unmarshal(data, &snapshot) == nil {
 			_ = enginev1.ValidateSnapshotEnvelope(&snapshot)
-			_ = enginev1.ValidateImportSnapshotRequest(context.Background(), &enginev1.ImportSnapshotRequest{
+			request := &enginev1.ImportSnapshotRequest{
 				ClientId: "client", OwnershipEpoch: 1, ClientOperationId: "fuzz-import", Snapshot: &snapshot,
-			}, codec, protocolLimits())
+			}
+			_ = enginev1.ValidateImportSnapshotRequestStructure(request, protocolLimits())
+			_ = enginev1.ValidateImportSnapshotRequest(context.Background(), request, codec, protocolLimits())
 		}
 		var response enginev1.RespondInteractionRequest
 		if proto.Unmarshal(data, &response) == nil {

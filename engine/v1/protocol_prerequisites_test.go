@@ -705,6 +705,28 @@ func FuzzUnaryProtocolValidators(f *testing.F) {
 	f.Add([]byte{0x08, 0x01})
 	f.Add([]byte{0xff, 0x01})
 	limits := protocolLimits()
+	codec, err := enginev1.NewHMACSnapshotAuthority(
+		bytes.Repeat([]byte{0x31}, 32), 9, bytes.Repeat([]byte{0x32}, 32),
+	)
+	if err != nil {
+		f.Fatal(err)
+	}
+	snapshot, err := enginev1.NewSnapshotEnvelope(
+		context.Background(), codec, "fuzz-import", 1,
+		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED,
+		[]byte(`{"run_id":"fuzz-import"}`),
+	)
+	if err != nil {
+		f.Fatal(err)
+	}
+	seed, err := proto.Marshal(&enginev1.ImportSnapshotRequest{
+		ClientId: "fuzz-client", OwnershipEpoch: 1,
+		ClientOperationId: "fuzz-import-operation", Snapshot: snapshot,
+	})
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Add(seed)
 	f.Fuzz(func(_ *testing.T, data []byte) {
 		var initialize enginev1.InitializeRequest
 		if proto.Unmarshal(data, &initialize) == nil {
@@ -775,6 +797,7 @@ func FuzzUnaryProtocolValidators(f *testing.F) {
 		}
 		var importRequest enginev1.ImportSnapshotRequest
 		if proto.Unmarshal(data, &importRequest) == nil {
+			_ = enginev1.ValidateImportSnapshotRequestStructure(&importRequest, limits)
 			_ = enginev1.ValidateImportSnapshotRequest(
 				context.Background(), &importRequest, fuzzSnapshotVerifier{}, limits,
 			)

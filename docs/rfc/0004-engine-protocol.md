@@ -98,7 +98,14 @@ abandonment returned with a result remain committed uncertain outcomes.
   snapshots, and preserves the run ID embedded in the snapshot. Clients cannot
   rename an imported run or assert a replacement plan. Export requires a trusted
   signer and import requires keyed HMAC verification before state mutation; an
-  unkeyed structural check is never import authority.
+  unkeyed structural check validates the full request shape, negotiated encoded
+  size, envelope digest, authority shape, and suspended lifecycle but is never
+  import authority. Root-envelope unknown fields are rejected because they are
+  outside the authority MAC; request and authority unknown fields remain
+  forward-compatible only within the negotiated request and opaque-envelope
+  bounds. The transport performs that check before translating the
+  envelope; `RunHost.Import` performs the keyed verification and remains the
+  sole admission boundary.
   Export uses the daemon authority's typed `agent.Snapshot` issuer; wire run
   identity, sequence, lifecycle, and payload are derived from that single
   validated value. A successful durable signing result wins late cancellation,

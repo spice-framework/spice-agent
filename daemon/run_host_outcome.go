@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 
 	"github.com/spice-framework/spice-agent/client"
 )
@@ -23,12 +24,19 @@ const (
 )
 
 type runHostOutcome struct {
-	Code        string `json:"code"`
-	RunID       string `json:"run_id,omitempty"`
-	PlanID      string `json:"plan_id,omitempty"`
-	Sequence    uint64 `json:"sequence,omitempty"`
-	Flag        bool   `json:"flag,omitempty"`
-	AbandonCode string `json:"abandon_code,omitempty"`
+	Code          string `json:"code"`
+	RunID         string `json:"run_id,omitempty"`
+	PlanID        string `json:"plan_id,omitempty"`
+	Sequence      uint64 `json:"sequence,omitempty"`
+	Flag          bool   `json:"flag,omitempty"`
+	AbandonCode   string `json:"abandon_code,omitempty"`
+	CapacityKind  string `json:"capacity_kind,omitempty"`
+	Resource      string `json:"resource,omitempty"`
+	Limit         uint64 `json:"limit,omitempty"`
+	Observed      uint64 `json:"observed,omitempty"`
+	StaleClient   string `json:"stale_client,omitempty"`
+	ExpectedEpoch uint64 `json:"expected_epoch,omitempty"`
+	ObservedEpoch uint64 `json:"observed_epoch,omitempty"`
 }
 
 func successRunHostOutcome(value runHostOutcome) Outcome {
@@ -48,6 +56,8 @@ func failureRunHostOutcome(err error) Outcome {
 		code = outcomeCodeClosed
 	case errors.Is(err, ErrRunHostCapacity):
 		code = outcomeCodeCapacity
+	case errors.Is(err, ErrSessionGateCapacity):
+		code = outcomeCodeCapacity
 	case errors.Is(err, ErrStaleSession):
 		code = outcomeCodeStale
 	case errors.Is(err, ErrHostedRunUnavailable):
@@ -58,7 +68,27 @@ func failureRunHostOutcome(err error) Outcome {
 	case errors.Is(err, ErrRunHostUnavailable):
 		code = outcomeCodeDependency
 	}
-	return newRunHostOutcome(kind, runHostOutcome{Code: code})
+	value := runHostOutcome{Code: code}
+	var hostCapacity *RunHostCapacityError
+	var sessionCapacity *SessionGateCapacityError
+	var stale *StaleSessionError
+	switch {
+	case errors.As(err, &hostCapacity):
+		value.CapacityKind = "host"
+		value.Resource = hostCapacity.Resource()
+		value.Limit = hostCapacity.Limit()
+		value.Observed = hostCapacity.Observed()
+	case errors.As(err, &sessionCapacity):
+		value.CapacityKind = "session_gate"
+		value.Resource = sessionCapacity.Resource()
+		value.Limit = uint64(sessionCapacity.Maximum()) // #nosec G115 -- SessionGateCapacityError has a positive bounded maximum.
+		value.Observed = value.Limit + 1
+	case errors.As(err, &stale):
+		value.StaleClient = stale.ClientID()
+		value.ExpectedEpoch = stale.ExpectedEpoch()
+		value.ObservedEpoch = stale.ObservedEpoch()
+	}
+	return newRunHostOutcome(kind, value)
 }
 
 // abandonRunHostOutcome is consumed by doMutation before Ledger can commit it.
@@ -70,7 +100,9 @@ func abandonRunHostOutcome(err error) Outcome {
 	if json.Unmarshal(failed.Payload(), &value) != nil {
 		return failed
 	}
-	return newRunHostOutcome(OutcomeFailure, runHostOutcome{Code: outcomeCodeAbandon, AbandonCode: value.Code})
+	value.AbandonCode = value.Code
+	value.Code = outcomeCodeAbandon
+	return newRunHostOutcome(OutcomeFailure, value)
 }
 
 func newRunHostOutcome(kind OutcomeKind, value runHostOutcome) Outcome {
@@ -106,8 +138,12 @@ func decodeRunHostOutcome(outcome Outcome) (runHostOutcome, error) {
 	case outcomeCodeClosed:
 		return runHostOutcome{}, ErrRunHostClosed
 	case outcomeCodeCapacity:
-		return runHostOutcome{}, ErrRunHostCapacity
+		return runHostOutcome{}, capacityErrorForOutcome(value)
 	case outcomeCodeStale:
+		if boundedToken("stale client ID", value.StaleClient) == nil && value.ExpectedEpoch != 0 &&
+			value.ExpectedEpoch != value.ObservedEpoch {
+			return runHostOutcome{}, staleSession(value.StaleClient, value.ExpectedEpoch, value.ObservedEpoch)
+		}
 		return runHostOutcome{}, ErrStaleSession
 	case outcomeCodeRunMissing:
 		return runHostOutcome{}, ErrHostedRunUnavailable
@@ -115,6 +151,23 @@ func decodeRunHostOutcome(outcome Outcome) (runHostOutcome, error) {
 		return runHostOutcome{}, ErrRunHostUnavailable
 	default:
 		return runHostOutcome{}, ErrRunHostState
+	}
+}
+
+func capacityErrorForOutcome(value runHostOutcome) error {
+	if boundedToken("capacity resource", value.Resource) != nil || value.Limit == 0 || value.Observed <= value.Limit {
+		return ErrRunHostCapacity
+	}
+	switch value.CapacityKind {
+	case "host":
+		return newRunHostCapacity(value.Resource, value.Limit, value.Observed)
+	case "session_gate":
+		if value.Limit > uint64(math.MaxInt) {
+			return ErrRunHostCapacity
+		}
+		return &SessionGateCapacityError{resource: value.Resource, maximum: int(value.Limit)}
+	default:
+		return ErrRunHostCapacity
 	}
 }
 
@@ -151,7 +204,7 @@ func (host *RunHost) doMutation(
 			value := execute(operationContext)
 			var marker runHostOutcome
 			if json.Unmarshal(value.Payload(), &marker) == nil && marker.Code == outcomeCodeAbandon {
-				return Outcome{}, AbandonOperation(runHostErrorForCode(marker.AbandonCode))
+				return Outcome{}, AbandonOperation(runHostErrorForOutcome(marker))
 			}
 			return value, nil
 		},
@@ -174,6 +227,11 @@ func (host *RunHost) doMutation(
 }
 
 func runHostErrorForCode(code string) error {
+	return runHostErrorForOutcome(runHostOutcome{AbandonCode: code})
+}
+
+func runHostErrorForOutcome(value runHostOutcome) error {
+	code := value.AbandonCode
 	switch code {
 	case outcomeCodeCanceled:
 		return context.Canceled
@@ -182,8 +240,12 @@ func runHostErrorForCode(code string) error {
 	case outcomeCodeClosed:
 		return ErrRunHostClosed
 	case outcomeCodeCapacity:
-		return ErrRunHostCapacity
+		return capacityErrorForOutcome(value)
 	case outcomeCodeStale:
+		if boundedToken("stale client ID", value.StaleClient) == nil && value.ExpectedEpoch != 0 &&
+			value.ExpectedEpoch != value.ObservedEpoch {
+			return staleSession(value.StaleClient, value.ExpectedEpoch, value.ObservedEpoch)
+		}
 		return ErrStaleSession
 	case outcomeCodeRunMissing:
 		return ErrHostedRunUnavailable

@@ -158,6 +158,9 @@ and session cancellation, and setup observes request, session, and host
 lifetimes before a commit boundary. Active capacity and terminal envelopes are
 bounded, terminal eviction follows completion order, owner lookup is
 non-disclosing, and fixed safe degradation reasons are reported by Health.
+Typed stale-owner and host/session-gate capacity facts survive durable outcome
+replay and pre-boundary abandonment without exposing dependency error text;
+malformed or legacy detail fields degrade to stable public sentinels.
 The kernel's service-lifetime seen-run identity tombstones remain unbounded even
 when RunHost evicts a terminal envelope. No gRPC/Protobuf adapter, IPC listener,
 stream bridge, endpoint authentication, discovery, or managed startup is
@@ -184,6 +187,14 @@ Evidence is in
 [`evidence/phase4-grpc-authentication.md`](evidence/phase4-grpc-authentication.md)
 and
 [`evidence/phase4-initialize-health.md`](evidence/phase4-initialize-health.md).
+The snapshot-import contract now also exposes a complete unkeyed structural
+validator for the transport boundary. It accounts for compatible unknown
+Protobuf fields in the negotiated size and deliberately accepts an untrusted
+but correctly shaped HMAC. Unsigned root-envelope fields and complete opaque
+envelopes beyond the client transfer bound fail before translation; only `RunHost.Import` performs keyed authority
+verification and admits state. This and the durable recovery facts are recorded
+in
+[`evidence/phase4-protocol-prerequisites.md`](evidence/phase4-protocol-prerequisites.md).
 The independent TUI repository now exposes an immutable UI-neutral session
 port and a public terminal shell while keeping Bubble Tea and presentation
 messages internal. Commit `82adb45` generates its renderer, theme, ordered key

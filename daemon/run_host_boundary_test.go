@@ -351,6 +351,28 @@ func TestRunHostBoundaryErrorVocabularyRoundTripsThroughLedgerOutcomes(t *testin
 		})
 	}
 
+	hostCapacity := &RunHostCapacityError{resource: "active runs", limit: 3, observed: 4}
+	_, typedCapacityErr := decodeRunHostOutcome(failureRunHostOutcome(hostCapacity))
+	var decodedHostCapacity *RunHostCapacityError
+	if !errors.As(typedCapacityErr, &decodedHostCapacity) || decodedHostCapacity.Resource() != "active runs" ||
+		decodedHostCapacity.Limit() != 3 || decodedHostCapacity.Observed() != 4 {
+		t.Fatalf("typed host capacity round trip = %#v, %v", decodedHostCapacity, typedCapacityErr)
+	}
+	sessionCapacity := &SessionGateCapacityError{resource: "mutation waiters", maximum: 7}
+	_, typedSessionCapacityErr := decodeRunHostOutcome(failureRunHostOutcome(sessionCapacity))
+	var decodedSessionCapacity *SessionGateCapacityError
+	if !errors.As(typedSessionCapacityErr, &decodedSessionCapacity) ||
+		decodedSessionCapacity.Resource() != "mutation waiters" || decodedSessionCapacity.Maximum() != 7 {
+		t.Fatalf("typed session capacity round trip = %#v, %v", decodedSessionCapacity, typedSessionCapacityErr)
+	}
+	stale := &StaleSessionError{clientID: "stable-client", expected: 5, observed: 4}
+	_, typedStaleErr := decodeRunHostOutcome(failureRunHostOutcome(stale))
+	var decodedStale *StaleSessionError
+	if !errors.As(typedStaleErr, &decodedStale) || decodedStale.ClientID() != "stable-client" ||
+		decodedStale.ExpectedEpoch() != 5 || decodedStale.ObservedEpoch() != 4 {
+		t.Fatalf("typed stale round trip = %#v, %v", decodedStale, typedStaleErr)
+	}
+
 	success := successRunHostOutcome(runHostOutcome{RunID: "run", Sequence: 3})
 	decoded, err := decodeRunHostOutcome(success)
 	if err != nil || decoded.RunID != "run" || decoded.Sequence != 3 {
@@ -412,6 +434,42 @@ func TestRunHostBoundaryMapsDependencyErrorsWithoutLeakingDetails(t *testing.T) 
 			t.Fatalf("%v mapped to %v, want %v", test.input, got, test.want)
 		}
 	}
+
+	typedStale := &StaleSessionError{clientID: "stable-client", expected: 2, observed: 1}
+	if got, ok := errors.AsType[*StaleSessionError](publicRunHostError(typedStale)); !ok || got != typedStale {
+		t.Fatalf("typed stale error mapped to %#v", got)
+	}
+	typedSessionCapacity := &SessionGateCapacityError{resource: "streams", maximum: 8}
+	if got, ok := errors.AsType[*SessionGateCapacityError](publicRunHostError(typedSessionCapacity)); !ok ||
+		got != typedSessionCapacity {
+		t.Fatalf("typed session capacity mapped to %#v", got)
+	}
+	typedHostCapacity := &RunHostCapacityError{resource: "active runs", limit: 4, observed: 5}
+	if got, ok := errors.AsType[*RunHostCapacityError](publicRunHostError(typedHostCapacity)); !ok ||
+		got != typedHostCapacity {
+		t.Fatalf("typed host capacity mapped to %#v", got)
+	}
+	for name, joined := range map[string]error{
+		"canceled capacity":       errors.Join(context.Canceled, typedHostCapacity),
+		"deadline stale":          errors.Join(context.DeadlineExceeded, typedStale),
+		"closed session capacity": errors.Join(ErrRunHostClosed, typedSessionCapacity),
+	} {
+		got := publicRunHostError(joined)
+		switch name {
+		case "canceled capacity":
+			if !errors.Is(got, context.Canceled) {
+				t.Fatalf("%s mapped to %v", name, got)
+			}
+		case "deadline stale":
+			if !errors.Is(got, context.DeadlineExceeded) {
+				t.Fatalf("%s mapped to %v", name, got)
+			}
+		case "closed session capacity":
+			if !errors.Is(got, ErrRunHostClosed) {
+				t.Fatalf("%s mapped to %v", name, got)
+			}
+		}
+	}
 }
 
 func TestRunHostBoundaryDefensiveHelperInputs(t *testing.T) {
@@ -436,6 +494,26 @@ func TestRunHostBoundaryDefensiveHelperInputs(t *testing.T) {
 	if !errors.Is(merged.Err(), context.Canceled) {
 		t.Fatalf("canceled nil-parent merge = %v", merged.Err())
 	}
+	for name, value := range map[string]runHostOutcome{
+		"empty capacity": {CapacityKind: "host", Resource: "", Limit: 1, Observed: 2},
+		"control capacity": {
+			CapacityKind: "host", Resource: "active\nruns", Limit: 1, Observed: 2,
+		},
+		"non-exceeded capacity": {CapacityKind: "host", Resource: "active runs", Limit: 2, Observed: 2},
+		"unknown capacity":      {CapacityKind: "future", Resource: "active runs", Limit: 1, Observed: 2},
+	} {
+		if err := capacityErrorForOutcome(value); !errors.Is(err, ErrRunHostCapacity) {
+			t.Fatalf("%s malformed capacity = %v", name, err)
+		}
+	}
+	if err := newRunHostCapacity("active runs", 2, 2); !errors.Is(err, ErrRunHostCapacity) {
+		t.Fatalf("invalid observed capacity = %v", err)
+	}
+	if err := runHostErrorForOutcome(runHostOutcome{
+		AbandonCode: outcomeCodeStale, StaleClient: "bad\nclient", ExpectedEpoch: 2, ObservedEpoch: 1,
+	}); !errors.Is(err, ErrStaleSession) {
+		t.Fatalf("malformed stale outcome = %v", err)
+	}
 }
 
 func TestRunHostBoundaryAbandonmentCodesPreserveRetryClassification(t *testing.T) {
@@ -458,6 +536,18 @@ func TestRunHostBoundaryAbandonmentCodesPreserveRetryClassification(t *testing.T
 		if got := runHostErrorForCode(test.code); !errors.Is(got, test.want) {
 			t.Fatalf("abandonment code %q = %v, want %v", test.code, got, test.want)
 		}
+	}
+
+	typed := &RunHostCapacityError{resource: "active runs", limit: 2, observed: 3}
+	abandoned := abandonRunHostOutcome(typed)
+	var marker runHostOutcome
+	if err := json.Unmarshal(abandoned.Payload(), &marker); err != nil {
+		t.Fatal(err)
+	}
+	var decoded *RunHostCapacityError
+	if err := runHostErrorForOutcome(marker); !errors.As(err, &decoded) || decoded.Limit() != 2 ||
+		decoded.Observed() != 3 {
+		t.Fatalf("typed abandonment capacity = %#v, %v", decoded, err)
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 
 	"github.com/spice-framework/spice-agent/agent"
 	"github.com/spice-framework/spice-agent/client"
+	commonv1 "github.com/spice-framework/spice-agent/common/v1"
 	enginev1 "github.com/spice-framework/spice-agent/engine/v1"
 	"github.com/spice-framework/spice-agent/interaction"
 	"github.com/spice-framework/spice-agent/model"
@@ -111,6 +112,11 @@ func TestRunHostCapacityFailureCanRetrySameOperation(t *testing.T) {
 	second := hostStartRequest(t, "capacity-second", fixture.definition, "input-second")
 	if _, err = fixture.host.Start(t.Context(), fixture.session, second); !errors.Is(err, ErrRunHostCapacity) {
 		t.Fatalf("capacity failure = %v", err)
+	}
+	var capacity *RunHostCapacityError
+	if !errors.As(err, &capacity) || capacity.Resource() != "active runs" ||
+		capacity.Limit() != 1 || capacity.Observed() != 2 {
+		t.Fatalf("typed capacity failure = %#v", capacity)
 	}
 	cancelOperation, _ := client.NewOperationID("cancel-capacity-first")
 	cancelRequest, _ := client.NewCancelRequest(firstResult.Run(), cancelOperation, "free capacity")
@@ -533,7 +539,14 @@ func TestRunHostSuspendResumeAndPreparedImportOrdering(t *testing.T) {
 	target.authority.recorder = importRecorder
 	target.authority.allowImport = true
 	operation, _ := client.NewOperationID("import-operation")
-	importRequest, err := client.NewImportRequest(operation, marshalClientSnapshot(t, envelope))
+	wireImport := &enginev1.ImportSnapshotRequest{
+		ClientId: target.session.ClientID(), OwnershipEpoch: target.session.Epoch(),
+		ClientOperationId: operation.String(), Snapshot: envelope,
+	}
+	if err = enginev1.ValidateImportSnapshotRequestStructure(wireImport, runHostWireLimits()); err != nil {
+		t.Fatalf("wire import structure: %v", err)
+	}
+	importRequest, err := client.NewImportRequest(operation, marshalClientSnapshot(t, wireImport.GetSnapshot()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1209,6 +1222,14 @@ func marshalClientSnapshot(t *testing.T, envelope *enginev1.SnapshotEnvelope) cl
 		t.Fatal(err)
 	}
 	return result
+}
+
+func runHostWireLimits() *commonv1.Limits {
+	return &commonv1.Limits{
+		MaxMessageBytes:    uint64(enginev1.MaximumSnapshotEnvelopeBytes + 1024),
+		MaxCollectionItems: 1, MaxReplayEvents: 1, MaxReplayBytes: 1,
+		MaxConcurrentStreams: 1, MaxActiveRuns: 1,
+	}
 }
 
 func containsString(values []string, target string) bool {

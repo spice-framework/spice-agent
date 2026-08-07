@@ -30,6 +30,59 @@ var (
 	ErrRunHostUnavailable = errors.New("run host dependency is unavailable")
 )
 
+// RunHostCapacityError reports one exact bounded host resource observation.
+// It matches ErrRunHostCapacity while preserving facts needed by protocol
+// recovery and overload diagnostics.
+type RunHostCapacityError struct {
+	resource string
+	limit    uint64
+	observed uint64
+}
+
+func (failure *RunHostCapacityError) Error() string {
+	if failure == nil {
+		return ErrRunHostCapacity.Error()
+	}
+	return fmt.Sprintf(
+		"%s: %s limit %d, observed %d",
+		ErrRunHostCapacity, failure.resource, failure.limit, failure.observed,
+	)
+}
+
+// Is makes RunHostCapacityError match ErrRunHostCapacity.
+func (failure *RunHostCapacityError) Is(target error) bool { return target == ErrRunHostCapacity }
+
+// Resource returns the bounded host resource.
+func (failure *RunHostCapacityError) Resource() string {
+	if failure == nil {
+		return ""
+	}
+	return failure.resource
+}
+
+// Limit returns the configured positive hard limit.
+func (failure *RunHostCapacityError) Limit() uint64 {
+	if failure == nil {
+		return 0
+	}
+	return failure.limit
+}
+
+// Observed returns the rejected resource observation.
+func (failure *RunHostCapacityError) Observed() uint64 {
+	if failure == nil {
+		return 0
+	}
+	return failure.observed
+}
+
+func newRunHostCapacity(resource string, limit, observed uint64) error {
+	if boundedToken("capacity resource", resource) != nil || limit == 0 || observed <= limit {
+		return ErrRunHostCapacity
+	}
+	return &RunHostCapacityError{resource: resource, limit: limit, observed: observed}
+}
+
 const (
 	degradedAuthorityUncertain = "run authority outcome uncertain"
 	degradedAuthorityMissing   = "run authority unavailable"
@@ -274,7 +327,8 @@ func (host *RunHost) reserveSlot(clientID string) (*hostReservation, error) {
 		return nil, ErrRunHostClosed
 	}
 	if host.activeReserved >= uint64(host.limits.ActiveRuns()) {
-		return nil, ErrRunHostCapacity
+		limit := uint64(host.limits.ActiveRuns())
+		return nil, newRunHostCapacity("active runs", limit, host.activeReserved+1)
 	}
 	host.activeReserved++
 	return &hostReservation{host: host, clientID: clientID}, nil
@@ -421,6 +475,15 @@ func publicRunHostError(err error) error {
 		return context.Canceled
 	case errors.Is(err, context.DeadlineExceeded):
 		return context.DeadlineExceeded
+	}
+	if hostCapacity, ok := errors.AsType[*RunHostCapacityError](err); ok {
+		return hostCapacity
+	}
+	return publicRunHostOwnerError(err)
+}
+
+func publicRunHostOwnerError(err error) error {
+	switch {
 	case errors.Is(err, ErrRunHostCapacity):
 		return ErrRunHostCapacity
 	case errors.Is(err, ErrHostedRunUnavailable):
@@ -433,8 +496,21 @@ func publicRunHostError(err error) error {
 		return ErrRunHostState
 	case errors.Is(err, ErrRunHostClosed), errors.Is(err, ErrSessionStoreClosed), errors.Is(err, ErrPendingHubClosed):
 		return ErrRunHostClosed
-	case errors.Is(err, ErrStaleSession):
+	}
+	return publicRunHostDependencyError(err)
+}
+
+func publicRunHostDependencyError(err error) error {
+	if stale, ok := errors.AsType[*StaleSessionError](err); ok {
+		return stale
+	}
+	if errors.Is(err, ErrStaleSession) {
 		return ErrStaleSession
+	}
+	if sessionCapacity, ok := errors.AsType[*SessionGateCapacityError](err); ok {
+		return sessionCapacity
+	}
+	switch {
 	case errors.Is(err, ErrSessionGateCapacity):
 		return ErrRunHostCapacity
 	case errors.Is(err, ErrRunAuthorityUncertain):

@@ -12,6 +12,7 @@ import (
 	"slices"
 
 	commonv1 "github.com/spice-framework/spice-agent/common/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -240,6 +241,12 @@ func ValidateSnapshotEnvelope(value *SnapshotEnvelope) error {
 	if err := validateSnapshotEnvelopeContent(value); err != nil {
 		return err
 	}
+	if len(value.ProtoReflect().GetUnknown()) != 0 {
+		return errors.New("snapshot envelope contains unsupported fields")
+	}
+	if proto.Size(value) > MaximumSnapshotEnvelopeBytes {
+		return fmt.Errorf("snapshot envelope exceeds %d encoded bytes", MaximumSnapshotEnvelopeBytes)
+	}
 	return ValidateSnapshotAuthority(value.GetAuthority())
 }
 
@@ -356,6 +363,24 @@ func ValidateImportSnapshotRequest(
 	if err := contextCause(ctx); err != nil {
 		return err
 	}
+	if err := ValidateImportSnapshotRequestStructure(request, limits); err != nil {
+		return err
+	}
+	return callSnapshotVerifier(ctx, verifier, snapshotAuthorityInput(request.GetSnapshot()), request.GetSnapshot().GetAuthority())
+}
+
+// ValidateImportSnapshotRequestStructure validates the complete unkeyed import
+// contract. It proves client and operation identity, the negotiated encoded
+// size, snapshot structure and digest, authority shape, and the suspended safe
+// boundary. It deliberately does not authenticate the authority HMAC; callers
+// admitting an import must additionally perform keyed authority verification.
+func ValidateImportSnapshotRequestStructure(
+	request *ImportSnapshotRequest,
+	limits *commonv1.Limits,
+) error {
+	if request == nil {
+		return errors.New("import snapshot request is required")
+	}
 	if err := validateClientMutation(
 		request.GetClientId(),
 		request.GetOwnershipEpoch(),
@@ -372,7 +397,7 @@ func ValidateImportSnapshotRequest(
 	if request.GetSnapshot().GetLifecycle() != SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED {
 		return errors.New("only a suspended snapshot may be imported")
 	}
-	return callSnapshotVerifier(ctx, verifier, snapshotAuthorityInput(request.GetSnapshot()), request.GetSnapshot().GetAuthority())
+	return nil
 }
 
 func callSnapshotSigner(

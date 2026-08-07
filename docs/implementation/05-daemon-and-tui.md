@@ -145,7 +145,9 @@ respondable through terminal drain.
 
 The host abandons an idempotency entry only for a failure proved to precede any
 visible or durable boundary. Committed errors and uncertain transitions remain
-stable outcomes. Active reservations are separately bounded from a
+stable outcomes. Typed stale-session and host/session-gate capacity facts are
+encoded in those bounded outcomes and survive replay or abandonment; malformed
+or legacy details fail closed to their stable public error class. Active reservations are separately bounded from a
 count-and-byte-bounded terminal-envelope cache, whose eviction follows terminal
 completion order. Ownership lookup does not distinguish unknown runs from runs
 owned by another client. Health reports immutable configured limits and fixed
@@ -183,6 +185,15 @@ gRPC: preflight precedes ownership allocation, reconnect is an exact epoch CAS,
 and Health rechecks both registry and SessionStore ownership before reaching the
 host. This slice has no OS listener, endpoint metadata file, lifecycle RPCs,
 stream bridge, discovery, or client adapter; those remain pending.
+
+The lifecycle-adapter prerequisite now separates snapshot-import structure
+from authority. `ValidateImportSnapshotRequestStructure` checks the complete
+client mutation, negotiated encoded size (including compatible unknown fields),
+snapshot envelope and digest, authority shape, and suspended lifecycle. It does
+not verify the HMAC. It rejects unsigned root-envelope extensions and enforces
+the complete opaque-envelope bound before translation. The adapter must call only this untrusted-input check before
+translation; `RunHost.Import` remains the sole keyed authority and mutation
+boundary.
 The TUI composition half of slice 4 is implemented independently at
 `spice-agent-tui` commit `82adb45`: public APIs contain no Bubble Tea or daemon
 types, Spice generates the renderer/theme/binding/I/O/shell graph, cancellation
