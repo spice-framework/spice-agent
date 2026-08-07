@@ -42,25 +42,90 @@ type InitializeRequest struct {
 	limits       Limits
 	reconnect    ReconnectClaim
 	hasReconnect bool
+	attempt      InitializationAttemptID
+	hasAttempt   bool
 }
 
-// NewInitializeRequest constructs a fresh-owner initialization request.
+// NewInitializeRequest constructs a legacy fresh-owner initialization request.
+// It deliberately negotiates at most protocol 1.2 and therefore cannot be
+// retried safely after an uncertain transport outcome. New code that supports
+// protocol 1.3 should use NewInitializeRequestWithAttempt.
+//
+// Deprecated: use NewInitializeRequestWithAttempt for protocol 1.3 clients.
 func NewInitializeRequest(protocol ProtocolRange, client Build, supported, required []string, limits Limits) (InitializeRequest, error) {
-	return newInitializeRequest(protocol, client, supported, required, limits, nil)
+	return NewLegacyInitializeRequest(protocol, client, supported, required, limits)
+}
+
+// NewLegacyInitializeRequest constructs a protocol-1.0-through-1.2 fresh-owner
+// request whose ambiguous transport failures must never be retried.
+func NewLegacyInitializeRequest(protocol ProtocolRange, client Build, supported, required []string, limits Limits) (InitializeRequest, error) {
+	return newInitializeRequest(protocol, client, supported, required, limits, nil, nil)
+}
+
+// NewInitializeRequestWithAttempt constructs a protocol-1.3-only fresh-owner
+// request with one caller-owned exact replay identity.
+func NewInitializeRequestWithAttempt(
+	protocol ProtocolRange,
+	client Build,
+	supported, required []string,
+	limits Limits,
+	attempt InitializationAttemptID,
+) (InitializeRequest, error) {
+	return newInitializeRequest(protocol, client, supported, required, limits, nil, &attempt)
 }
 
 // NewReconnectRequest constructs an initialization request that atomically
-// reclaims one stable client identity at its expected ownership epoch.
+// reclaims one stable client identity at its expected ownership epoch using
+// legacy protocol semantics. It negotiates at most protocol 1.2 and is never
+// retried automatically after an uncertain transport outcome.
+//
+// Deprecated: use NewReconnectRequestWithAttempt for protocol 1.3 clients.
 func NewReconnectRequest(protocol ProtocolRange, client Build, supported, required []string, limits Limits, claim ReconnectClaim) (InitializeRequest, error) {
-	return newInitializeRequest(protocol, client, supported, required, limits, &claim)
+	return NewLegacyReconnectRequest(protocol, client, supported, required, limits, claim)
 }
 
-func newInitializeRequest(protocol ProtocolRange, client Build, supported, required []string, limits Limits, claim *ReconnectClaim) (InitializeRequest, error) {
+// NewLegacyReconnectRequest constructs a protocol-1.0-through-1.2 reconnect
+// request whose ambiguous ownership-CAS transport failures must never be
+// retried.
+func NewLegacyReconnectRequest(protocol ProtocolRange, client Build, supported, required []string, limits Limits, claim ReconnectClaim) (InitializeRequest, error) {
+	return newInitializeRequest(protocol, client, supported, required, limits, &claim, nil)
+}
+
+// NewReconnectRequestWithAttempt constructs a protocol-1.3-only reconnect
+// request with one caller-owned exact replay identity.
+func NewReconnectRequestWithAttempt(
+	protocol ProtocolRange,
+	client Build,
+	supported, required []string,
+	limits Limits,
+	claim ReconnectClaim,
+	attempt InitializationAttemptID,
+) (InitializeRequest, error) {
+	return newInitializeRequest(protocol, client, supported, required, limits, &claim, &attempt)
+}
+
+func newInitializeRequest(
+	protocol ProtocolRange,
+	client Build,
+	supported, required []string,
+	limits Limits,
+	claim *ReconnectClaim,
+	attempt *InitializationAttemptID,
+) (InitializeRequest, error) {
 	if err := protocol.Validate(); err != nil {
 		return InitializeRequest{}, err
 	}
-	if err := client.Validate(); err != nil {
+	var err error
+	if attempt == nil {
+		protocol, err = legacyInitializeProtocol(protocol)
+	} else {
+		protocol, err = attemptInitializeProtocol(protocol)
+	}
+	if err != nil {
 		return InitializeRequest{}, err
+	}
+	if validationErr := client.Validate(); validationErr != nil {
+		return InitializeRequest{}, validationErr
 	}
 	supportedValues, err := canonicalTokens("supported capability", supported)
 	if err != nil {
@@ -73,21 +138,54 @@ func newInitializeRequest(protocol ProtocolRange, client Build, supported, requi
 	if !containsAll(supportedValues, requiredValues) {
 		return InitializeRequest{}, errors.New("required capabilities must be supported by the client")
 	}
-	if err := limits.Validate(); err != nil {
-		return InitializeRequest{}, err
+	if validationErr := limits.Validate(); validationErr != nil {
+		return InitializeRequest{}, validationErr
 	}
 	result := InitializeRequest{
 		protocol: protocol, client: client, supported: supportedValues,
 		required: requiredValues, limits: limits,
 	}
 	if claim != nil {
-		if err := claim.Validate(); err != nil {
-			return InitializeRequest{}, err
+		if validationErr := claim.Validate(); validationErr != nil {
+			return InitializeRequest{}, validationErr
 		}
 		result.reconnect = *claim
 		result.hasReconnect = true
 	}
+	if attempt != nil {
+		if validationErr := attempt.Validate(); validationErr != nil {
+			return InitializeRequest{}, validationErr
+		}
+		result.attempt = *attempt
+		result.hasAttempt = true
+	}
 	return result, nil
+}
+
+func legacyInitializeProtocol(protocol ProtocolRange) (ProtocolRange, error) {
+	target := ProtocolVersion{
+		major: initializationAttemptProtocolMajor,
+		minor: initializationAttemptProtocolMinor,
+	}
+	if protocol.maximum.major != target.major || compareProtocol(protocol.maximum, target) < 0 {
+		return protocol, nil
+	}
+	legacyMaximum := ProtocolVersion{major: target.major, minor: target.minor - 1}
+	if compareProtocol(protocol.minimum, legacyMaximum) > 0 {
+		return ProtocolRange{}, errors.New("protocol 1.3 initialization requires an initialization attempt ID")
+	}
+	return ProtocolRange{minimum: protocol.minimum, maximum: legacyMaximum}, nil
+}
+
+func attemptInitializeProtocol(protocol ProtocolRange) (ProtocolRange, error) {
+	target := ProtocolVersion{
+		major: initializationAttemptProtocolMajor,
+		minor: initializationAttemptProtocolMinor,
+	}
+	if compareProtocol(protocol.minimum, target) > 0 || compareProtocol(protocol.maximum, target) < 0 {
+		return ProtocolRange{}, errors.New("initialization attempt ID requires protocol 1.3 support")
+	}
+	return ProtocolRange{minimum: target, maximum: target}, nil
 }
 
 func (request InitializeRequest) Protocol() ProtocolRange { return request.protocol }
@@ -104,12 +202,30 @@ func (request InitializeRequest) Reconnect() (ReconnectClaim, bool) {
 	return request.reconnect, request.hasReconnect
 }
 
+// AttemptID returns the caller-owned exact replay identity when this is a
+// protocol-1.3 initialization request.
+func (request InitializeRequest) AttemptID() (InitializationAttemptID, bool) {
+	return request.attempt, request.hasAttempt
+}
+
 func (request InitializeRequest) Validate() error {
 	var claim *ReconnectClaim
 	if request.hasReconnect {
 		claim = &request.reconnect
 	}
-	_, err := newInitializeRequest(request.protocol, request.client, request.supported, request.required, request.limits, claim)
+	var attempt *InitializationAttemptID
+	if request.hasAttempt {
+		attempt = &request.attempt
+	}
+	_, err := newInitializeRequest(
+		request.protocol,
+		request.client,
+		request.supported,
+		request.required,
+		request.limits,
+		claim,
+		attempt,
+	)
 	return err
 }
 

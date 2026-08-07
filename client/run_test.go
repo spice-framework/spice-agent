@@ -16,7 +16,7 @@ func TestInitializeAndRunValues(t *testing.T) {
 	}
 	supported := []string{"snapshot", "events"}
 	required := []string{"events"}
-	request, err := NewInitializeRequest(protocol, testBuild(t), supported, required, testLimits(t))
+	request, err := NewLegacyInitializeRequest(protocol, testBuild(t), supported, required, testLimits(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestInitializeAndRunValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reconnect, err := NewReconnectRequest(protocol, testBuild(t), []string{"events"}, nil, testLimits(t), claim)
+	reconnect, err := NewLegacyReconnectRequest(protocol, testBuild(t), []string{"events"}, nil, testLimits(t), claim)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestInitializeAndRunValuesRejectInvalidInputs(t *testing.T) {
 	protocol, _ := NewProtocolRange(version, version)
 	limits := testLimits(t)
 	build := testBuild(t)
-	if _, err := NewInitializeRequest(protocol, build, []string{"events"}, []string{"snapshots"}, limits); err == nil {
+	if _, err := NewLegacyInitializeRequest(protocol, build, []string{"events"}, []string{"snapshots"}, limits); err == nil {
 		t.Fatal("unsupported required capability accepted")
 	}
 	if _, err := NewReconnectClaim("client", 0); err == nil {
@@ -201,6 +201,78 @@ func TestInitializeAndRunValuesRejectInvalidInputs(t *testing.T) {
 	}
 	if _, err := NewImportRequest(operation, Snapshot{}); err == nil {
 		t.Fatal("zero import snapshot accepted")
+	}
+}
+
+func TestInitializationAttemptRequestsAreExactProtocol13AndCallerRetainable(t *testing.T) {
+	t.Parallel()
+	minimum, err := NewProtocolVersion(1, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	maximum, err := NewProtocolVersion(1, 3, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	protocol, err := NewProtocolRange(minimum, maximum)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attempt, err := ParseInitializationAttemptID("00112233445566778899aabbccddeeff")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := NewInitializeRequestWithAttempt(
+		protocol, testBuild(t), []string{"events"}, nil, testLimits(t), attempt,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := fresh.AttemptID(); !ok || got != attempt {
+		t.Fatalf("fresh attempt = %v, %t", got, ok)
+	}
+	if fresh.Protocol().Minimum() != maximum || fresh.Protocol().Maximum() != maximum {
+		t.Fatalf("attempt protocol = %#v, want exact 1.3", fresh.Protocol())
+	}
+
+	claim, err := NewReconnectClaim("client-1", 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reconnect, err := NewReconnectRequestWithAttempt(
+		protocol, testBuild(t), []string{"events"}, nil, testLimits(t), claim, attempt,
+	)
+	if err != nil || reconnect.Validate() != nil {
+		t.Fatalf("reconnect attempt request = %#v, %v", reconnect, err)
+	}
+	if got, ok := reconnect.AttemptID(); !ok || got != attempt {
+		t.Fatalf("reconnect attempt = %v, %t", got, ok)
+	}
+
+	legacy, err := NewLegacyInitializeRequest(protocol, testBuild(t), nil, nil, testLimits(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if legacy.Protocol().Maximum().Minor() != 2 {
+		t.Fatalf("legacy maximum minor = %d, want 2", legacy.Protocol().Maximum().Minor())
+	}
+	if _, ok := legacy.AttemptID(); ok {
+		t.Fatal("legacy request unexpectedly has an attempt ID")
+	}
+
+	legacyOnly, err := NewProtocolRange(minimum, legacy.Protocol().Maximum())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = NewInitializeRequestWithAttempt(
+		legacyOnly, testBuild(t), nil, nil, testLimits(t), attempt,
+	); err == nil {
+		t.Fatal("attempt ID was accepted without protocol 1.3 support")
+	}
+	if _, err = NewInitializeRequestWithAttempt(
+		protocol, testBuild(t), nil, nil, testLimits(t), InitializationAttemptID{},
+	); err == nil {
+		t.Fatal("zero attempt ID was accepted")
 	}
 }
 

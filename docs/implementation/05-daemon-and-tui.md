@@ -26,6 +26,9 @@ complete current snapshot and captured control followed, when requested, by a
 bounded live tail. Minor-0 and minor-1 peers cannot invoke that revised stream.
 Minor-2 initialization also requires server-sized message and collection
 bounds so every state admitted by the host remains reconnectable in one frame.
+Minor 3 adds one caller-owned 128-bit initialization attempt identity and exact
+committed-success replay. Legacy 1.0 through 1.2 requests remain non-retryable,
+and no request range may cross the 1.2/1.3 semantic boundary.
 
 Every request has count, byte, and deadline limits. Unknown fields follow the
 documented additive-compatibility rule. Protocol errors distinguish invalid
@@ -209,8 +212,14 @@ startup locks, liveness probing, and stale cleanup. `daemon/localipc` supports
 only private Unix sockets and current-user Windows named pipes. The public gRPC
 adapter translates and validates the complete session protocol, and the managed
 adapter launches only after exact proven absence. Their local bridge owns each
-channel and disables transport retry and every nonlocal resolution path. See
+channel and disables generic transport retry and every nonlocal resolution
+path. The protocol adapter alone performs the one bounded, byte-identical 1.3
+initialization retry. See
 [`evidence/phase4-local-client.md`](evidence/phase4-local-client.md).
+Protocol-1.3 initialization now adds caller-owned attempt identities, bounded
+server coalescing, atomic committed-response retention, and one exact client
+retry while preserving legacy uncertainty. See
+[`evidence/phase4-initialization-replay.md`](evidence/phase4-initialization-replay.md).
 
 The lifecycle-adapter prerequisite now separates snapshot-import structure
 from authority. `ValidateImportSnapshotRequestStructure` checks the complete
@@ -227,8 +236,8 @@ has an independent control lane, and external acceptance executes the actual
 injected terminal shell through explicit application start and stop. Its full
 gate passed in 158.4 seconds at 90.1% product coverage. Distribution-owned
 process launch, daemon attachment, reconnect, and the real terminal workflow
-remain pending. The remainder of slices 2 through 6 includes protocol-1.3
-initialization replay, managed process launch, the daemon-to-TUI bridge, and
+remain pending. The remainder of slices 2 through 6 includes managed process
+launch, the daemon-to-TUI bridge, and
 real Windows/Linux reconnect acceptance. See
 [`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
 Foundation-specific evidence is in

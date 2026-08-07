@@ -225,6 +225,37 @@ func initializeTransportError(ctx context.Context, err error) error {
 	return result
 }
 
+func initializationAttemptTransportError(
+	ctx context.Context,
+	err error,
+	attempt client.InitializationAttemptID,
+) error {
+	switch status.Code(err) {
+	case codes.Unauthenticated, codes.PermissionDenied, codes.InvalidArgument, codes.OutOfRange:
+		return transportError(ctx, err)
+	}
+	facts, factsErr := client.NewErrorFacts(
+		"initialization outcome is uncertain; replay only the same immutable request and attempt ID",
+		true,
+		nil,
+	)
+	if factsErr != nil {
+		return protocolError()
+	}
+	replay := constructed(client.NewInitializationReplayError(facts, attempt))
+	if ctx != nil && context.Cause(ctx) != nil {
+		return errors.Join(replay, context.Cause(ctx))
+	}
+	switch status.Code(err) {
+	case codes.Canceled:
+		return errors.Join(replay, context.Canceled)
+	case codes.DeadlineExceeded:
+		return errors.Join(replay, context.DeadlineExceeded)
+	default:
+		return replay
+	}
+}
+
 func protocolError() error {
 	return statusError(client.ErrorInternal, "daemon response violated the protocol contract", false)
 }

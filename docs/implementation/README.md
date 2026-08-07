@@ -214,6 +214,14 @@ identity. Evidence and the remaining process-launch/TUI exclusions are in
 Implementation commit `ec3ef1c` passed the complete local gate in 155.8 seconds
 at 85.2% whole-repository handwritten-product coverage with zero reachable
 vulnerabilities and full race, fuzz, and offline-vendor proof.
+Protocol minor 3 now closes the local initialization acknowledgement gap. One
+caller-owned 128-bit identity covers both fresh allocation and reconnect CAS;
+the server coalesces exact duplicates, publishes replay state atomically with
+ownership, retains creation/latest-reconnect results within fixed bounds, and
+rejects conflicting reuse. The client performs one exact retry only for a
+transient unavailable transport and preserves legacy 1.0-1.2 uncertainty.
+Evidence and remaining managed-launch/TUI exclusions are in
+[`evidence/phase4-initialization-replay.md`](evidence/phase4-initialization-replay.md).
 The snapshot-import contract now also exposes a complete unkeyed structural
 validator for the transport boundary. It accounts for compatible unknown
 Protobuf fields in the negotiated size and deliberately accepts an untrusted

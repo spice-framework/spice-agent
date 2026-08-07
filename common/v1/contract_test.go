@@ -30,11 +30,11 @@ func TestProtocolNegotiationSelectsGreatestCompatibleVersion(t *testing.T) {
 	}
 }
 
-func TestSupportedProtocolRangeRetainsMinorZeroAndAdvertisesMinorTwo(t *testing.T) {
+func TestSupportedProtocolRangeRetainsMinorZeroAndAdvertisesMinorThree(t *testing.T) {
 	t.Parallel()
 	supported := commonv1.SupportedProtocolRange()
 	if supported.GetMinimum().GetMajor() != 1 || supported.GetMinimum().GetMinor() != 0 ||
-		supported.GetMaximum().GetMajor() != 1 || supported.GetMaximum().GetMinor() != 2 {
+		supported.GetMaximum().GetMajor() != 1 || supported.GetMaximum().GetMinor() != 3 {
 		t.Fatalf("supported protocol range = %#v", supported)
 	}
 	selected, status := commonv1.NegotiateProtocol(protocolRange(1, 0, 1, 0), supported)
@@ -48,6 +48,10 @@ func TestSupportedProtocolRangeRetainsMinorZeroAndAdvertisesMinorTwo(t *testing.
 	selected, status = commonv1.NegotiateProtocol(protocolRange(1, 2, 1, 2), supported)
 	if status.GetCode() != commonv1.ErrorCode_ERROR_CODE_OK || selected.GetMinor() != 2 {
 		t.Fatalf("minor-two negotiation = %#v, %#v", selected, status)
+	}
+	selected, status = commonv1.NegotiateProtocol(protocolRange(1, 3, 1, 3), supported)
+	if status.GetCode() != commonv1.ErrorCode_ERROR_CODE_OK || selected.GetMinor() != 3 {
+		t.Fatalf("minor-three negotiation = %#v, %#v", selected, status)
 	}
 }
 

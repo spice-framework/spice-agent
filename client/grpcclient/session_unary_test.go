@@ -269,7 +269,7 @@ func TestInitializeTransportLossIsFailClosedForFreshAndReconnect(t *testing.T) {
 		return nil, status.Error(codes.Unavailable, "response was lost after commit")
 	}}
 	connector := &Connector{service: service, token: token, sessions: make(map[string]*session)}
-	fresh := mustInitializeRequest(t, connection, nil)
+	fresh := legacyInitializeRequest(t, connection, nil)
 	_, err = connector.Initialize(t.Context(), fresh)
 	assertNonretryableUnavailable(t, err, "fresh")
 
@@ -277,7 +277,7 @@ func TestInitializeTransportLossIsFailClosedForFreshAndReconnect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reconnect := mustInitializeRequest(t, connection, &claim)
+	reconnect := legacyInitializeRequest(t, connection, &claim)
 	_, err = connector.Initialize(t.Context(), reconnect)
 	assertNonretryableUnavailable(t, err, "reconnect")
 }
@@ -619,16 +619,26 @@ func mustInitializeRequest(
 		t.Fatal(err)
 	}
 	if claim == nil {
-		request, requestErr := client.NewInitializeRequest(
+		attempt, attemptErr := client.NewInitializationAttemptID()
+		if attemptErr != nil {
+			t.Fatal(attemptErr)
+		}
+		request, requestErr := client.NewInitializeRequestWithAttempt(
 			protocol, connection.Server(), connection.Capabilities(), connection.Capabilities(), connection.Limits(),
+			attempt,
 		)
 		if requestErr != nil {
 			t.Fatal(requestErr)
 		}
 		return request
 	}
-	request, err := client.NewReconnectRequest(
+	attempt, err := client.NewInitializationAttemptID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err := client.NewReconnectRequestWithAttempt(
 		protocol, connection.Server(), connection.Capabilities(), connection.Capabilities(), connection.Limits(), *claim,
+		attempt,
 	)
 	if err != nil {
 		t.Fatal(err)

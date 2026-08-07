@@ -874,8 +874,12 @@ type InitializeRequest struct {
 	RequiredCapabilities  *v1.CapabilitySet      `protobuf:"bytes,4,opt,name=required_capabilities,json=requiredCapabilities,proto3" json:"required_capabilities,omitempty"`
 	RequestedLimits       *v1.Limits             `protobuf:"bytes,5,opt,name=requested_limits,json=requestedLimits,proto3" json:"requested_limits,omitempty"`
 	ReconnectClaim        *ReconnectClaim        `protobuf:"bytes,7,opt,name=reconnect_claim,json=reconnectClaim,proto3" json:"reconnect_claim,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// initialization_attempt_id is one caller-generated 128-bit identity. It is
+	// required only by protocol 1.3, where repeating the byte-identical request
+	// permits the server to replay the exact committed response.
+	InitializationAttemptId []byte `protobuf:"bytes,8,opt,name=initialization_attempt_id,json=initializationAttemptId,proto3" json:"initialization_attempt_id,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *InitializeRequest) Reset() {
@@ -950,6 +954,13 @@ func (x *InitializeRequest) GetReconnectClaim() *ReconnectClaim {
 	return nil
 }
 
+func (x *InitializeRequest) GetInitializationAttemptId() []byte {
+	if x != nil {
+		return x.InitializationAttemptId
+	}
+	return nil
+}
+
 // InitializeResponse contains the negotiated connection contract.
 type InitializeResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
@@ -962,8 +973,10 @@ type InitializeResponse struct {
 	ClientId       string                 `protobuf:"bytes,7,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
 	OwnershipEpoch uint64                 `protobuf:"varint,8,opt,name=ownership_epoch,json=ownershipEpoch,proto3" json:"ownership_epoch,omitempty"`
 	Definitions    *DefinitionSet         `protobuf:"bytes,9,opt,name=definitions,proto3" json:"definitions,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// initialization_attempt_id echoes the successful protocol-1.3 request.
+	InitializationAttemptId []byte `protobuf:"bytes,10,opt,name=initialization_attempt_id,json=initializationAttemptId,proto3" json:"initialization_attempt_id,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *InitializeResponse) Reset() {
@@ -1055,6 +1068,13 @@ func (x *InitializeResponse) GetOwnershipEpoch() uint64 {
 func (x *InitializeResponse) GetDefinitions() *DefinitionSet {
 	if x != nil {
 		return x.Definitions
+	}
+	return nil
+}
+
+func (x *InitializeResponse) GetInitializationAttemptId() []byte {
+	if x != nil {
+		return x.InitializationAttemptId
 	}
 	return nil
 }
@@ -3132,14 +3152,15 @@ const file_spice_agent_engine_v1_engine_proto_rawDesc = "" +
 	"\vdefinitions\x18\x02 \x03(\v2!.spice.agent.engine.v1.DefinitionR\vdefinitions\"g\n" +
 	"\x0eReconnectClaim\x12\x1b\n" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\x128\n" +
-	"\x18expected_ownership_epoch\x18\x02 \x01(\x04R\x16expectedOwnershipEpoch\"\x81\x04\n" +
+	"\x18expected_ownership_epoch\x18\x02 \x01(\x04R\x16expectedOwnershipEpoch\"\xbd\x04\n" +
 	"\x11InitializeRequest\x12@\n" +
 	"\bprotocol\x18\x01 \x01(\v2$.spice.agent.common.v1.ProtocolRangeR\bprotocol\x12<\n" +
 	"\x06client\x18\x02 \x01(\v2$.spice.agent.common.v1.BuildIdentityR\x06client\x12[\n" +
 	"\x16supported_capabilities\x18\x03 \x01(\v2$.spice.agent.common.v1.CapabilitySetR\x15supportedCapabilities\x12Y\n" +
 	"\x15required_capabilities\x18\x04 \x01(\v2$.spice.agent.common.v1.CapabilitySetR\x14requiredCapabilities\x12H\n" +
 	"\x10requested_limits\x18\x05 \x01(\v2\x1d.spice.agent.common.v1.LimitsR\x0frequestedLimits\x12N\n" +
-	"\x0freconnect_claim\x18\a \x01(\v2%.spice.agent.engine.v1.ReconnectClaimR\x0ereconnectClaimJ\x04\b\x06\x10\aR\x14authentication_token\"\x93\x04\n" +
+	"\x0freconnect_claim\x18\a \x01(\v2%.spice.agent.engine.v1.ReconnectClaimR\x0ereconnectClaim\x12:\n" +
+	"\x19initialization_attempt_id\x18\b \x01(\fR\x17initializationAttemptIdJ\x04\b\x06\x10\aR\x14authentication_token\"\xcf\x04\n" +
 	"\x12InitializeResponse\x125\n" +
 	"\x06status\x18\x01 \x01(\v2\x1d.spice.agent.common.v1.StatusR\x06status\x12B\n" +
 	"\bprotocol\x18\x02 \x01(\v2&.spice.agent.common.v1.ProtocolVersionR\bprotocol\x12<\n" +
@@ -3149,7 +3170,9 @@ const file_spice_agent_engine_v1_engine_proto_rawDesc = "" +
 	"\x06health\x18\x06 \x01(\v2\x1d.spice.agent.common.v1.HealthR\x06health\x12\x1b\n" +
 	"\tclient_id\x18\a \x01(\tR\bclientId\x12'\n" +
 	"\x0fownership_epoch\x18\b \x01(\x04R\x0eownershipEpoch\x12F\n" +
-	"\vdefinitions\x18\t \x01(\v2$.spice.agent.engine.v1.DefinitionSetR\vdefinitions\"U\n" +
+	"\vdefinitions\x18\t \x01(\v2$.spice.agent.engine.v1.DefinitionSetR\vdefinitions\x12:\n" +
+	"\x19initialization_attempt_id\x18\n" +
+	" \x01(\fR\x17initializationAttemptId\"U\n" +
 	"\rHealthRequest\x12\x1b\n" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12'\n" +
 	"\x0fownership_epoch\x18\x02 \x01(\x04R\x0eownershipEpoch\"\x80\x02\n" +

@@ -15,10 +15,9 @@ const (
 	ProtocolMajor = uint32(1)
 	// ProtocolMinimumMinor is the oldest compatible architecture-proof wire minor.
 	ProtocolMinimumMinor = uint32(0)
-	// ProtocolMinor is the highest architecture-proof wire minor. Minor 2
-	// introduces complete-snapshot-first interaction streams without a
-	// historical delta replay field.
-	ProtocolMinor = uint32(2)
+	// ProtocolMinor is the highest architecture-proof wire minor. Minor 3 adds
+	// caller-identified initialization attempts with exact success replay.
+	ProtocolMinor = uint32(3)
 	// ProtocolPatch is the architecture-proof wire patch.
 	ProtocolPatch      = uint32(0)
 	maximumTokenBytes  = 256

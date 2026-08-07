@@ -398,6 +398,7 @@ type grpcFixtureHost struct {
 	describeErr    error
 	healthErr      error
 	interactionErr error
+	describeCalls  atomic.Int32
 	healthCalls    atomic.Int32
 }
 
@@ -408,6 +409,7 @@ func (host *grpcFixtureHost) Describe(ctx context.Context) (daemon.RunHostDescri
 	if err := ctx.Err(); err != nil {
 		return daemon.RunHostDescription{}, err
 	}
+	host.describeCalls.Add(1)
 	return host.description, host.describeErr
 }
 
@@ -485,7 +487,10 @@ func (host *grpcFixtureHost) SubscribeInteractions(
 func grpcInitializeRequest(limits client.Limits) *enginev1.InitializeRequest {
 	wireLimits, _ := limitsToWire(limits)
 	return &enginev1.InitializeRequest{
-		Protocol: commonv1.SupportedProtocolRange(),
+		Protocol: &commonv1.ProtocolRange{
+			Minimum: &commonv1.ProtocolVersion{Major: 1},
+			Maximum: &commonv1.ProtocolVersion{Major: 1, Minor: 2},
+		},
 		Client: &commonv1.BuildIdentity{
 			Component: "test-client", Version: "0.1.0", Commit: "01234567", GoVersion: "go1.26.5",
 		},

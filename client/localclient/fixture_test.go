@@ -83,7 +83,7 @@ func initializeRequestFixture(tb testing.TB, metadata endpoint.Metadata) client.
 	if err != nil {
 		tb.Fatal(err)
 	}
-	request, err := client.NewInitializeRequest(rangeValue, build, nil, nil, limits)
+	request, err := client.NewLegacyInitializeRequest(rangeValue, build, nil, nil, limits)
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func reconnectRequestFixture(
 ) client.InitializeRequest {
 	tb.Helper()
 	fresh := initializeRequestFixture(tb, metadata)
-	request, err := client.NewReconnectRequest(
+	request, err := client.NewLegacyReconnectRequest(
 		fresh.Protocol(), fresh.Client(), fresh.SupportedCapabilities(), fresh.RequiredCapabilities(),
 		fresh.RequestedLimits(), claim,
 	)

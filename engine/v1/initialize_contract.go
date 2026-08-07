@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 
 	commonv1 "github.com/spice-framework/spice-agent/common/v1"
@@ -15,12 +16,22 @@ import (
 // value exists, then completes the response with the resulting ownership.
 type InitializeNegotiation struct {
 	reconnectClaim *ReconnectClaim
+	attemptID      []byte
 	protocol       *commonv1.ProtocolVersion
 	server         *commonv1.BuildIdentity
 	capabilities   *commonv1.CapabilitySet
 	limits         *commonv1.Limits
 	health         *commonv1.Health
 	definitions    *DefinitionSet
+}
+
+// InitializationAttemptID returns the validated protocol-1.3 attempt
+// identity, or nil for a legacy request. The returned bytes are independent.
+func (negotiation *InitializeNegotiation) InitializationAttemptID() []byte {
+	if negotiation == nil {
+		return nil
+	}
+	return slices.Clone(negotiation.attemptID)
 }
 
 // ReconnectClaim returns the validated reconnect claim, or nil for a new
@@ -39,6 +50,9 @@ func ValidateInitializeRequest(request *InitializeRequest) error {
 		return errors.New("initialize request is required")
 	}
 	if err := commonv1.ValidateProtocolRange(request.GetProtocol()); err != nil {
+		return err
+	}
+	if err := validateInitializeRequestAttempt(request.GetProtocol(), request.GetInitializationAttemptId()); err != nil {
 		return err
 	}
 	if err := commonv1.ValidateBuildIdentity(request.GetClient()); err != nil {
@@ -134,6 +148,7 @@ func PreflightInitialize(
 	}
 	negotiation := &InitializeNegotiation{
 		reconnectClaim: reconnectClaim,
+		attemptID:      slices.Clone(request.GetInitializationAttemptId()),
 		protocol:       clone(version),
 		server:         clone(serverBuild),
 		capabilities:   clone(capabilities),
@@ -213,16 +228,60 @@ func initializeSuccessResponse(
 	ownershipEpoch uint64,
 ) *InitializeResponse {
 	return &InitializeResponse{
-		Status:         commonv1.OKStatus(),
-		Protocol:       clone(negotiation.protocol),
-		Server:         clone(negotiation.server),
-		Capabilities:   clone(negotiation.capabilities),
-		Limits:         clone(negotiation.limits),
-		Health:         clone(negotiation.health),
-		ClientId:       clientID,
-		OwnershipEpoch: ownershipEpoch,
-		Definitions:    clone(negotiation.definitions),
+		Status:                  commonv1.OKStatus(),
+		Protocol:                clone(negotiation.protocol),
+		Server:                  clone(negotiation.server),
+		Capabilities:            clone(negotiation.capabilities),
+		Limits:                  clone(negotiation.limits),
+		Health:                  clone(negotiation.health),
+		ClientId:                clientID,
+		OwnershipEpoch:          ownershipEpoch,
+		Definitions:             clone(negotiation.definitions),
+		InitializationAttemptId: slices.Clone(negotiation.attemptID),
 	}
+}
+
+func validateInitializeRequestAttempt(protocol *commonv1.ProtocolRange, attemptID []byte) error {
+	minimum, maximum := protocol.GetMinimum(), protocol.GetMaximum()
+	if minimum.GetMajor() == commonv1.ProtocolMajor && maximum.GetMajor() == commonv1.ProtocolMajor &&
+		minimum.GetMinor() < InitializationAttemptMinimumMinor &&
+		maximum.GetMinor() >= InitializationAttemptMinimumMinor {
+		return errors.New("initialize protocol range cannot cross the minor-3 attempt-replay boundary")
+	}
+	attemptReplayRange := minimum.GetMajor() == commonv1.ProtocolMajor &&
+		minimum.GetMinor() >= InitializationAttemptMinimumMinor
+	if attemptReplayRange {
+		return ValidateInitializationAttemptID(attemptID)
+	}
+	if len(attemptID) != 0 {
+		return errors.New("initialization attempt identity requires a protocol range beginning at minor 3 or newer")
+	}
+	return nil
+}
+
+func validateInitializeResponseAttempt(protocol *commonv1.ProtocolVersion, attemptID []byte) error {
+	if protocol.GetMajor() == commonv1.ProtocolMajor &&
+		protocol.GetMinor() >= InitializationAttemptMinimumMinor {
+		return ValidateInitializationAttemptID(attemptID)
+	}
+	if len(attemptID) != 0 {
+		return errors.New("legacy initialize response must omit the attempt identity")
+	}
+	return nil
+}
+
+// ValidateInitializationAttemptID requires one nonzero canonical 128-bit
+// identity. The zero value is reserved as the absent/invalid sentinel.
+func ValidateInitializationAttemptID(attemptID []byte) error {
+	if len(attemptID) != InitializationAttemptIDBytes {
+		return fmt.Errorf("initialization attempt identity must contain exactly %d bytes", InitializationAttemptIDBytes)
+	}
+	for _, value := range attemptID {
+		if value != 0 {
+			return nil
+		}
+	}
+	return errors.New("initialization attempt identity must be nonzero")
 }
 
 func initializeFailure(code commonv1.ErrorCode, message string) *InitializeResponse {

@@ -44,6 +44,10 @@ func initializeRequestToWire(request client.InitializeRequest) (*enginev1.Initia
 			ClientId: reconnect.ClientID(), ExpectedOwnershipEpoch: reconnect.ExpectedEpoch(),
 		}
 	}
+	if attempt, ok := request.AttemptID(); ok {
+		encoded := attempt.Bytes()
+		value.InitializationAttemptId = append([]byte(nil), encoded[:]...)
+	}
 	if err = enginev1.ValidateInitializeRequest(value); err != nil {
 		return nil, err
 	}

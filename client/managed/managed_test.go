@@ -469,7 +469,7 @@ func mustInitializeRequest(
 	limits client.Limits,
 ) client.InitializeRequest {
 	t.Helper()
-	request, err := client.NewInitializeRequest(protocol, build, []string{"events"}, nil, limits)
+	request, err := client.NewLegacyInitializeRequest(protocol, build, []string{"events"}, nil, limits)
 	if err != nil {
 		t.Fatal(err)
 	}

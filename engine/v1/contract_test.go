@@ -411,7 +411,10 @@ func FuzzEngineEnvelope(f *testing.F) {
 
 func validInitializeRequest() *enginev1.InitializeRequest {
 	return &enginev1.InitializeRequest{
-		Protocol:              commonv1.SupportedProtocolRange(),
+		Protocol: &commonv1.ProtocolRange{
+			Minimum: &commonv1.ProtocolVersion{Major: 1},
+			Maximum: &commonv1.ProtocolVersion{Major: 1, Minor: 2},
+		},
 		Client:                build("spice-agent-tui"),
 		SupportedCapabilities: capabilities("events", enginev1.CapabilitySnapshotAuthorityV1, "snapshots", "tools"),
 		RequiredCapabilities:  capabilities("events", enginev1.CapabilitySnapshotAuthorityV1, "snapshots"),

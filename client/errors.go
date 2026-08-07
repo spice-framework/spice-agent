@@ -63,6 +63,63 @@ type StatusFailure interface {
 	Operation() (OperationID, bool)
 }
 
+// InitializationReplayError reports a protocol-1.3 initialization whose
+// response was not observed after the request may have committed. Recovery is
+// safe only by replaying the same immutable request carrying AttemptID; callers
+// must never create a replacement attempt for this outcome.
+type InitializationReplayError struct {
+	facts   ErrorFacts
+	attempt InitializationAttemptID
+}
+
+// NewInitializationReplayError constructs one constrained initialization
+// recovery result.
+func NewInitializationReplayError(
+	facts ErrorFacts,
+	attempt InitializationAttemptID,
+) (*InitializationReplayError, error) {
+	if err := facts.Validate(); err != nil {
+		return nil, err
+	}
+	if !facts.Retryable() {
+		return nil, errors.New("initialization replay facts must permit the exact replay")
+	}
+	if _, present := facts.Operation(); present {
+		return nil, errors.New("initialization replay facts must not carry an operation ID")
+	}
+	if err := attempt.Validate(); err != nil {
+		return nil, err
+	}
+	return &InitializationReplayError{facts: facts, attempt: attempt}, nil
+}
+
+func (current *InitializationReplayError) Error() string {
+	return errorMessage(current.Facts(), current != nil)
+}
+
+func (current *InitializationReplayError) Facts() ErrorFacts {
+	if current == nil {
+		return ErrorFacts{}
+	}
+	return current.facts
+}
+
+func (current *InitializationReplayError) Retryable() bool {
+	return retryable(current.Facts(), current != nil)
+}
+
+func (current *InitializationReplayError) Operation() (OperationID, bool) {
+	return operation(current.Facts(), current != nil)
+}
+
+// AttemptID returns the exact caller-owned identity that must be reused.
+func (current *InitializationReplayError) AttemptID() InitializationAttemptID {
+	if current == nil {
+		return InitializationAttemptID{}
+	}
+	return current.attempt
+}
+
 func errorMessage(facts ErrorFacts, available bool) string {
 	if !available {
 		return "client status is unavailable"
@@ -667,6 +724,7 @@ func validGenericErrorCode(code ErrorCode) bool {
 }
 
 var (
+	_ StatusFailure = (*InitializationReplayError)(nil)
 	_ StatusFailure = (*TerminalError)(nil)
 	_ StatusFailure = (*UncertainOperationError)(nil)
 	_ StatusFailure = (*CursorGapError)(nil)

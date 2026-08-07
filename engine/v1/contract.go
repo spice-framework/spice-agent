@@ -1,6 +1,7 @@
 package enginev1
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,6 +30,11 @@ const (
 	// InteractionStreamMinimumMinor is the first protocol minor with the
 	// complete-snapshot-first interaction stream and no historical replay field.
 	InteractionStreamMinimumMinor = uint32(2)
+	// InitializationAttemptMinimumMinor is the first protocol minor that makes
+	// initialization loss-safe through exact committed-response replay.
+	InitializationAttemptMinimumMinor = uint32(3)
+	// InitializationAttemptIDBytes is the canonical 128-bit wire identity size.
+	InitializationAttemptIDBytes = 16
 
 	maximumJSONBytes        = 1 << 20
 	maximumInteractionBytes = 512 << 10
@@ -127,16 +133,19 @@ func ValidateInitializeResponse(response *InitializeResponse) error {
 	if err := validateNegotiatedProtocol(response.GetProtocol()); err != nil {
 		return err
 	}
+	if err := validateInitializeResponseAttempt(response.GetProtocol(), response.GetInitializationAttemptId()); err != nil {
+		return err
+	}
 	if err := commonv1.ValidateBuildIdentity(response.GetServer()); err != nil {
 		return err
 	}
 	if err := commonv1.ValidateCapabilities(response.GetCapabilities()); err != nil {
 		return err
 	}
-	if !protocolSupportsSnapshotAuthority(response.GetProtocol()) &&
-		(containsCapability(response.GetCapabilities(), CapabilitySnapshotAuthorityV1) ||
-			containsCapability(response.GetCapabilities(), "snapshots")) {
-		return errors.New("protocol minor 1 is required for snapshot transfer")
+	if err := validateInitializeSnapshotCapabilities(
+		response.GetProtocol(), response.GetCapabilities(),
+	); err != nil {
+		return err
 	}
 	if err := commonv1.ValidateLimits(response.GetLimits()); err != nil {
 		return err
@@ -167,10 +176,23 @@ func ValidateInitializeResponse(response *InitializeResponse) error {
 	return commonv1.ValidateEncodedSize(response, response.GetLimits().GetMaxMessageBytes())
 }
 
+func validateInitializeSnapshotCapabilities(
+	protocol *commonv1.ProtocolVersion,
+	capabilities *commonv1.CapabilitySet,
+) error {
+	if !protocolSupportsSnapshotAuthority(protocol) &&
+		(containsCapability(capabilities, CapabilitySnapshotAuthorityV1) ||
+			containsCapability(capabilities, "snapshots")) {
+		return errors.New("protocol minor 1 is required for snapshot transfer")
+	}
+	return nil
+}
+
 func initializeResponseHasNegotiatedFields(response *InitializeResponse) bool {
 	return response.GetProtocol() != nil || response.GetServer() != nil || response.GetCapabilities() != nil ||
 		response.GetLimits() != nil || response.GetHealth() != nil || response.GetClientId() != "" ||
-		response.GetOwnershipEpoch() != 0 || response.GetDefinitions() != nil
+		response.GetOwnershipEpoch() != 0 || response.GetDefinitions() != nil ||
+		len(response.GetInitializationAttemptId()) != 0
 }
 
 // ValidateInitializeResponseForRequest additionally verifies that ownership is
@@ -190,6 +212,9 @@ func ValidateInitializeResponseForRequest(request *InitializeRequest, response *
 	}
 	if err := validateInitializeLimitSelection(request, response); err != nil {
 		return err
+	}
+	if !bytes.Equal(request.GetInitializationAttemptId(), response.GetInitializationAttemptId()) {
+		return errors.New("initialize response attempt identity does not match the request")
 	}
 	return validateReconnectResult(request.GetReconnectClaim(), response.GetClientId(), response.GetOwnershipEpoch())
 }

@@ -332,17 +332,21 @@ func (fixture *daemonFixture) initializeRequest(
 		t.Fatal(err)
 	}
 	capabilities := []string{"events", "interactions"}
+	attempt, err := client.NewInitializationAttemptID()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if reconnect == nil {
-		request, requestErr := client.NewInitializeRequest(
-			protocol, fixture.build, capabilities, capabilities, fixture.limits,
+		request, requestErr := client.NewInitializeRequestWithAttempt(
+			protocol, fixture.build, capabilities, capabilities, fixture.limits, attempt,
 		)
 		if requestErr != nil {
 			t.Fatal(requestErr)
 		}
 		return request
 	}
-	request, err := client.NewReconnectRequest(
-		protocol, fixture.build, capabilities, capabilities, fixture.limits, *reconnect,
+	request, err := client.NewReconnectRequestWithAttempt(
+		protocol, fixture.build, capabilities, capabilities, fixture.limits, *reconnect, attempt,
 	)
 	if err != nil {
 		t.Fatal(err)

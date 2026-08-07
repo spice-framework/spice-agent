@@ -32,10 +32,21 @@ changing ownership.
 Protocol versions 1.0 through 1.2 do not identify an initialization attempt.
 Consequently, transport loss after fresh allocation or reconnect CAS has an
 uncertain outcome and is non-retryable; clients must not silently allocate a
-replacement identity or repeat the claim. A following minor-1.3 slice will add
-one caller-generated attempt identity for both fresh and reconnect requests and
-exact-response replay. Managed process startup is not loss-safe until that
-contract is implemented and proven.
+replacement identity or repeat the claim. Protocol 1.3 adds one caller-owned,
+nonzero 128-bit attempt identity for both fresh and reconnect requests. A 1.3
+request negotiates 1.3 exactly, and a request range may not cross the 1.2/1.3
+semantic boundary. This prevents one payload from acquiring different retry
+meaning through version selection.
+
+The server fingerprints the complete deterministic request with only the
+attempt identity removed. An exact duplicate waits for the owner or receives a
+defensive clone of the exact committed success response; the same identity with
+a different fingerprint fails closed. Reservation precedes allocation or the
+reconnect CAS. Cancellation before mutation abandons the reservation, while a
+response committed after mutation remains replayable even if the original RPC
+loses its acknowledgement. Pending attempts and waiters are bounded. Each
+active session retains its creation result and latest reconnect result, so the
+ledger stays proportional to negotiated-session capacity.
 
 The implemented server wrapper installs unary and streaming authentication as
 one non-optional assembly step and retains successful negotiations in a bounded
@@ -55,7 +66,7 @@ or dynamic plan fingerprint. Incompatible major versions or required
 capabilities fail before a run is created, with both observed and required
 values.
 
-The implementation advertises protocol range 1.0 through 1.2. Snapshot transfer
+The implementation advertises protocol range 1.0 through 1.3. Snapshot transfer
 is atomic with authenticated authority: minor-0 negotiation removes both
 `snapshots` and `snapshot-authority-v1`. A client requiring either receives a
 typed missing-capability result. A minor-1 client must require
@@ -70,6 +81,17 @@ client must request message and collection limits at least as large as the
 server's advertised bounds. Host construction proves its pending-interaction
 admission capacity fits those server bounds, and every accepted live delta is
 validated against the resulting reconnect snapshot before state advances.
+
+Minor 3 changes only initialization acknowledgement semantics. Successful
+responses echo the exact attempt identity; failure responses contain no
+negotiated fields and therefore do not echo it. The client may automatically
+repeat the byte-identical request once after a transient transport loss. It
+never retries authentication, validation, application status, cancellation, or
+deadline failures, and it validates the echoed identity before constructing a
+session. The adapter disables transport-owned service-config retries. After
+both automatic attempts lose their responses, or cancellation/deadline leaves
+the acknowledgement ambiguous, a typed recovery error carries the attempt
+identity and permits only the same immutable request to be replayed.
 
 The transport-independent host represents this catalog as exact immutable
 `agent.Definition` values rather than reconstructing model or maximum-turn
@@ -203,9 +225,12 @@ must never be derived from or reused as endpoint authentication tokens.
 ## Failure semantics
 
 Transport failure never implies a mutating request failed before commit.
-Operation IDs provide deduplication where defined. Mutating tool outcomes that
-lose acknowledgement are marked uncertain and never replayed automatically.
-Cancellation is cooperative and terminal events remain authoritative.
+Operation IDs provide deduplication where defined. Protocol-1.3 initialization
+is the narrow exception to automatic replay because its exact request identity
+and committed response are retained by the server; legacy initialization stays
+uncertain and non-retryable. Mutating tool outcomes that lose acknowledgement
+are marked uncertain and never replayed automatically. Cancellation is
+cooperative and terminal events remain authoritative.
 Executor panics and unexpected errors are contained as one bounded canonical
 uncertain outcome and a secret-safe sentinel; expected business failures are
 explicit canonical outcomes. A canceled duplicate waiter never cancels or
@@ -218,8 +243,8 @@ fields, capability mismatch, transport-metadata authentication separation,
 deadline/cancellation fields, overload, cursor gap/recovery, stale interaction
 response, snapshot version skew, malformed input, fuzz smoke, Buf lint/breaking,
 deterministic generation, duplicate operations, authenticated unary and stream
-RPCs, reconnect fencing, and Windows/Unix endpoint permissions. Protocol-1.3
-initialization replay, managed process launch, daemon/TUI attachment, and real
+RPCs, reconnect fencing, Windows/Unix endpoint permissions, and protocol-1.3
+initialization replay. Managed process launch, daemon/TUI attachment, and real
 cross-platform terminal acceptance remain required before the Phase 4 freeze.
 
 The pre-host contract repair resolves interaction prompt discovery, reconnect

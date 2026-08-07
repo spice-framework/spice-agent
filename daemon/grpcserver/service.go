@@ -31,18 +31,37 @@ func (service *engineService) Initialize(
 	if err := service.requireAuthenticated(ctx); err != nil {
 		return nil, err
 	}
+	var attempt *initializationAttemptLease
+	// Invalid protocol-1.3 requests stay on the pure PreflightInitialize error
+	// path and never consume replay-ledger capacity. A previously committed
+	// exact request is still replayed before mutable host description work.
+	if len(request.GetInitializationAttemptId()) != 0 && enginev1.ValidateInitializeRequest(request) == nil {
+		fingerprint, err := fingerprintInitializeRequest(request)
+		if err != nil {
+			return initializeContextOrFailure(ctx, err)
+		}
+		var replay *enginev1.InitializeResponse
+		attempt, replay, err = service.registry.reserveInitializationAttempt(
+			ctx, request.GetInitializationAttemptId(), fingerprint,
+		)
+		if err != nil {
+			return initializeContextOrFailure(ctx, err)
+		}
+		if replay != nil {
+			return replay, nil
+		}
+		defer attempt.abort()
+	}
 	description, err := service.host.Describe(ctx)
 	if err != nil {
 		return initializeContextOrFailure(ctx, err)
 	}
 	health, err := healthToWire(description.Health())
 	if err != nil {
-		//nolint:nilerr // application failures are protocol statuses; gRPC errors are transport-only.
 		return initializeInternalFailure("daemon health is invalid"), nil
 	}
 	definitions, err := definitionsToWire(description.Definitions(), service.limits)
 	if err != nil {
-		//nolint:nilerr // application failures are protocol statuses; gRPC errors are transport-only.
 		return initializeInternalFailure("daemon definitions are invalid"), nil
 	}
 	negotiation, failure := enginev1.PreflightInitialize(
@@ -60,7 +79,7 @@ func (service *engineService) Initialize(
 
 	claim := negotiation.ReconnectClaim()
 	if claim == nil {
-		response, transactionErr := service.registry.initializeFresh(ctx, func() (
+		response, transactionErr := service.registry.initializeFreshAttempt(ctx, attempt, func() (
 			daemon.Session,
 			*enginev1.InitializeResponse,
 			error,
@@ -78,8 +97,8 @@ func (service *engineService) Initialize(
 	} else {
 		clientID, expectedEpoch := claim.GetClientId(), claim.GetExpectedOwnershipEpoch()
 		response := enginev1.CompleteInitialize(negotiation, clientID, expectedEpoch+1)
-		response, transactionErr := service.registry.initializeReconnect(
-			ctx, clientID, expectedEpoch, response,
+		response, transactionErr := service.registry.initializeReconnectAttempt(
+			ctx, attempt, clientID, expectedEpoch, response,
 			func() (daemon.Session, error) {
 				return service.sessions.ReconnectContext(ctx, clientID, expectedEpoch)
 			},
@@ -201,6 +220,12 @@ func healthFailure(code commonv1.ErrorCode, message string) *enginev1.HealthResp
 }
 
 func sessionFailureStatus(err error) *commonv1.Status {
+	if errors.Is(err, errInitializationAttemptConflict) {
+		return &commonv1.Status{
+			Code:    commonv1.ErrorCode_ERROR_CODE_CONFLICT,
+			Message: "initialization attempt identity conflicts with another request",
+		}
+	}
 	var negotiatedCapacity *negotiatedCapacityError
 	if errors.As(err, &negotiatedCapacity) && negotiatedCapacity.limit > 0 {
 		return &commonv1.Status{

@@ -43,9 +43,11 @@ func (failure *negotiatedCapacityError) Is(target error) bool {
 
 // negotiatedSession is the immutable adapter view used by RPC handlers.
 type negotiatedSession struct {
-	session  daemon.Session
-	response *enginev1.InitializeResponse
-	gate     *initializationGate
+	session          daemon.Session
+	response         *enginev1.InitializeResponse
+	gate             *initializationGate
+	creationAttempt  string
+	reconnectAttempt string
 }
 
 type initializationGate struct {
@@ -68,6 +70,8 @@ type negotiatedSessionRegistry struct {
 
 	activeTransactions uint32
 	freshReservations  int
+	pendingAttempts    int
+	attempts           map[string]*initializationAttemptRecord
 }
 
 func newNegotiatedSessionRegistry(root context.Context, maximum int) (*negotiatedSessionRegistry, error) {
@@ -79,7 +83,8 @@ func newNegotiatedSessionRegistry(root context.Context, maximum int) (*negotiate
 	}
 	registry := &negotiatedSessionRegistry{
 		root: root, maximum: maximum,
-		entries: make(map[string]negotiatedSession), closedCh: make(chan struct{}),
+		entries:  make(map[string]negotiatedSession),
+		attempts: make(map[string]*initializationAttemptRecord), closedCh: make(chan struct{}),
 	}
 	registry.mu.Lock()
 	registry.stopRootWatch = context.AfterFunc(root, registry.close)
@@ -130,6 +135,14 @@ func (registry *negotiatedSessionRegistry) initializeFresh(
 	ctx context.Context,
 	operation func() (daemon.Session, *enginev1.InitializeResponse, error),
 ) (*enginev1.InitializeResponse, error) {
+	return registry.initializeFreshAttempt(ctx, nil, operation)
+}
+
+func (registry *negotiatedSessionRegistry) initializeFreshAttempt(
+	ctx context.Context,
+	attempt *initializationAttemptLease,
+	operation func() (daemon.Session, *enginev1.InitializeResponse, error),
+) (*enginev1.InitializeResponse, error) {
 	if registry == nil || operation == nil {
 		return nil, errNegotiatedSessionClosed
 	}
@@ -148,7 +161,14 @@ func (registry *negotiatedSessionRegistry) initializeFresh(
 	if err != nil || session.Epoch() != 1 {
 		return nil, errNegotiatedSessionInvalid
 	}
+	if attempt != nil && string(validated.GetInitializationAttemptId()) != attempt.id {
+		return nil, errNegotiatedSessionInvalid
+	}
 	registry.mu.Lock()
+	if err = registry.validateAttemptLeaseLocked(attempt); err != nil {
+		registry.mu.Unlock()
+		return nil, err
+	}
 	if _, exists := registry.entries[session.ClientID()]; exists {
 		registry.mu.Unlock()
 		return nil, errNegotiatedSessionUnavailable
@@ -156,10 +176,17 @@ func (registry *negotiatedSessionRegistry) initializeFresh(
 	registry.entries[session.ClientID()] = negotiatedSession{
 		session: session, response: validated, gate: newInitializationGate(),
 	}
+	if attempt != nil {
+		if err = attempt.commitLocked(validated, false); err != nil {
+			delete(registry.entries, session.ClientID())
+			registry.mu.Unlock()
+			return nil, err
+		}
+	}
 	terminalErr := registry.transactionTerminalError(ctx, session)
 	registry.mu.Unlock()
 	if terminalErr != nil {
-		return nil, terminalErr
+		return proto.CloneOf(validated), terminalErr
 	}
 	return proto.CloneOf(validated), context.Cause(ctx)
 }
@@ -174,13 +201,21 @@ func (registry *negotiatedSessionRegistry) initializeReconnect(
 	response *enginev1.InitializeResponse,
 	operation func() (daemon.Session, error),
 ) (*enginev1.InitializeResponse, error) {
+	return registry.initializeReconnectAttempt(ctx, nil, clientID, expectedEpoch, response, operation)
+}
+
+func (registry *negotiatedSessionRegistry) initializeReconnectAttempt(
+	ctx context.Context,
+	attempt *initializationAttemptLease,
+	clientID string,
+	expectedEpoch uint64,
+	response *enginev1.InitializeResponse,
+	operation func() (daemon.Session, error),
+) (*enginev1.InitializeResponse, error) {
 	if registry == nil || operation == nil {
 		return nil, errNegotiatedSessionClosed
 	}
-	if ctx == nil || clientID == "" || expectedEpoch == 0 || expectedEpoch == math.MaxUint64 {
-		return nil, errNegotiatedSessionInvalid
-	}
-	validated, err := validateReconnectResponse(clientID, expectedEpoch, response)
+	validated, err := validateReconnectAttempt(ctx, attempt, clientID, expectedEpoch, response)
 	if err != nil {
 		return nil, err
 	}
@@ -197,19 +232,80 @@ func (registry *negotiatedSessionRegistry) initializeReconnect(
 	if session.ClientID() != clientID || session.Epoch() != expectedEpoch+1 || session.Context() == nil {
 		return nil, errNegotiatedSessionInvalid
 	}
-	registry.mu.Lock()
-	current, exists := registry.entries[clientID]
-	if !exists || current.session.Epoch() != expectedEpoch || current.gate != gate {
-		registry.mu.Unlock()
-		return nil, errNegotiatedSessionUnavailable
-	}
-	registry.entries[clientID] = negotiatedSession{session: session, response: validated, gate: gate}
-	terminalErr := registry.transactionTerminalError(ctx, session)
-	registry.mu.Unlock()
+	committed, terminalErr := registry.commitReconnectSession(
+		ctx, attempt, clientID, expectedEpoch, session, validated, gate,
+	)
 	if terminalErr != nil {
-		return nil, terminalErr
+		if !committed {
+			return nil, terminalErr
+		}
+		return proto.CloneOf(validated), terminalErr
 	}
 	return proto.CloneOf(validated), context.Cause(ctx)
+}
+
+func validateReconnectAttempt(
+	ctx context.Context,
+	attempt *initializationAttemptLease,
+	clientID string,
+	expectedEpoch uint64,
+	response *enginev1.InitializeResponse,
+) (*enginev1.InitializeResponse, error) {
+	if ctx == nil || clientID == "" || expectedEpoch == 0 || expectedEpoch == math.MaxUint64 {
+		return nil, errNegotiatedSessionInvalid
+	}
+	validated, err := validateReconnectResponse(clientID, expectedEpoch, response)
+	if err != nil {
+		return nil, err
+	}
+	if attempt != nil && string(validated.GetInitializationAttemptId()) != attempt.id {
+		return nil, errNegotiatedSessionInvalid
+	}
+	return validated, nil
+}
+
+func (registry *negotiatedSessionRegistry) commitReconnectSession(
+	ctx context.Context,
+	attempt *initializationAttemptLease,
+	clientID string,
+	expectedEpoch uint64,
+	session daemon.Session,
+	response *enginev1.InitializeResponse,
+	gate *initializationGate,
+) (bool, error) {
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	if err := registry.validateAttemptLeaseLocked(attempt); err != nil {
+		return false, err
+	}
+	current, exists := registry.entries[clientID]
+	if !exists || current.session.Epoch() != expectedEpoch || current.gate != gate {
+		return false, errNegotiatedSessionUnavailable
+	}
+	registry.entries[clientID] = negotiatedSession{
+		session: session, response: response, gate: gate,
+		creationAttempt: current.creationAttempt, reconnectAttempt: current.reconnectAttempt,
+	}
+	if attempt != nil {
+		if err := attempt.commitLocked(response, true); err != nil {
+			// SessionStore already committed its ownership CAS. This path is
+			// unreachable after the pre-CAS lease validation unless shutdown
+			// fences the registry; fail closed rather than expose stale state.
+			return true, err
+		}
+	}
+	return true, registry.transactionTerminalError(ctx, session)
+}
+
+func (registry *negotiatedSessionRegistry) validateAttemptLeaseLocked(attempt *initializationAttemptLease) error {
+	if attempt == nil {
+		return nil
+	}
+	if attempt.registry != registry || attempt.record == nil || attempt.finished ||
+		registry.attempts[attempt.id] != attempt.record || attempt.record.terminal {
+		return errInitializationAttemptUnavailable
+	}
+	return nil
 }
 
 func validateReconnectResponse(
@@ -424,6 +520,8 @@ func (registry *negotiatedSessionRegistry) replaceReconnect(
 		return err
 	}
 	replacement.gate = current.gate
+	replacement.creationAttempt = current.creationAttempt
+	replacement.reconnectAttempt = current.reconnectAttempt
 	registry.entries[clientID] = replacement
 	registry.mu.Unlock()
 	return nil
@@ -490,6 +588,7 @@ func (registry *negotiatedSessionRegistry) close() {
 		registry.mu.Lock()
 		registry.closed = true
 		close(registry.closedCh)
+		registry.abortAttemptsLocked()
 		if registry.activeTransactions == 0 {
 			clear(registry.entries)
 		}

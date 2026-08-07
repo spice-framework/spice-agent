@@ -43,7 +43,7 @@ func TestInitializeRejectsPlatformUnrepresentableLimitsBeforeRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request, err := client.NewInitializeRequest(protocol, build, nil, nil, limits)
+	request, err := client.NewLegacyInitializeRequest(protocol, build, nil, nil, limits)
 	if err != nil {
 		t.Fatal(err)
 	}

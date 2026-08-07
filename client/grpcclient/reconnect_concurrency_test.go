@@ -269,7 +269,9 @@ func TestFutureReconnectClaimDoesNotFenceLocalPrior(t *testing.T) {
 	prior.streams[lifetime] = struct{}{}
 
 	result, err := connector.Initialize(t.Context(), request)
-	if result != nil || errorCode(err) != client.ErrorUnavailable {
+	replay, replayed := errors.AsType[*client.InitializationReplayError](err)
+	attempt, present := request.AttemptID()
+	if result != nil || !replayed || !present || replay.AttemptID() != attempt {
 		t.Fatalf("future reconnect = %#v, %v", result, err)
 	}
 	select {
@@ -365,6 +367,7 @@ func reconnectResponse(
 		Definitions: &enginev1.DefinitionSet{Revision: "catalog", Definitions: []*enginev1.Definition{{
 			Id: "definition", Revision: "revision", Model: "model", MaxTurns: 1,
 		}}},
+		InitializationAttemptId: append([]byte(nil), wireRequest.GetInitializationAttemptId()...),
 	}
 	if err = enginev1.ValidateInitializeResponseForRequest(wireRequest, response); err != nil {
 		t.Fatalf("reconnect response fixture: %v", err)

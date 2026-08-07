@@ -11,7 +11,10 @@ import (
 	"github.com/spice-framework/spice-agent/daemon/endpoint"
 	enginev1 "github.com/spice-framework/spice-agent/engine/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 const authorizationMetadataKey = "authorization"
@@ -97,11 +100,11 @@ func (connector *Connector) Initialize(
 	receiveMaximum := max(
 		uint64(enginev1.InitializeBootstrapMaximumBytes), request.RequestedLimits().MessageBytes(),
 	)
-	response, err := connector.service.Initialize(
-		connector.authorized(ctx), wireRequest,
-		messageCallOptions(enginev1.InitializeBootstrapMaximumBytes, receiveMaximum)...,
-	)
+	response, err := connector.initializeRPC(ctx, wireRequest, receiveMaximum)
 	if err != nil {
+		if attemptID, present := request.AttemptID(); present {
+			return nil, initializationAttemptTransportError(ctx, err, attemptID)
+		}
 		if reconnecting {
 			return nil, reconnectTransportError(ctx, err)
 		}
@@ -133,6 +136,33 @@ func (connector *Connector) Initialize(
 		return nil, protocolError()
 	}
 	return result, nil
+}
+
+func (connector *Connector) initializeRPC(
+	ctx context.Context,
+	request *enginev1.InitializeRequest,
+	receiveMaximum uint64,
+) (*enginev1.InitializeResponse, error) {
+	maximumAttempts := 1
+	if len(request.GetInitializationAttemptId()) != 0 {
+		maximumAttempts = 2
+	}
+	options := messageCallOptions(enginev1.InitializeBootstrapMaximumBytes, receiveMaximum)
+	for attempt := range maximumAttempts {
+		exact := proto.CloneOf(request)
+		response, err := connector.service.Initialize(connector.authorized(ctx), exact, options...)
+		if err == nil {
+			return response, nil
+		}
+		if attempt+1 == maximumAttempts || !retryableInitializeTransport(ctx, err) {
+			return nil, err
+		}
+	}
+	return nil, errors.New("initialization retry exhausted without a transport result")
+}
+
+func retryableInitializeTransport(ctx context.Context, err error) bool {
+	return ctx.Err() == nil && status.Code(err) == codes.Unavailable
 }
 
 func (connector *Connector) authorized(ctx context.Context) context.Context {
@@ -354,6 +384,10 @@ func (current *session) LogValue() slog.Value { return slog.StringValue(current.
 
 func messageCallOptions(sendMaximum, receiveMaximum uint64) []grpc.CallOption {
 	return []grpc.CallOption{
+		// The adapter owns every permitted retry. Committing after the first
+		// nonempty request message prevents caller-supplied service config from
+		// multiplying initialization attempts or replaying mutations beneath us.
+		grpc.MaxRetryRPCBufferSize(0),
 		grpc.MaxCallSendMsgSize(platformMessageMaximum(sendMaximum)),
 		grpc.MaxCallRecvMsgSize(platformMessageMaximum(receiveMaximum)),
 	}
