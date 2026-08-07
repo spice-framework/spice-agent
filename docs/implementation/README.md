@@ -211,6 +211,9 @@ malformed or untrusted state fails hard. Legacy protocol initialization loss is
 explicitly non-retryable because versions 1.0 through 1.2 have no attempt
 identity. Evidence and the remaining process-launch/TUI exclusions are in
 [`evidence/phase4-local-client.md`](evidence/phase4-local-client.md).
+Implementation commit `ec3ef1c` passed the complete local gate in 155.8 seconds
+at 85.2% whole-repository handwritten-product coverage with zero reachable
+vulnerabilities and full race, fuzz, and offline-vendor proof.
 The snapshot-import contract now also exposes a complete unkeyed structural
 validator for the transport boundary. It accounts for compatible unknown
 Protobuf fields in the negotiated size and deliberately accepts an untrusted

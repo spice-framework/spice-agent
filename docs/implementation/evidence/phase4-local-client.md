@@ -93,8 +93,13 @@ The controlled gRPC service test proves reconnect waits for the prior stream's
 managed discovery reuses that same adapter and reconnect closes a blocked old
 `Next` with `client.ErrClosed`.
 
-The exact commit, whole-repository coverage, and full verification timing are
-recorded in the implementation ledger only after the final tree passes
-`make verify` and is pushed. This slice deliberately does not claim a daemon
-process launcher, distribution wiring, protocol-1.3 replay, TUI attachment, or
-real installed Windows/Linux terminal workflow.
+Implementation commit `ec3ef1c` passed `make fast` in 30.2 seconds, `make check`
+in 36.6 seconds, and the complete `make verify` in 155.8 seconds on Go 1.26.5.
+The exact commit tree passed formatting, module/vendor and Protobuf freshness,
+architecture checks, vet, shuffled and race tests, NilAway, golangci-lint,
+gosec, govulncheck, seven fuzz targets, offline-vendor tests, and the executable
+composition proof. Whole-repository handwritten-product coverage was 85.2%.
+
+This slice deliberately does not claim a daemon process launcher, distribution
+wiring, protocol-1.3 replay, TUI attachment, or real installed Windows/Linux
+terminal workflow.
