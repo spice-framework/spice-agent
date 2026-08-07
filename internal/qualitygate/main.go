@@ -68,7 +68,12 @@ func run(ctx context.Context, root, mode string) error {
 		"GOTOOLCHAIN": "local",
 		"GOWORK":      "off",
 	}
-	identity := step{"repository identity", func() error { return checkIdentity(root) }}
+	identity := step{"repository identity", func() error {
+		if err := checkIdentity(root); err != nil {
+			return err
+		}
+		return checkReleaseMetadata(root)
+	}}
 	diffHygiene := step{"diff hygiene", func() error { return command(ctx, root, nil, "git", "diff", "--check", "HEAD", "--") }}
 	tests := step{"tests", func() error {
 		return command(ctx, root, productEnvironment, "go", "test", "-shuffle=on", "-count=1", "./...")
