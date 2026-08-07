@@ -74,7 +74,9 @@ message  tool  interaction
 
 Public contracts do not import repository internals. Protocol and host packages
 may depend on public contracts; the kernel does not depend on transport, UI, or
-provider implementations.
+provider implementations. `process` imports only the public `tool.Capability`
+value so launch policy observes the same canonical security vocabulary used by
+dispatch; it imports no kernel, daemon, client, provider, or platform package.
 
 The public `daemon` package is the transport-independent host seam. A generated
 `DefinitionSet` wraps exact immutable `agent.Definition` values and owns the
@@ -202,6 +204,17 @@ into startup authorization, and preserves credential/address redaction. The
 ordinary local discovery adapter remains responsible for constructing the lazy
 authenticated gRPC connection over `daemon/localipc`.
 
+The public provider-neutral `process` package is the mandatory construction
+seam for daemon and coding-tool processes. Its immutable `Spec` carries a
+canonical absolute executable and working directory, discrete arguments, an
+exact copied environment, explicit streams, and declared tool capabilities.
+An injected `Launcher` may be decorated by permissions without a registry or
+reflection. Its launch context bounds launch only. Root termination produces a
+typed portable `Outcome`; a separate context-bounded `Wait` proves whether all
+implementation-owned descendants and containment resources are safe to
+release. Core deliberately contains no `os/exec` implementation and makes no
+universal containment claim.
+
 `client/managed` owns attach-or-start policy rather than process construction.
 Only the exact unwrapped absence sentinel authorizes the serialized
 discovery/recheck/start sequence. A `Starter` returns the exact `Candidate`
@@ -212,8 +225,11 @@ cancels an in-flight initializer, and stops only that owned candidate—never a
 daemon obtained from discovery. A candidate's `Result` reports only its child
 process outcome, while `Wait` returns nil only when all owned process and
 platform-containment resources are safe to release. A timed-out or failed
-containment join retains ownership for a later shutdown attempt; root-process
-exit alone never proves safe release. The distribution still must supply the
+containment join retains ownership. Retryable or unclassified failures permit
+a later proof attempt. An explicitly non-retryable containment failure is
+cached and returned without repeating cleanup actions; ownership remains for
+manual recovery. Root-process exit alone never proves safe release. The
+distribution still must supply the
 concrete process starter and compose these libraries into managed and explicit
 commands. Current evidence is in
 [`docs/implementation/evidence/phase4-managed-local-lifecycle.md`](docs/implementation/evidence/phase4-managed-local-lifecycle.md).

@@ -45,7 +45,9 @@ type Discovery interface {
 // attempted its terminal cleanup. Result is safe after Done closes and reports
 // only the child process outcome. BeginShutdown is idempotent and nonblocking.
 // Wait honors its context and returns nil only after every process and
-// containment resource owned by the candidate is safe to release.
+// containment resource owned by the candidate is safe to release. A Wait
+// error may implement Retryable() bool. False means cleanup cannot safely be
+// repeated and the candidate must remain owned for manual recovery.
 type Candidate interface {
 	Done() <-chan struct{}
 	Result() error
@@ -96,6 +98,7 @@ type Connector struct {
 	closed       bool
 	activeCancel context.CancelCauseFunc
 	owned        Candidate
+	terminalJoin error
 }
 
 // String prevents dependency implementations from leaking endpoint material.
@@ -323,16 +326,17 @@ func (connector *Connector) ensureCandidate(ctx context.Context) (Candidate, boo
 		return nil, false, errors.New("local daemon starter returned a nil candidate")
 	}
 	if candidate.Done() == nil {
-		_, cleanupErr := connector.shutdownCandidate(candidate, context.Background())
+		_, _, cleanupErr := connector.shutdownCandidate(candidate, context.Background())
 		return nil, false, opaqueFailure("local daemon candidate is invalid", cleanupErr)
 	}
 	connector.mu.Lock()
 	if connector.owned != nil {
 		connector.mu.Unlock()
-		_, cleanupErr := connector.shutdownCandidate(candidate, context.Background())
+		_, _, cleanupErr := connector.shutdownCandidate(candidate, context.Background())
 		return nil, false, opaqueFailure("managed connector already owns a daemon candidate", cleanupErr)
 	}
 	connector.owned = candidate
+	connector.terminalJoin = nil
 	closed = connector.closed
 	connector.mu.Unlock()
 	if err != nil {
@@ -451,35 +455,97 @@ func classifyStartupContext(ctx context.Context, fallback error) error {
 }
 
 func (connector *Connector) cleanupOwnedCandidate(candidate Candidate) error {
-	joined, err := connector.shutdownCandidate(candidate, context.Background())
+	joined, terminal, err := connector.shutdownCandidate(candidate, context.Background())
+	connector.mu.Lock()
 	if joined {
-		connector.mu.Lock()
 		connector.owned = nil
-		connector.mu.Unlock()
+		connector.terminalJoin = nil
+	} else if terminal {
+		connector.terminalJoin = err
 	}
+	connector.mu.Unlock()
 	return err
 }
 
 func (connector *Connector) shutdownCandidate(
 	candidate Candidate,
 	parent context.Context,
-) (bool, error) {
+) (joined bool, terminal bool, resultErr error) {
 	if candidate == nil {
-		return true, nil
+		return true, false, nil
 	}
 	ctx, cancel := context.WithTimeoutCause(parent, connector.shutdownTimeout, ErrShutdownTimeout)
 	defer cancel()
 	beginErr := candidate.BeginShutdown()
 	waitErr := candidate.Wait(ctx)
-	joined := candidateJoined(candidate) && waitErr == nil
+	joined = candidateJoined(candidate) && waitErr == nil
 	if !joined {
 		cause := context.Cause(ctx)
 		if cause == nil {
 			cause = ErrCandidateJoin
 		}
-		return false, opaqueFailure("managed daemon shutdown did not join", cause, waitErr, beginErr)
+		terminal = errors.Is(cause, ErrCandidateJoin) && waitErr != nil && explicitlyNonRetryable(waitErr)
+		return false, terminal, opaqueFailure("managed daemon shutdown did not join", cause, waitErr, beginErr)
 	}
-	return true, opaqueFailureOrNil("managed daemon shutdown failed", beginErr, candidate.Result())
+	return true, false, opaqueFailureOrNil("managed daemon shutdown failed", beginErr, candidate.Result())
+}
+
+func explicitlyNonRetryable(err error) bool {
+	return containsNonRetryable(err, 0)
+}
+
+func containsNonRetryable(err error, depth int) bool {
+	if err == nil {
+		return false
+	}
+	if depth >= 128 {
+		// A cyclic or adversarial graph cannot prove replay safety.
+		return true
+	}
+	// Direct structural traversal is required because errors.As observes only
+	// one joined branch and a later terminal classifier must dominate.
+	if classified, ok := err.(interface{ Retryable() bool }); ok &&
+		classificationIsTerminal(classified) {
+		return true
+	}
+	children, safe := retryChildren(err)
+	if !safe {
+		return true
+	}
+	for _, cause := range children {
+		if containsNonRetryable(cause, depth+1) {
+			return true
+		}
+	}
+	return false
+}
+
+func classificationIsTerminal(classified interface{ Retryable() bool }) (terminal bool) {
+	terminal = true
+	defer func() {
+		if recover() != nil {
+			terminal = true
+		}
+	}()
+	return !classified.Retryable()
+}
+
+func retryChildren(err error) (children []error, safe bool) {
+	defer func() {
+		if recover() != nil {
+			children = nil
+			safe = false
+		}
+	}()
+	// Direct structural traversal is required to inspect every joined branch.
+	switch wrapped := err.(type) { //nolint:errorlint // errors.As cannot inspect every joined branch.
+	case interface{ Unwrap() []error }:
+		return wrapped.Unwrap(), true
+	case interface{ Unwrap() error }:
+		return []error{wrapped.Unwrap()}, true
+	default:
+		return nil, true
+	}
 }
 
 func candidateJoined(candidate Candidate) bool {
@@ -521,13 +587,20 @@ func (connector *Connector) Shutdown(ctx context.Context) error {
 	defer func() { connector.initializeGate <- struct{}{} }()
 	connector.mu.Lock()
 	candidate := connector.owned
+	terminalJoin := connector.terminalJoin
 	connector.mu.Unlock()
-	joined, err := connector.shutdownCandidate(candidate, shutdownContext)
-	if joined {
-		connector.mu.Lock()
-		connector.owned = nil
-		connector.mu.Unlock()
+	if terminalJoin != nil {
+		return terminalJoin
 	}
+	joined, terminal, err := connector.shutdownCandidate(candidate, shutdownContext)
+	connector.mu.Lock()
+	if joined {
+		connector.owned = nil
+		connector.terminalJoin = nil
+	} else if terminal {
+		connector.terminalJoin = err
+	}
+	connector.mu.Unlock()
 	return err
 }
 

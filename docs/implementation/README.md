@@ -220,10 +220,17 @@ scope selects one inseparable private directory/local transport/address tuple;
 explicit attach requires an exact address match in active protected metadata
 and can never authorize startup; managed shutdown stops only the exact candidate
 this connector launched. Failed, canceled, or early-exiting launches are
-boundedly shut down and joined, while an incomplete join retains ownership for
-a later attempt. Windows focused, repeated, race, and vet evidence plus the
+boundedly shut down and joined, while an incomplete join retains ownership.
+Retryable joins may be re-proved; explicitly non-retryable joins are retained
+for manual recovery without repeating cleanup. Windows focused, repeated,
+race, and vet evidence plus the
 reported WSL endpoint race evidence are recorded in
 [`evidence/phase4-managed-local-lifecycle.md`](evidence/phase4-managed-local-lifecycle.md).
+The public provider-neutral process-launch contract now supplies immutable,
+bounded, capability-declared launch intent plus typed root outcomes and a
+strictly separate containment/resource join. It is an injection/decorator seam,
+not an OS implementation or containment claim. Evidence is in
+[`evidence/phase4-process-launch-contract.md`](evidence/phase4-process-launch-contract.md).
 Protocol minor 3 now closes the local initialization acknowledgement gap. One
 caller-owned 128-bit identity covers both fresh allocation and reconnect CAS;
 the server coalesces exact duplicates, publishes replay state atomically with

@@ -44,6 +44,10 @@ exhaustion, unavailable, cancellation, and uncertain operation state.
 - The library boundary can attach to a compatible protected endpoint or own one
   candidate launched after a bounded startup lock and health handshake. The
   distribution commands that exercise it remain pending.
+- Distribution launchers implement the public `process.Launcher` contract.
+  Root outcomes and containment joins remain separate, and core does not claim
+  that every supported operating system supplies universal descendant
+  containment.
 - The distribution will expose `spice-agentd serve`; `spice-agent attach` will
   connect to an explicitly selected protected local endpoint.
 - An incompatible daemon is rejected with its observed/required versions and a

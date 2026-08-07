@@ -56,8 +56,12 @@ Ownership is exact:
   only the owned candidate.
 
 If the candidate cannot join before the shutdown budget, or its containment
-join reports a failure after process exit, ownership is retained and a later
-`Shutdown` may retry. Dependency errors remain available through
+join reports a failure after process exit, ownership is retained. Timeouts,
+unclassified failures, and explicitly retryable failures permit a later
+`Shutdown` proof attempt. An error implementing `Retryable() bool` with a false
+result is terminal: the connector retains manual-recovery ownership, caches the
+exact redacted join failure, and later `Shutdown` calls return it without
+repeating `BeginShutdown` or `Wait`. Dependency errors remain available through
 `errors.Is`/`errors.As`, while their arbitrary text is not copied into the
 public error string. This is lifecycle ownership, not a sandbox: the future
 distribution starter will still launch a daemon with the user's process

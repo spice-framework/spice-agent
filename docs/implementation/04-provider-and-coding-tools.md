@@ -41,6 +41,10 @@ provider errors, capability-aware dispatch, and phase 1 auto-configuration.
   selected starting directory. It is not filesystem containment: the child has
   the user's full process, network, filesystem, and allowlisted-environment
   privileges.
+- Process construction uses the public provider-neutral `process.Launcher`
+  bean. Immutable specifications preserve exact argv/environment/streams and
+  declared capabilities for later permission decorators; no coding tool may
+  expose or construct `*exec.Cmd` as its public boundary.
 - Shell output is count/byte bounded, binary-safe, cancellable, and time bounded.
   Unix process groups and Windows kill-on-close Job Objects are used; inability
   to confirm tree termination is surfaced.

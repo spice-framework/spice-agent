@@ -479,6 +479,105 @@ func TestConnectorJoinFailureRetainsOwnershipForRetry(t *testing.T) {
 	}
 }
 
+func TestConnectorNonRetryableJoinFailureIsTerminalAndRetained(t *testing.T) {
+	t.Parallel()
+	joinFailure := classifiedJoinError{message: "private terminal containment failure", retryable: false}
+	candidate := newFixtureCandidate()
+	candidate.waitErr = joinFailure
+	starter := &fixtureStarter{candidate: candidate}
+	discovery := &fixtureDiscovery{results: []discoveryResult{
+		{err: managed.ErrEndpointNotFound},
+		{err: managed.ErrEndpointNotFound},
+		{connector: fixtureConnector{session: &fixtureSession{}}},
+	}}
+	connector := newManagedFixture(t, discovery, starter, &fixtureLock{})
+	if _, err := connector.Initialize(t.Context(), initializeRequestFixture(t)); err != nil {
+		t.Fatal(err)
+	}
+	first := connector.Shutdown(t.Context())
+	if !errors.Is(first, joinFailure) || !errors.Is(first, managed.ErrCandidateJoin) {
+		t.Fatalf("terminal join failure = %v", first)
+	}
+	beginCalls, waitCalls := candidate.beginCalls.Load(), candidate.waitCalls.Load()
+	candidate.waitErr = nil
+	second := connector.Shutdown(t.Context())
+	if !errors.Is(second, joinFailure) || !errors.Is(second, managed.ErrCandidateJoin) {
+		t.Fatalf("cached terminal failure = %v", second)
+	}
+	if candidate.beginCalls.Load() != beginCalls || candidate.waitCalls.Load() != waitCalls {
+		t.Fatalf(
+			"terminal cleanup was repeated: begin %d->%d wait %d->%d",
+			beginCalls, candidate.beginCalls.Load(), waitCalls, candidate.waitCalls.Load(),
+		)
+	}
+}
+
+func TestConnectorExplicitRetryableJoinFailureCanBeReproved(t *testing.T) {
+	t.Parallel()
+	joinFailure := classifiedJoinError{message: "retryable containment failure", retryable: true}
+	candidate := newFixtureCandidate()
+	candidate.waitErr = joinFailure
+	starter := &fixtureStarter{candidate: candidate}
+	discovery := &fixtureDiscovery{results: []discoveryResult{
+		{err: managed.ErrEndpointNotFound},
+		{err: managed.ErrEndpointNotFound},
+		{connector: fixtureConnector{session: &fixtureSession{}}},
+	}}
+	connector := newManagedFixture(t, discovery, starter, &fixtureLock{})
+	if _, err := connector.Initialize(t.Context(), initializeRequestFixture(t)); err != nil {
+		t.Fatal(err)
+	}
+	if err := connector.Shutdown(t.Context()); !errors.Is(err, joinFailure) {
+		t.Fatalf("retryable join failure = %v", err)
+	}
+	candidate.waitErr = nil
+	if err := connector.Shutdown(t.Context()); err != nil {
+		t.Fatalf("retryable join proof = %v", err)
+	}
+	if candidate.beginCalls.Load() != 2 || candidate.waitCalls.Load() != 2 {
+		t.Fatalf("retry counts = begin %d wait %d", candidate.beginCalls.Load(), candidate.waitCalls.Load())
+	}
+}
+
+func TestConnectorNonRetryableJoinDominatesJoinedOrdering(t *testing.T) {
+	t.Parallel()
+	retryable := classifiedJoinError{message: "retryable", retryable: true}
+	terminal := classifiedJoinError{message: "terminal", retryable: false}
+	for name, joinFailure := range map[string]error{
+		"terminal first": errors.Join(terminal, retryable),
+		"terminal last":  errors.Join(retryable, terminal),
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			candidate := newFixtureCandidate()
+			candidate.waitErr = joinFailure
+			discovery := &fixtureDiscovery{results: []discoveryResult{
+				{err: managed.ErrEndpointNotFound},
+				{err: managed.ErrEndpointNotFound},
+				{connector: fixtureConnector{session: &fixtureSession{}}},
+			}}
+			connector := newManagedFixture(
+				t, discovery, &fixtureStarter{candidate: candidate}, &fixtureLock{},
+			)
+			if _, err := connector.Initialize(t.Context(), initializeRequestFixture(t)); err != nil {
+				t.Fatal(err)
+			}
+			first := connector.Shutdown(t.Context())
+			if !errors.Is(first, terminal) {
+				t.Fatalf("joined terminal failure = %v", first)
+			}
+			beginCalls, waitCalls := candidate.beginCalls.Load(), candidate.waitCalls.Load()
+			if second := connector.Shutdown(t.Context()); !errors.Is(second, terminal) ||
+				!errors.Is(second, managed.ErrCandidateJoin) {
+				t.Fatalf("cached terminal failure = %v", second)
+			}
+			if candidate.beginCalls.Load() != beginCalls || candidate.waitCalls.Load() != waitCalls {
+				t.Fatal("joined terminal failure replayed cleanup")
+			}
+		})
+	}
+}
+
 func TestConnectorDependencyFailuresAreRedacted(t *testing.T) {
 	t.Parallel()
 	const secret = "managed-secret-canary"
@@ -657,6 +756,19 @@ type fixtureCandidate struct {
 	ignoreShutdown atomic.Bool
 	beginCalls     atomic.Int32
 	waitCalls      atomic.Int32
+}
+
+type classifiedJoinError struct {
+	message   string
+	retryable bool
+}
+
+func (failure classifiedJoinError) Error() string   { return failure.message }
+func (failure classifiedJoinError) Retryable() bool { return failure.retryable }
+
+func (failure classifiedJoinError) Is(target error) bool {
+	classified, ok := target.(classifiedJoinError)
+	return ok && classified == failure
 }
 
 func newFixtureCandidate() *fixtureCandidate {
