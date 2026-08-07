@@ -44,16 +44,18 @@ var closedDeltaStream = func() <-chan Delta {
 }()
 
 const (
-	maximumPendingClients      = 4096
-	maximumPendingRuns         = 16384
-	maximumPendingInteractions = 4096
-	maximumPendingObservers    = 1024
-	maximumObserverQueue       = 1024
-	maximumObserverEntries     = maximumPendingObservers * maximumObserverQueue
-	maximumObserverQueuedBytes = 4 << 20
-	maximumPendingBytes        = 16 << 20
-	maximumObserverBytes       = 64 << 20
-	maximumPendingDeltaBytes   = 2*interaction.MaximumPayloadBytes + 512
+	maximumPendingClients        = 4096
+	maximumPendingRuns           = 16384
+	maximumPendingInteractions   = 4096
+	maximumPendingObservers      = 1024
+	maximumObserverQueue         = 1024
+	maximumObserverEntries       = maximumPendingObservers * maximumObserverQueue
+	maximumObserverQueuedBytes   = 4 << 20
+	maximumPendingBytes          = 16 << 20
+	maximumObserverBytes         = 64 << 20
+	maximumPendingDeltaBytes     = 2*interaction.MaximumPayloadBytes + 512
+	pendingSnapshotItemOverhead  = 32
+	pendingSnapshotFrameOverhead = 32
 )
 
 // PendingLimits bounds both the whole hub and every stable client partition.
@@ -92,7 +94,7 @@ func DefaultPendingLimits() PendingLimits {
 	return PendingLimits{
 		Clients: 1024, Runs: 4096, RunsPerClient: 256,
 		Pending: 1024, PendingPerClient: 128,
-		PendingBytes: maximumPendingBytes, PendingBytesPerClient: 4 << 20,
+		PendingBytes: maximumPendingBytes, PendingBytesPerClient: 768 << 10,
 		Observers: observers, ObserversPerClient: observersPerClient,
 		ObserverQueueEntries: queueEntries, ObserverQueueBytes: maximumPendingDeltaBytes,
 		ReservedQueueEntries:          observers * queueEntries,
@@ -104,6 +106,19 @@ func DefaultPendingLimits() PendingLimits {
 		QueuedBytes:                   observers * maximumPendingDeltaBytes,
 		QueuedBytesPerClient:          observersPerClient * maximumPendingDeltaBytes,
 	}
+}
+
+// snapshotCapacityUpperBound returns the maximum complete transport-neutral
+// pending-set shape admitted for one client. The fixed overhead safely covers
+// every current Protobuf field tag, length prefix, revision, repeated-item
+// wrapper, and stream-response oneof wrapper without importing wire packages.
+func (hub *PendingHub) snapshotCapacityUpperBound() (int, int) {
+	if hub == nil {
+		return 0, 0
+	}
+	items := hub.limits.PendingPerClient
+	bytes := hub.limits.PendingBytesPerClient + items*pendingSnapshotItemOverhead + pendingSnapshotFrameOverhead
+	return items, bytes
 }
 
 // ObserverExhaustedError reports the exact last revision delivered to a slow
@@ -678,6 +693,28 @@ func (hub *PendingHub) removeReleasedBindingLocked(binding *runBindingState) {
 		}
 		close(binding.released)
 	}
+}
+
+// Snapshot returns one stable client's complete sorted pending view without
+// allocating an observer or consuming any queue reservation. A client without
+// retained interaction state receives the initial empty revision.
+func (hub *PendingHub) Snapshot(clientID string) (PendingSnapshot, error) {
+	if hub == nil {
+		return PendingSnapshot{}, ErrPendingHubClosed
+	}
+	if err := boundedToken("client ID", clientID); err != nil {
+		return PendingSnapshot{}, err
+	}
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+	if hub.closed {
+		return PendingSnapshot{}, ErrPendingHubClosed
+	}
+	partition := hub.partitions[clientID]
+	if partition == nil {
+		return PendingSnapshot{}, nil
+	}
+	return hub.snapshotLocked(partition), nil
 }
 
 // Subscribe atomically captures one stable client's complete sorted pending

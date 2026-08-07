@@ -18,6 +18,12 @@ The typed surface is:
   as the run lifetime.
 - `Respond` completes a pending interaction owned by the same stable client.
 - `Export` returns only a cached authority-issued safe-boundary envelope.
+- `ReplayEvents` returns one owned run's bounded atomic page and optional
+  gap-free tail across active and retained-terminal runs.
+- `SnapshotInteractions` returns a watcher-free complete client view, while
+  `SubscribeInteractions` atomically couples that view to a live delta tail.
+  Both read paths return opaque observations that own their reconnect fence
+  until the transport finishes sending and calls idempotent `Close`.
 - `Health` reports the configured server limits, active reservations, and fixed
   secret-safe degradation reasons.
 - `Shutdown` fences admission, drains owned work, and closes authority last.
@@ -48,6 +54,11 @@ IDs. A failure proved to occur before any durable or visible boundary abandons
 its ledger entry so the same operation ID can retry. Success, business failure,
 and uncertainty remain committed deterministic results. Another client's run
 and an unknown run produce the same public unavailable result.
+
+Host construction proves the PendingHub's maximum client snapshot count and a
+conservative complete-frame byte bound fit the configured protocol limits.
+The configured concurrent-stream limit is also enforced by SessionStore lease
+admission rather than left to a transport convention.
 
 Per-run lifecycle serialization is context-aware. A request waiting behind an
 active Suspend, Resume, Cancel, or terminal transition can stop on its own
@@ -82,11 +93,13 @@ retention. This remains an explicit pre-freeze daemon lifecycle limitation.
 
 ## Exclusions
 
-This slice contains no gRPC server, Protobuf/RPC translation, event stream,
-pending-interaction stream, listener, endpoint authentication, Unix socket,
-Windows named pipe, endpoint discovery, managed daemon startup, or TUI client
-adapter. Those are separate Phase 4 slices and must not reuse an RPC context as
-run lifetime.
+This slice contains transport-neutral event and interaction read seams, but no
+gRPC stream sender, Protobuf/RPC translation for those seams, listener, Unix
+socket, Windows named pipe, endpoint discovery, managed daemon startup, or TUI
+client adapter. RunHost acquires the `SessionStore` lease into an opaque
+observation; the transport must retain that observation until its final sender
+has joined and then call `Close`, which cancels and joins internal delivery
+before releasing the reconnect fence.
 
 ## Verification status
 
@@ -101,6 +114,12 @@ shuffled repetitions and three race-enabled repetitions; authority Start's
 attempted-write regression passed ten shuffled repetitions. Repository
 `make check` passed on the same tree before the full gate.
 
+Stream-seam tests additionally cover active and terminal replay, paging, live
+tailing, cursor gaps, byte exhaustion, non-disclosing ownership, session epoch
+cancellation, complete pending snapshots, client isolation, open/close deltas,
+observer admission, and snapshot-only operation without allocating a watcher
+or partition.
+
 The exact combined RunHost tree passed repository `make verify` before commit.
-This document does not claim RPC, IPC, stream, managed startup, Windows/Linux
-process, or release acceptance.
+This document does not claim an RPC stream adapter, IPC, managed startup,
+Windows/Linux process, or release acceptance.

@@ -266,8 +266,8 @@ func newRunHost(config RunHostConfig, authority hostAuthority) (*RunHost, error)
 	if err := config.Root.Err(); err != nil {
 		return nil, errors.New("run host root is already canceled")
 	}
-	if err := config.Limits.Validate(); err != nil {
-		return nil, fmt.Errorf("run host limits: %w", err)
+	if err := validateRunHostLimits(config.Pending, config.Limits); err != nil {
+		return nil, err
 	}
 	definitions, err := NewDefinitionSet(config.Definitions.Definitions())
 	if err != nil || definitions.Revision() != config.Definitions.Revision() {
@@ -299,6 +299,21 @@ func newRunHost(config RunHostConfig, authority hostAuthority) (*RunHost, error)
 		degraded:     make(map[string]struct{}),
 		shutdownDone: make(chan struct{}),
 	}, nil
+}
+
+func validateRunHostLimits(pending *PendingHub, limits client.Limits) error {
+	if err := limits.Validate(); err != nil {
+		return fmt.Errorf("run host limits: %w", err)
+	}
+	if limits.ConcurrentStreams() > maximumSessionStreamsPerClient {
+		return fmt.Errorf("run host concurrent streams exceed %d", maximumSessionStreamsPerClient)
+	}
+	pendingItems, pendingBytes := pending.snapshotCapacityUpperBound()
+	if pendingItems < 1 || uint64(pendingItems) > uint64(limits.CollectionItems()) ||
+		pendingBytes < 1 || uint64(pendingBytes) > limits.MessageBytes() {
+		return errors.New("run host pending snapshot capacity exceeds protocol limits")
+	}
+	return nil
 }
 
 func (host *RunHost) beginOperation() error {
@@ -520,7 +535,8 @@ func publicRunHostDependencyError(err error) error {
 	case errors.Is(err, ErrRunAuthorityBusy), errors.Is(err, ErrRunAuthorityState),
 		errors.Is(err, ErrRunAuthorityVerification):
 		return ErrRunHostState
-	case errors.Is(err, ErrRunBindingCapacity), errors.Is(err, ErrPendingCapacity):
+	case errors.Is(err, ErrRunBindingCapacity), errors.Is(err, ErrPendingCapacity),
+		errors.Is(err, ErrObserverCapacity):
 		return ErrRunHostCapacity
 	case errors.Is(err, ErrRunNotBound), errors.Is(err, ErrInteractionNotPending):
 		return ErrHostedRunUnavailable

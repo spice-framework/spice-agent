@@ -204,30 +204,18 @@ func (update InteractionUpdate) validate() error {
 	}
 }
 
-// InteractionStreamOptions bounds one complete-snapshot page and chooses
-// whether to tail future changes.
+// InteractionStreamOptions chooses whether to tail future changes after the
+// mandatory complete snapshot and captured control. Reconnect always starts
+// from a fresh snapshot, so interaction streams have no historical replay
+// cursor or limit.
 type InteractionStreamOptions struct {
-	replayLimit uint32
-	tail        bool
+	tail bool
 }
 
-func NewInteractionStreamOptions(replayLimit uint32, tail bool, limits Limits) (InteractionStreamOptions, error) {
-	if err := limits.Validate(); err != nil {
-		return InteractionStreamOptions{}, err
-	}
-	if replayLimit == 0 || replayLimit > limits.ReplayEvents() {
-		return InteractionStreamOptions{}, fmt.Errorf(
-			"interaction replay limit must be between 1 and %d",
-			limits.ReplayEvents(),
-		)
-	}
-	return InteractionStreamOptions{replayLimit: replayLimit, tail: tail}, nil
+func NewInteractionStreamOptions(tail bool) InteractionStreamOptions {
+	return InteractionStreamOptions{tail: tail}
 }
 
-func (options InteractionStreamOptions) ReplayLimit() uint32 { return options.replayLimit }
-func (options InteractionStreamOptions) Tail() bool          { return options.tail }
+func (options InteractionStreamOptions) Tail() bool { return options.tail }
 
-func (options InteractionStreamOptions) Validate(limits Limits) error {
-	_, err := NewInteractionStreamOptions(options.replayLimit, options.tail, limits)
-	return err
-}
+func (InteractionStreamOptions) Validate() error { return nil }

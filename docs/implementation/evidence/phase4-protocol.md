@@ -13,8 +13,8 @@ vendor tree and `GOPROXY=off`.
 | --- | --- |
 | Schema style and compatibility | `buf lint .` and `buf breaking . --against schema-baseline` through `make check` |
 | Deterministic generation | `make proto`; `make check` rerenders to a temporary tree with the exact selected Go binary and compares every `*.pb.go` byte |
-| Negotiation | `common/v1` tests cover the 1.0-1.1 range, greatest-compatible selection, old/new peers, malformed ranges, capabilities, bounds, health, and typed status details |
-| Engine behavior | `engine/v1` tests cover server definitions, reconnect CAS, run validation, ordered replay controls, complete-first interaction streams, cancellation, suspend/resume, authenticated stable snapshot identity, exact reservations, and service shape |
+| Negotiation | `common/v1` tests cover the 1.0-1.2 range, greatest-compatible selection, old/new peers, malformed ranges, capabilities, bounds, health, and typed status details |
+| Engine behavior | `engine/v1` tests cover server definitions, reconnect CAS, run validation, ordered replay controls, minor-2 complete-snapshot/control-first interaction streams, complete response-envelope bounds, stateful contiguous live-delta membership validation, reconnectable aggregate-state limits, cancellation, suspend/resume, authenticated stable snapshot identity, exact reservations, and service shape |
 | Snapshot authority | Golden-vector and tamper tests cover canonical domain-separated HMAC input, exact scope/generation/tag structure, signed-only construction, keyed-only import, secret-safe panic/failure containment, cancellation, defensive copies, capability gating, descriptors, and unknown fields |
 | Kernel replay | `event` tests cover empty initial/imported bounds, bounded pages, final-head tail registration, eviction, stale/future recovery, and slow-tail recovery without gaps or duplicates |
 | Interaction scope | `interaction` and `agent` tests prove every broker request receives its validated owning run ID |

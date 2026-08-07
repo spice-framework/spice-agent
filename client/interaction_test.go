@@ -165,11 +165,11 @@ func TestInteractionUpdatesAreTypedCanonicalAndImmutable(t *testing.T) {
 	if err != nil || !accepted.Accepted() || accepted.DuplicateOperation() {
 		t.Fatalf("respond result = %#v, err=%v", accepted, err)
 	}
-	options, err := NewInteractionStreamOptions(16, true, limits)
-	if err != nil || options.ReplayLimit() != 16 || !options.Tail() {
-		t.Fatalf("interaction options = %#v, err=%v", options, err)
+	options := NewInteractionStreamOptions(true)
+	if !options.Tail() {
+		t.Fatalf("interaction options = %#v", options)
 	}
-	if err := options.Validate(limits); err != nil {
+	if err := options.Validate(); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -202,8 +202,5 @@ func TestInteractionValuesRejectInvalidBoundaries(t *testing.T) {
 	}
 	if _, err := NewRespondResult(false, false); err == nil {
 		t.Fatal("empty response outcome accepted")
-	}
-	if _, err := NewInteractionStreamOptions(limits.ReplayEvents()+1, false, limits); err == nil {
-		t.Fatal("replay limit above negotiation accepted")
 	}
 }

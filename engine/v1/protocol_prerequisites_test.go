@@ -153,6 +153,7 @@ func TestInitializePreflightReconnectAndFailureBoundaries(t *testing.T) {
 	}
 
 	worstRequest := validInitializeRequest()
+	worstRequest.Protocol.Maximum.Minor = 1
 	worstRequest.ReconnectClaim = &enginev1.ReconnectClaim{
 		ClientId: strings.Repeat("c", 128), ExpectedOwnershipEpoch: math.MaxUint64 - 1,
 	}
@@ -173,6 +174,7 @@ func TestInitializePreflightReconnectAndFailureBoundaries(t *testing.T) {
 		t.Fatal("initialize success response size boundary did not converge")
 	}
 	exactSuccess := validInitializeRequest()
+	exactSuccess.Protocol.Maximum.Minor = 1
 	exactSuccess.ReconnectClaim = &enginev1.ReconnectClaim{
 		ClientId: strings.Repeat("c", 128), ExpectedOwnershipEpoch: math.MaxUint64 - 1,
 	}
@@ -191,6 +193,7 @@ func TestInitializePreflightReconnectAndFailureBoundaries(t *testing.T) {
 		t.Fatalf("exact-size initialize success = size %d, response %#v", proto.Size(exactResponse), exactResponse)
 	}
 	oneByteShort := validInitializeRequest()
+	oneByteShort.Protocol.Maximum.Minor = 1
 	oneByteShort.ReconnectClaim = &enginev1.ReconnectClaim{
 		ClientId: strings.Repeat("c", 128), ExpectedOwnershipEpoch: math.MaxUint64 - 1,
 	}

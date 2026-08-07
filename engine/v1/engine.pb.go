@@ -2166,12 +2166,14 @@ func (x *InteractionSnapshot) GetPending() []*PendingInteraction {
 }
 
 // StreamInteractionsRequest always produces one complete atomic pending
-// snapshot first, then revision-contiguous deltas after that snapshot.
+// snapshot and its captured control first. When tail is true, strictly
+// revision-contiguous live deltas follow that control. Reconnect starts from a
+// fresh complete snapshot; there is deliberately no historical delta cursor or
+// replay limit.
 type StreamInteractionsRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ClientId       string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
 	OwnershipEpoch uint64                 `protobuf:"varint,2,opt,name=ownership_epoch,json=ownershipEpoch,proto3" json:"ownership_epoch,omitempty"`
-	ReplayLimit    uint32                 `protobuf:"varint,3,opt,name=replay_limit,json=replayLimit,proto3" json:"replay_limit,omitempty"`
 	Tail           bool                   `protobuf:"varint,4,opt,name=tail,proto3" json:"tail,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
@@ -2217,13 +2219,6 @@ func (x *StreamInteractionsRequest) GetClientId() string {
 func (x *StreamInteractionsRequest) GetOwnershipEpoch() uint64 {
 	if x != nil {
 		return x.OwnershipEpoch
-	}
-	return 0
-}
-
-func (x *StreamInteractionsRequest) GetReplayLimit() uint32 {
-	if x != nil {
-		return x.ReplayLimit
 	}
 	return 0
 }
@@ -3240,12 +3235,11 @@ const file_spice_agent_engine_v1_engine_proto_rawDesc = "" +
 	"\vinteraction\x18\x03 \x01(\v2).spice.agent.engine.v1.PendingInteractionR\vinteraction\"v\n" +
 	"\x13InteractionSnapshot\x12\x1a\n" +
 	"\brevision\x18\x01 \x01(\x04R\brevision\x12C\n" +
-	"\apending\x18\x02 \x03(\v2).spice.agent.engine.v1.PendingInteractionR\apending\"\x98\x01\n" +
+	"\apending\x18\x02 \x03(\v2).spice.agent.engine.v1.PendingInteractionR\apending\"\x89\x01\n" +
 	"\x19StreamInteractionsRequest\x12\x1b\n" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12'\n" +
-	"\x0fownership_epoch\x18\x02 \x01(\x04R\x0eownershipEpoch\x12!\n" +
-	"\freplay_limit\x18\x03 \x01(\rR\vreplayLimit\x12\x12\n" +
-	"\x04tail\x18\x04 \x01(\bR\x04tail\"\xdd\x01\n" +
+	"\x0fownership_epoch\x18\x02 \x01(\x04R\x0eownershipEpoch\x12\x12\n" +
+	"\x04tail\x18\x04 \x01(\bR\x04tailJ\x04\b\x03\x10\x04R\freplay_limit\"\xdd\x01\n" +
 	"\x18InteractionStreamControl\x125\n" +
 	"\x06status\x18\x01 \x01(\v2\x1d.spice.agent.common.v1.StatusR\x06status\x12'\n" +
 	"\x0flatest_revision\x18\x02 \x01(\x04R\x0elatestRevision\x12,\n" +

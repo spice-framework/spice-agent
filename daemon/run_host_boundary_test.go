@@ -17,6 +17,24 @@ import (
 func TestRunHostBoundaryRejectsEveryInvalidConfigurationClass(t *testing.T) {
 	t.Parallel()
 	fixture := newRunHostFixture(t, immediateHostProvider{}, 1, 2)
+	oversizedBytesLimits := DefaultPendingLimits()
+	oversizedBytesLimits.PendingBytesPerClient = 2 << 20
+	oversizedBytes, err := NewPendingHub(oversizedBytesLimits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oversizedItemsLimits := DefaultPendingLimits()
+	oversizedItemsLimits.PendingPerClient = 129
+	oversizedItems, err := NewPendingHub(oversizedItemsLimits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oversizedStreams, err := client.NewLimits(
+		1<<20, 128, 128, 1<<20, maximumSessionStreamsPerClient+1, 1,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		name      string
@@ -29,12 +47,15 @@ func TestRunHostBoundaryRejectsEveryInvalidConfigurationClass(t *testing.T) {
 		{name: "nil sessions", configure: func(config *RunHostConfig) { config.Sessions = nil }, authority: fixture.authority},
 		{name: "nil ledger", configure: func(config *RunHostConfig) { config.Ledger = nil }, authority: fixture.authority},
 		{name: "nil pending hub", configure: func(config *RunHostConfig) { config.Pending = nil }, authority: fixture.authority},
+		{name: "pending snapshot bytes exceed protocol", configure: func(config *RunHostConfig) { config.Pending = oversizedBytes }, authority: fixture.authority},
+		{name: "pending snapshot items exceed protocol", configure: func(config *RunHostConfig) { config.Pending = oversizedItems }, authority: fixture.authority},
 		{name: "canceled root", configure: func(config *RunHostConfig) {
 			root, cancel := context.WithCancel(context.Background())
 			cancel()
 			config.Root = root
 		}, authority: fixture.authority},
 		{name: "invalid limits", configure: func(config *RunHostConfig) { config.Limits = client.Limits{} }, authority: fixture.authority},
+		{name: "stream limit above session fence", configure: func(config *RunHostConfig) { config.Limits = oversizedStreams }, authority: fixture.authority},
 		{name: "invalid definitions", configure: func(config *RunHostConfig) { config.Definitions = DefinitionSet{} }, authority: fixture.authority},
 		{name: "terminal count above bound", configure: func(config *RunHostConfig) { config.TerminalRuns = maximumTerminalRuns + 1 }, authority: fixture.authority},
 		{name: "terminal bytes zero", configure: func(config *RunHostConfig) { config.TerminalBytes = 0 }, authority: fixture.authority},

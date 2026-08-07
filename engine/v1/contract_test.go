@@ -15,6 +15,10 @@ import (
 func TestInitializeNegotiatesVersionCapabilitiesLimitsAndHealth(t *testing.T) {
 	t.Parallel()
 	request := validInitializeRequest()
+	request.RequestedLimits.MaxReplayEvents = 128
+	request.RequestedLimits.MaxReplayBytes = 4 << 20
+	request.RequestedLimits.MaxConcurrentStreams = 4
+	request.RequestedLimits.MaxActiveRuns = 8
 	response := enginev1.NegotiateInitialize(
 		request,
 		commonv1.SupportedProtocolRange(),
@@ -411,7 +415,7 @@ func validInitializeRequest() *enginev1.InitializeRequest {
 		Client:                build("spice-agent-tui"),
 		SupportedCapabilities: capabilities("events", enginev1.CapabilitySnapshotAuthorityV1, "snapshots", "tools"),
 		RequiredCapabilities:  capabilities("events", enginev1.CapabilitySnapshotAuthorityV1, "snapshots"),
-		RequestedLimits:       limits(2<<20, 64, 128, 4<<20, 4, 8),
+		RequestedLimits:       protocolLimits(),
 	}
 }
 

@@ -145,8 +145,20 @@ func (lease *MutationCommitLease) Close() {
 // closes the lease; a successful ReconnectContext cannot advance or return
 // while any old stream lease remains registered.
 func (store *SessionStore) AcquireStream(ctx context.Context, clientID string, epoch uint64) (*StreamLease, error) {
+	return store.acquireStream(ctx, clientID, epoch, maximumSessionStreamsPerClient)
+}
+
+func (store *SessionStore) acquireStream(
+	ctx context.Context,
+	clientID string,
+	epoch uint64,
+	maximum int,
+) (*StreamLease, error) {
 	if store == nil {
 		return nil, ErrSessionStoreClosed
+	}
+	if maximum < 1 || maximum > maximumSessionStreamsPerClient {
+		return nil, errors.New("stream lease limit is invalid")
 	}
 	if ctx == nil {
 		return nil, errors.New("stream context is nil")
@@ -180,9 +192,9 @@ func (store *SessionStore) AcquireStream(ctx context.Context, clientID string, e
 		}
 		if len(state.reconnectWaiters) == 0 {
 			store.removeStreamWaiterLocked(state, waiter)
-			if len(state.streams) >= maximumSessionStreamsPerClient {
+			if len(state.streams) >= maximum {
 				store.mu.Unlock()
-				return nil, newSessionGateCapacity("stream leases", maximumSessionStreamsPerClient)
+				return nil, newSessionGateCapacity("stream leases", maximum)
 			}
 			streamContext, cancel := context.WithCancelCause(state.ctx)
 			lease := &StreamLease{store: store, state: state, ctx: streamContext, cancel: cancel}

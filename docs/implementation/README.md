@@ -85,7 +85,7 @@ protocol fuzzing are covered. No daemon, listener, transport authentication,
 managed startup, or TUI implementation is claimed by this slice. Reproducible
 commands are recorded in
 [`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
-The wire boundary advertises protocol 1.0-1.1 and makes snapshot transfer a
+The wire boundary advertises protocol 1.0-1.2 and makes snapshot transfer a
 minor-1 `snapshot-authority-v1` capability. Envelopes require a canonical
 HMAC-SHA256 authority claim; construction requires a trusted signer and import
 requires keyed verification. This is a wire and cryptographic seam, not an OS
@@ -161,6 +161,11 @@ non-disclosing, and fixed safe degradation reasons are reported by Health.
 Typed stale-owner and host/session-gate capacity facts survive durable outcome
 replay and pre-boundary abandonment without exposing dependency error text;
 malformed or legacy detail fields degrade to stable public sentinels.
+Owned event replay/tailing and client-scoped interaction snapshot/tail views now
+form the transport-neutral read boundary. Snapshot-only interaction reads do
+not allocate observers. Opaque observations enforce configured stream capacity,
+merge request, session, and host lifetimes, and retain their reconnect fence
+until the eventual transport joins every sender and calls `Close`.
 The kernel's service-lifetime seen-run identity tombstones remain unbounded even
 when RunHost evicts a terminal envelope. No gRPC/Protobuf adapter, IPC listener,
 stream bridge, endpoint authentication, discovery, or managed startup is

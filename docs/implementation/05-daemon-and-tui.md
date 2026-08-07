@@ -21,6 +21,11 @@ Protocol minor 1 makes snapshot transfer authenticated and atomic with the
 `snapshot-authority-v1` capability. Signed construction and keyed import
 verification are mandatory. Minor-0 connections receive neither snapshot
 capability; unkeyed SHA-256 validation is payload integrity, not authority.
+Protocol minor 2 replaces the provisional interaction replay limit with one
+complete current snapshot and captured control followed, when requested, by a
+bounded live tail. Minor-0 and minor-1 peers cannot invoke that revised stream.
+Minor-2 initialization also requires server-sized message and collection
+bounds so every state admitted by the host remains reconnectable in one frame.
 
 Every request has count, byte, and deadline limits. Unknown fields follow the
 documented additive-compatibility rule. Protocol errors distinguish invalid

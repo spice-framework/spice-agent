@@ -4,11 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
 	commonv1 "github.com/spice-framework/spice-agent/common/v1"
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -23,6 +26,9 @@ const (
 	MaximumSnapshotEnvelopeOverheadBytes = 295
 	// MaximumSnapshotEnvelopeBytes bounds a complete signed snapshot transfer.
 	MaximumSnapshotEnvelopeBytes = MaximumSnapshotBytes + MaximumSnapshotEnvelopeOverheadBytes
+	// InteractionStreamMinimumMinor is the first protocol minor with the
+	// complete-snapshot-first interaction stream and no historical replay field.
+	InteractionStreamMinimumMinor = uint32(2)
 
 	maximumJSONBytes        = 1 << 20
 	maximumInteractionBytes = 512 << 10
@@ -30,6 +36,48 @@ const (
 	maximumMessageParts     = 128
 	maximumDefinitionTurns  = 1000
 )
+
+// ValidateInteractionStreamProtocol rejects negotiated peers that still use
+// the provisional pre-minor-2 interaction request semantics.
+func ValidateInteractionStreamProtocol(version *commonv1.ProtocolVersion) error {
+	if err := validateNegotiatedProtocol(version); err != nil {
+		return err
+	}
+	if version.GetMinor() < InteractionStreamMinimumMinor {
+		return errors.New("protocol minor 2 is required for interaction streams")
+	}
+	return nil
+}
+
+func validateInteractionStreamRequestedLimits(
+	version *commonv1.ProtocolVersion,
+	requested *commonv1.Limits,
+	server *commonv1.Limits,
+) error {
+	if version.GetMinor() < InteractionStreamMinimumMinor {
+		return nil
+	}
+	if requested.GetMaxMessageBytes() < server.GetMaxMessageBytes() ||
+		requested.GetMaxCollectionItems() < server.GetMaxCollectionItems() {
+		return errors.New("protocol minor 2 requires server-sized interaction snapshot limits")
+	}
+	return nil
+}
+
+func validateInteractionStreamSelectedLimits(
+	version *commonv1.ProtocolVersion,
+	selected *commonv1.Limits,
+	server *commonv1.Limits,
+) error {
+	if version.GetMinor() < InteractionStreamMinimumMinor {
+		return nil
+	}
+	if selected.GetMaxMessageBytes() != server.GetMaxMessageBytes() ||
+		selected.GetMaxCollectionItems() != server.GetMaxCollectionItems() {
+		return errors.New("protocol minor 2 requires server-sized interaction snapshot limits")
+	}
+	return nil
+}
 
 // NegotiateInitialize validates the first application payload after transport
 // metadata authentication and returns a complete immutable connection contract.
@@ -97,6 +145,11 @@ func ValidateInitializeResponse(response *InitializeResponse) error {
 		return errors.New("initialize capability count exceeds the negotiated collection limit")
 	}
 	if err := commonv1.ValidateHealth(response.GetHealth()); err != nil {
+		return err
+	}
+	if err := validateInteractionStreamSelectedLimits(
+		response.GetProtocol(), response.GetLimits(), response.GetHealth().GetLimits(),
+	); err != nil {
 		return err
 	}
 	if len(response.GetHealth().GetDegradedReasons()) > int(response.GetLimits().GetMaxCollectionItems()) {
@@ -413,9 +466,18 @@ func validateCurrentStreamControl(value *StreamControl, earliest, latest uint64)
 }
 
 // ValidateStreamInteractionsRequest bounds the separate pending-prompt stream.
-func ValidateStreamInteractionsRequest(request *StreamInteractionsRequest, limits *commonv1.Limits) error {
+// Reconnect always receives a complete current snapshot, so there is no
+// historical delta replay limit to validate.
+func ValidateStreamInteractionsRequest(
+	request *StreamInteractionsRequest,
+	protocol *commonv1.ProtocolVersion,
+	limits *commonv1.Limits,
+) error {
 	if request == nil {
 		return errors.New("stream interactions request is required")
+	}
+	if err := ValidateInteractionStreamProtocol(protocol); err != nil {
+		return err
 	}
 	if err := validateClient(request.GetClientId(), request.GetOwnershipEpoch()); err != nil {
 		return err
@@ -423,10 +485,32 @@ func ValidateStreamInteractionsRequest(request *StreamInteractionsRequest, limit
 	if err := commonv1.ValidateLimits(limits); err != nil {
 		return err
 	}
-	if request.GetReplayLimit() == 0 || request.GetReplayLimit() > limits.GetMaxReplayEvents() {
-		return fmt.Errorf("interaction replay limit must be between 1 and %d", limits.GetMaxReplayEvents())
+	legacyReplay, err := hasUnknownFieldNumber(request.ProtoReflect().GetUnknown(), 3)
+	if err != nil {
+		return err
+	}
+	if legacyReplay {
+		return errors.New("provisional interaction replay field is unsupported")
 	}
 	return commonv1.ValidateEncodedSize(request, limits.GetMaxMessageBytes())
+}
+
+func hasUnknownFieldNumber(encoded []byte, field protowire.Number) (bool, error) {
+	for len(encoded) != 0 {
+		number, kind, tagBytes := protowire.ConsumeTag(encoded)
+		if tagBytes < 0 {
+			return false, errors.New("interaction request contains malformed unknown fields")
+		}
+		valueBytes := protowire.ConsumeFieldValue(number, kind, encoded[tagBytes:])
+		if valueBytes < 0 {
+			return false, errors.New("interaction request contains malformed unknown fields")
+		}
+		if number == field {
+			return true, nil
+		}
+		encoded = encoded[tagBytes+valueBytes:]
+	}
+	return false, nil
 }
 
 // ValidatePendingInteraction rejects uncorrelated or unbounded prompt state.
@@ -516,62 +600,160 @@ func ValidateInteractionStreamControl(value *InteractionStreamControl) error {
 }
 
 // ValidateInteractionStreamPage proves the mandatory reconnect contract: the
-// first frame is always a complete atomic pending snapshot, followed by
-// revision-contiguous deltas and one final page control. A client therefore
-// never depends on evicted delta history to discover an unresolved prompt.
-func ValidateInteractionStreamPage(values []*StreamInteractionsResponse, limits *commonv1.Limits) error {
-	if len(values) < 2 {
-		return errors.New("interaction stream page requires a snapshot and control")
+// initial page is exactly one complete atomic pending snapshot followed by its
+// captured control. A tail, when requested, begins only after that control and
+// carries revision-contiguous live deltas. A client therefore never depends on
+// evicted delta history to discover an unresolved prompt.
+func ValidateInteractionStreamPage(
+	values []*StreamInteractionsResponse,
+	expectedTail bool,
+	limits *commonv1.Limits,
+) error {
+	if len(values) != 2 {
+		return errors.New("interaction stream initial page requires exactly a snapshot and control")
 	}
 	if err := commonv1.ValidateLimits(limits); err != nil {
 		return err
+	}
+	for index, value := range values {
+		if err := commonv1.ValidateEncodedSize(value, limits.GetMaxMessageBytes()); err != nil {
+			return fmt.Errorf("interaction frame %d: %w", index, err)
+		}
 	}
 	snapshot := values[0].GetSnapshot()
 	if err := ValidateInteractionSnapshot(snapshot, limits); err != nil {
 		return fmt.Errorf("first interaction frame: %w", err)
 	}
-	revision := snapshot.GetRevision()
-	pending := make(map[string]struct{}, len(snapshot.GetPending()))
-	for _, interaction := range snapshot.GetPending() {
-		pending[interactionKey(interaction)] = struct{}{}
-	}
-	deltaCount := 0
-	for index, response := range values[1 : len(values)-1] {
-		delta := response.GetDelta()
-		if err := ValidateInteractionDelta(delta); err != nil {
-			return fmt.Errorf("interaction frame %d: %w", index+1, err)
-		}
-		if revision == math.MaxUint64 || delta.GetRevision() != revision+1 {
-			return fmt.Errorf("interaction frame %d is not the next revision", index+1)
-		}
-		revision = delta.GetRevision()
-		key := interactionKey(delta.GetInteraction())
-		_, exists := pending[key]
-		switch delta.GetKind() {
-		case InteractionDeltaKind_INTERACTION_DELTA_KIND_OPENED:
-			if exists {
-				return fmt.Errorf("interaction frame %d opens an already-pending interaction", index+1)
-			}
-			pending[key] = struct{}{}
-		case InteractionDeltaKind_INTERACTION_DELTA_KIND_CLOSED:
-			if !exists {
-				return fmt.Errorf("interaction frame %d closes a non-pending interaction", index+1)
-			}
-			delete(pending, key)
-		}
-		deltaCount++
-	}
-	if deltaCount > int(limits.GetMaxReplayEvents()) {
-		return fmt.Errorf("interaction delta count exceeds %d", limits.GetMaxReplayEvents())
-	}
-	control := values[len(values)-1].GetControl()
+	control := values[1].GetControl()
 	if err := ValidateInteractionStreamControl(control); err != nil {
-		return fmt.Errorf("final interaction frame: %w", err)
+		return fmt.Errorf("interaction control frame: %w", err)
 	}
-	if commonv1.AsError(control.GetStatus()) == nil && control.GetPageLastRevision() != revision {
-		return errors.New("interaction control page cursor does not match the delivered revision")
+	if commonv1.AsError(control.GetStatus()) != nil {
+		return errors.New("interaction initial page control must be successful")
+	}
+	if control.GetLatestRevision() != snapshot.GetRevision() ||
+		control.GetPageLastRevision() != snapshot.GetRevision() || control.GetHasMore() {
+		return errors.New("interaction control must identify the complete snapshot revision")
+	}
+	if control.GetTailing() != expectedTail {
+		return errors.New("interaction control tail state does not match the request")
 	}
 	return nil
+}
+
+// InteractionTailValidator validates the stateful live-delta contract after a
+// complete snapshot and its control have been accepted. It is single-consumer
+// state: failed deltas never advance the revision or pending-set membership.
+type InteractionTailValidator struct {
+	revision uint64
+	limits   *commonv1.Limits
+	pending  map[string]*PendingInteraction
+}
+
+// NewInteractionTailValidator validates a tailing initial page and captures a
+// defensive pending-set baseline for subsequent Accept calls.
+func NewInteractionTailValidator(
+	snapshot *InteractionSnapshot,
+	control *InteractionStreamControl,
+	limits *commonv1.Limits,
+) (*InteractionTailValidator, error) {
+	page := []*StreamInteractionsResponse{
+		{Payload: &StreamInteractionsResponse_Snapshot{Snapshot: snapshot}},
+		{Payload: &StreamInteractionsResponse_Control{Control: control}},
+	}
+	if err := ValidateInteractionStreamPage(page, true, limits); err != nil {
+		return nil, err
+	}
+	validator := &InteractionTailValidator{
+		revision: snapshot.GetRevision(), limits: proto.CloneOf(limits),
+		pending: make(map[string]*PendingInteraction, len(snapshot.GetPending())),
+	}
+	for _, item := range snapshot.GetPending() {
+		validator.pending[interactionKey(item)] = proto.CloneOf(item)
+	}
+	return validator, nil
+}
+
+// Accept validates and commits exactly one complete next live-delta frame.
+func (validator *InteractionTailValidator) Accept(frame *StreamInteractionsResponse) error {
+	if validator == nil || validator.pending == nil || validator.limits == nil {
+		return errors.New("interaction tail validator is unavailable")
+	}
+	if err := commonv1.ValidateEncodedSize(frame, validator.limits.GetMaxMessageBytes()); err != nil {
+		return err
+	}
+	delta := frame.GetDelta()
+	if err := ValidateInteractionDelta(delta); err != nil {
+		return err
+	}
+	if validator.revision == math.MaxUint64 || delta.GetRevision() != validator.revision+1 {
+		return errors.New("interaction delta is not the next revision")
+	}
+	key := interactionKey(delta.GetInteraction())
+	existing, exists := validator.pending[key]
+	next := make(map[string]*PendingInteraction, len(validator.pending)+1)
+	maps.Copy(next, validator.pending)
+	switch delta.GetKind() {
+	case InteractionDeltaKind_INTERACTION_DELTA_KIND_OPENED:
+		if exists {
+			return errors.New("interaction delta opens an already-pending interaction")
+		}
+		if len(validator.pending) >= int(validator.limits.GetMaxCollectionItems()) {
+			return errors.New("interaction delta exceeds the negotiated pending count")
+		}
+		next[key] = proto.CloneOf(delta.GetInteraction())
+	case InteractionDeltaKind_INTERACTION_DELTA_KIND_CLOSED:
+		if !exists {
+			return errors.New("interaction delta closes a non-pending interaction")
+		}
+		if !proto.Equal(existing, delta.GetInteraction()) {
+			return errors.New("interaction close does not match the pending interaction")
+		}
+		delete(next, key)
+	default:
+		return errors.New("interaction delta kind is unsupported")
+	}
+	if err := validateRepresentableInteractionState(delta.GetRevision(), next, validator.limits); err != nil {
+		return err
+	}
+	validator.pending = next
+	validator.revision = delta.GetRevision()
+	return nil
+}
+
+func validateRepresentableInteractionState(
+	revision uint64,
+	pending map[string]*PendingInteraction,
+	limits *commonv1.Limits,
+) error {
+	keys := make([]string, 0, len(pending))
+	for key := range pending {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	items := make([]*PendingInteraction, len(keys))
+	for index, key := range keys {
+		items[index] = pending[key]
+	}
+	snapshot := &InteractionSnapshot{Revision: revision, Pending: items}
+	if err := ValidateInteractionSnapshot(snapshot, limits); err != nil {
+		return fmt.Errorf("interaction state is not reconnectable: %w", err)
+	}
+	frame := &StreamInteractionsResponse{
+		Payload: &StreamInteractionsResponse_Snapshot{Snapshot: snapshot},
+	}
+	if err := commonv1.ValidateEncodedSize(frame, limits.GetMaxMessageBytes()); err != nil {
+		return fmt.Errorf("interaction state is not reconnectable: %w", err)
+	}
+	return nil
+}
+
+// Revision returns the last accepted snapshot or delta revision.
+func (validator *InteractionTailValidator) Revision() uint64 {
+	if validator == nil {
+		return 0
+	}
+	return validator.revision
 }
 
 func interactionKey(value *PendingInteraction) string {

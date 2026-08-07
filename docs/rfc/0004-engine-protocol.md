@@ -47,11 +47,21 @@ or dynamic plan fingerprint. Incompatible major versions or required
 capabilities fail before a run is created, with both observed and required
 values.
 
-The implementation advertises protocol range 1.0 through 1.1. Snapshot transfer
+The implementation advertises protocol range 1.0 through 1.2. Snapshot transfer
 is atomic with authenticated authority: minor-0 negotiation removes both
 `snapshots` and `snapshot-authority-v1`. A client requiring either receives a
 typed missing-capability result. A minor-1 client must require
 `snapshot-authority-v1` before relying on export or import.
+
+Minor 2 defines the complete-snapshot-first interaction stream without the
+provisional historical `replay_limit` field. `StreamInteractions` requires a
+minor-2 negotiation; peers that negotiate minor 0 or 1 receive an explicit
+version refusal rather than silently assigning a different meaning to field 3.
+Because reconnect must fit the complete pending set in one frame, a minor-2
+client must request message and collection limits at least as large as the
+server's advertised bounds. Host construction proves its pending-interaction
+admission capacity fits those server bounds, and every accepted live delta is
+validated against the resulting reconnect snapshot before state advances.
 
 The transport-independent host represents this catalog as exact immutable
 `agent.Definition` values rather than reconstructing model or maximum-turn
@@ -82,8 +92,9 @@ abandonment returned with a result remain committed uncertain outcomes.
   non-tailing compatibility shape. For current controls, `has_more` is exactly
   equivalent to `page_last_sequence < latest_sequence`.
 - `StreamInteractions` always sends a complete atomic snapshot of every pending
-  prompt as its first frame. Revision-contiguous opened/closed deltas and a
-  final control follow. Reconnect never relies on retained delta history to
+  prompt and its captured control first. If live tailing was requested,
+  revision-contiguous opened/closed deltas follow that control. Reconnect never
+  relies on retained delta history, a historical cursor, or a replay limit to
   discover an unresolved prompt. Prompt/schema/response content remains outside
   authoritative run events.
 - `CancelRun` is idempotent and reports whether the run was already terminal.

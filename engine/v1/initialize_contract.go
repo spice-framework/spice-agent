@@ -85,26 +85,10 @@ func PreflightInitialize(
 	if err := ValidateInitializeRequest(request); err != nil {
 		return invalid(err.Error())
 	}
-	if err := commonv1.ValidateProtocolRange(serverRange); err != nil {
-		return internal("server protocol range is invalid")
-	}
-	if err := commonv1.ValidateBuildIdentity(serverBuild); err != nil {
-		return internal("server build identity is invalid")
-	}
-	if err := commonv1.ValidateCapabilities(serverCapabilities); err != nil {
-		return internal("server capabilities are invalid")
-	}
-	if err := commonv1.ValidateLimits(serverLimits); err != nil {
-		return internal("server limits are invalid")
-	}
-	if err := commonv1.ValidateHealth(health); err != nil {
-		return internal("server health is invalid")
-	}
-	if !proto.Equal(health.GetLimits(), serverLimits) {
-		return internal("server health limits do not match server limits")
-	}
-	if err := ValidateDefinitionSet(definitions, serverLimits); err != nil {
-		return internal("server definition set is invalid")
+	if err := validateInitializeServer(
+		serverRange, serverBuild, serverCapabilities, serverLimits, health, definitions,
+	); err != nil {
+		return internal(err.Error())
 	}
 
 	version, status := commonv1.NegotiateProtocol(request.GetProtocol(), serverRange)
@@ -113,6 +97,11 @@ func PreflightInitialize(
 	}
 	if err := validateNegotiatedProtocol(version); err != nil {
 		return internal("server negotiated an unsupported protocol")
+	}
+	if err := validateInteractionStreamRequestedLimits(
+		version, request.GetRequestedLimits(), serverLimits,
+	); err != nil {
+		return invalid(err.Error())
 	}
 	limits, status := commonv1.NegotiateLimits(request.GetRequestedLimits(), serverLimits)
 	if status.GetCode() != commonv1.ErrorCode_ERROR_CODE_OK {
@@ -160,6 +149,38 @@ func PreflightInitialize(
 		return internal("initialize success response is invalid")
 	}
 	return negotiation, nil
+}
+
+func validateInitializeServer(
+	serverRange *commonv1.ProtocolRange,
+	serverBuild *commonv1.BuildIdentity,
+	serverCapabilities *commonv1.CapabilitySet,
+	serverLimits *commonv1.Limits,
+	health *commonv1.Health,
+	definitions *DefinitionSet,
+) error {
+	if err := commonv1.ValidateProtocolRange(serverRange); err != nil {
+		return errors.New("server protocol range is invalid")
+	}
+	if err := commonv1.ValidateBuildIdentity(serverBuild); err != nil {
+		return errors.New("server build identity is invalid")
+	}
+	if err := commonv1.ValidateCapabilities(serverCapabilities); err != nil {
+		return errors.New("server capabilities are invalid")
+	}
+	if err := commonv1.ValidateLimits(serverLimits); err != nil {
+		return errors.New("server limits are invalid")
+	}
+	if err := commonv1.ValidateHealth(health); err != nil {
+		return errors.New("server health is invalid")
+	}
+	if !proto.Equal(health.GetLimits(), serverLimits) {
+		return errors.New("server health limits do not match server limits")
+	}
+	if err := ValidateDefinitionSet(definitions, serverLimits); err != nil {
+		return errors.New("server definition set is invalid")
+	}
+	return nil
 }
 
 // CompleteInitialize binds a successful pure negotiation to one newly

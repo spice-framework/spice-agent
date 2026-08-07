@@ -281,11 +281,15 @@ message InteractionSnapshot {
 }
 
 // StreamInteractionsRequest always produces one complete atomic pending
-// snapshot first, then revision-contiguous deltas after that snapshot.
+// snapshot and its captured control first. When tail is true, strictly
+// revision-contiguous live deltas follow that control. Reconnect starts from a
+// fresh complete snapshot; there is deliberately no historical delta cursor or
+// replay limit.
 message StreamInteractionsRequest {
   string client_id = 1;
   uint64 ownership_epoch = 2;
-  uint32 replay_limit = 3;
+  reserved 3;
+  reserved "replay_limit";
   bool tail = 4;
 }
 
