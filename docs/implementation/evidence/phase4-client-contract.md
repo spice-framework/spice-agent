@@ -22,6 +22,14 @@ latest sequence, continuation state, and tail state. Interaction streams
 similarly carry a complete pending snapshot followed by revision-contiguous
 changes and explicit stream controls.
 
+Managed transport adapters own one additional reconnect obligation. They must
+cancel and join all stream RPCs from the old ownership epoch, or close the old
+transport, before reconnecting. The server cancels an old observation and holds
+its reconnect fence until the stream sender exits, but gRPC does not provide a
+server-side mechanism to interrupt a `Send` already blocked by transport flow
+control. A deadline-bounded reconnect therefore may time out without advancing
+the epoch; after the old RPC exits, retrying the same expected epoch is safe.
+
 ## Safety and fidelity
 
 All public values validate the same count, byte, token, health, replay, and
@@ -51,7 +59,10 @@ cursor gaps in both directions, every generic and structured failure, token
 control characters, arbitrary JSON kinds, secret canaries under nested
 formatting/logging/encoding, cancellation, concurrent session use, stream
 single-reader ownership, close races, and immutable post-close connection
-inspection.
+inspection. The gRPC event-stream acceptance additionally uses a deliberately
+flow-control-blocked `Send`: reconnect times out without advancing ownership,
+canceling and joining the old RPC releases the fence, and the retry advances
+exactly one epoch.
 
 Exact whole-repository acceptance commands and timings are recorded with the
 commit that accepts this slice. This evidence establishes a public client

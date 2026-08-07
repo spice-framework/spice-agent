@@ -191,7 +191,9 @@ unknown identities reveal no invented epoch. The same authenticated service now
 implements all seven lifecycle unary RPCs through typed client values and
 `RunHost`, with exact negotiated-limit revalidation, fixed safe error statuses,
 single-text Start input, snapshot capability gates, and structural-only import
-translation. No OS endpoint, metadata-file permission handling, streams, or
+translation. Authenticated event replay/tailing and complete-first interaction
+streaming now preserve exact typed recovery facts and reconnect fencing through
+sender exit. No OS endpoint, metadata-file permission handling, or public
 client adapter is claimed.
 Evidence is in
 [`evidence/phase4-grpc-authentication.md`](evidence/phase4-grpc-authentication.md)
@@ -199,6 +201,8 @@ and
 [`evidence/phase4-initialize-health.md`](evidence/phase4-initialize-health.md).
 Lifecycle unary evidence is in
 [`evidence/phase4-lifecycle-unary.md`](evidence/phase4-lifecycle-unary.md).
+Authenticated streaming evidence is in
+[`evidence/phase4-streaming-rpc.md`](evidence/phase4-streaming-rpc.md).
 The snapshot-import contract now also exposes a complete unkeyed structural
 validator for the transport boundary. It accounts for compatible unknown
 Protobuf fields in the negotiated size and deliberately accepts an untrusted

@@ -196,8 +196,12 @@ deadlines alone remain gRPC errors. Start deliberately supports one user text
 part until the standard-library client contract grows richer input types.
 Snapshot transfer requires minor 1 plus `snapshots` and
 `snapshot-authority-v1`; the adapter validates and serializes import structure
-but never verifies its HMAC. This slice has no OS listener, endpoint metadata
-file, stream bridge, discovery, or client adapter; those remain pending.
+but never verifies its HMAC. Authenticated event and interaction streams now
+consume RunHost-owned observations, prevalidate complete pages before
+disclosure, preserve typed replay/overload recovery, and retain reconnect
+fences until their senders exit. Bounded server shutdown cancels adapter-owned
+observations and force-stops gRPC at the caller deadline. This slice has no OS listener, endpoint
+metadata file, discovery, or public client adapter; those remain pending.
 
 The lifecycle-adapter prerequisite now separates snapshot-import structure
 from authority. `ValidateImportSnapshotRequestStructure` checks the complete
@@ -214,8 +218,8 @@ has an independent control lane, and external acceptance executes the actual
 injected terminal shell through explicit application start and stop. Its full
 gate passed in 158.4 seconds at 90.1% product coverage. The high-level daemon
 client adapter and real terminal process workflow remain pending.
-The remainder of slices 2 through 6 stays pending, including event and
-interaction streams, OS transport, managed startup, the
+The remainder of slices 2 through 6 stays pending, including OS transport,
+managed startup, the
 daemon-to-TUI bridge, and real Windows/Linux reconnect acceptance. See
 [`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
 Foundation-specific evidence is in
@@ -244,6 +248,8 @@ Initialize/Health adapter evidence is in
 [`evidence/phase4-initialize-health.md`](evidence/phase4-initialize-health.md).
 Lifecycle unary adapter evidence is in
 [`evidence/phase4-lifecycle-unary.md`](evidence/phase4-lifecycle-unary.md).
+Authenticated streaming adapter evidence is in
+[`evidence/phase4-streaming-rpc.md`](evidence/phase4-streaming-rpc.md).
 
 The baseline remains intentionally provisional. The pre-host repair closes the
 schema and kernel seams for interaction discovery/run identity, reconnect CAS,

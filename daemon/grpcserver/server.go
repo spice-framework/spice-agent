@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"sync"
 
 	"github.com/spice-framework/spice-agent/client"
 	"github.com/spice-framework/spice-agent/daemon"
 	enginev1 "github.com/spice-framework/spice-agent/engine/v1"
+	"github.com/spice-framework/spice-agent/event"
 	"google.golang.org/grpc"
 )
 
@@ -36,6 +38,57 @@ type runHostBoundary interface {
 	Resume(context.Context, daemon.Session, client.RunMutation) (client.ResumeResult, error)
 	Export(context.Context, daemon.Session, client.RunRef) (client.Snapshot, error)
 	Import(context.Context, daemon.Session, client.ImportRequest) (client.ImportResult, error)
+	ReplayEvents(context.Context, daemon.Session, client.RunRef, event.ReplayRequest) (ownedEventObservation, error)
+	SnapshotInteractions(context.Context, daemon.Session) (interactionObservation, error)
+	SubscribeInteractions(context.Context, daemon.Session) (interactionObservation, error)
+}
+
+type runHostAdapter struct{ *daemon.RunHost }
+
+func (adapter runHostAdapter) ReplayEvents(
+	ctx context.Context,
+	session daemon.Session,
+	run client.RunRef,
+	request event.ReplayRequest,
+) (ownedEventObservation, error) {
+	observation, err := adapter.RunHost.ReplayEvents(ctx, session, run, request)
+	return normalizeEventObservation(observation, err)
+}
+
+func (adapter runHostAdapter) SnapshotInteractions(
+	ctx context.Context,
+	session daemon.Session,
+) (interactionObservation, error) {
+	observation, err := adapter.RunHost.SnapshotInteractions(ctx, session)
+	return normalizeInteractionObservation(observation, err)
+}
+
+func (adapter runHostAdapter) SubscribeInteractions(
+	ctx context.Context,
+	session daemon.Session,
+) (interactionObservation, error) {
+	observation, err := adapter.RunHost.SubscribeInteractions(ctx, session)
+	return normalizeInteractionObservation(observation, err)
+}
+
+func normalizeEventObservation(
+	observation *daemon.EventObservation,
+	err error,
+) (ownedEventObservation, error) {
+	if observation == nil {
+		return nil, err
+	}
+	return observation, err
+}
+
+func normalizeInteractionObservation(
+	observation *daemon.InteractionObservation,
+	err error,
+) (interactionObservation, error) {
+	if observation == nil {
+		return nil, err
+	}
+	return observation, err
 }
 
 type sessionStoreBoundary interface {
@@ -57,9 +110,12 @@ type serverDependencies struct {
 // Server is one authenticated local gRPC boundary. It wraps gRPC so callers
 // cannot register the engine service without both authentication interceptors.
 type Server struct {
-	grpc     *grpc.Server
-	registry *negotiatedSessionRegistry
-	cancel   context.CancelFunc
+	grpc         *grpc.Server
+	registry     *negotiatedSessionRegistry
+	cancel       context.CancelFunc
+	shutdownOnce sync.Once
+	forceOnce    sync.Once
+	shutdownDone chan struct{}
 }
 
 // NewServer constructs the authenticated boundary without opening an OS
@@ -69,7 +125,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		return nil, errors.New("gRPC server requires run host and session store")
 	}
 	return newServer(serverDependencies{
-		root: config.Root, token: config.EndpointToken, host: config.Host,
+		root: config.Root, token: config.EndpointToken, host: runHostAdapter{RunHost: config.Host},
 		sessions: config.Sessions, build: config.Build,
 		capabilities: config.Capabilities, maximumSessions: config.MaximumSessions,
 	})
@@ -132,7 +188,10 @@ func newServer(dependencies serverDependencies) (*Server, error) {
 		grpc.StreamInterceptor(stream),
 	)
 	enginev1.RegisterEngineServiceServer(server, service)
-	return &Server{grpc: server, registry: registry, cancel: cancel}, nil
+	return &Server{
+		grpc: server, registry: registry, cancel: cancel,
+		shutdownDone: make(chan struct{}),
+	}, nil
 }
 
 // Serve accepts authenticated connections from the caller-owned listener.
@@ -146,34 +205,66 @@ func (server *Server) Serve(listener net.Listener) error {
 // Stop immediately stops gRPC work and closes negotiated-session lookup. It
 // does not close the transport-independent RunHost or SessionStore.
 func (server *Server) Stop() {
-	if server == nil {
+	if server == nil || server.grpc == nil {
 		return
 	}
-	if server.grpc != nil {
-		server.grpc.Stop()
+	server.beginGracefulShutdown()
+	server.forceOnce.Do(server.grpc.Stop)
+	<-server.shutdownDone
+}
+
+// GracefulStop stops admission and waits without a deadline. New code should
+// use Shutdown with an explicit deadline so a flow-control-blocked client
+// cannot make process shutdown unbounded.
+func (server *Server) GracefulStop() {
+	if server == nil || server.grpc == nil {
+		return
 	}
-	if server.cancel != nil {
-		server.cancel()
+	_ = server.Shutdown(context.Background())
+}
+
+// Shutdown stops admission, cancels adapter-owned stream observations, and
+// waits for accepted RPCs. If ctx ends first, it force-stops gRPC so a client
+// blocked by transport flow control cannot strand process shutdown.
+func (server *Server) Shutdown(ctx context.Context) error {
+	if server == nil || server.grpc == nil {
+		return errors.New("gRPC server is required")
 	}
-	if server.registry != nil {
-		server.registry.close()
+	if ctx == nil {
+		return errors.New("gRPC shutdown context is required")
+	}
+	server.beginGracefulShutdown()
+	select {
+	case <-server.shutdownDone:
+		return nil
+	default:
+	}
+	select {
+	case <-server.shutdownDone:
+		return nil
+	case <-ctx.Done():
+		select {
+		case <-server.shutdownDone:
+			return nil
+		default:
+		}
+		server.forceOnce.Do(server.grpc.Stop)
+		<-server.shutdownDone
+		return ctx.Err()
 	}
 }
 
-// GracefulStop stops admission, waits for accepted RPCs, and then releases the
-// adapter's negotiated-session state. Long-lived streams must be canceled by
-// the owning daemon lifetime before calling this method.
-func (server *Server) GracefulStop() {
-	if server == nil {
-		return
-	}
-	if server.grpc != nil {
-		server.grpc.GracefulStop()
-	}
-	if server.cancel != nil {
-		server.cancel()
-	}
-	if server.registry != nil {
-		server.registry.close()
-	}
+func (server *Server) beginGracefulShutdown() {
+	server.shutdownOnce.Do(func() {
+		if server.cancel != nil {
+			server.cancel()
+		}
+		go func() {
+			server.grpc.GracefulStop()
+			if server.registry != nil {
+				server.registry.close()
+			}
+			close(server.shutdownDone)
+		}()
+	})
 }

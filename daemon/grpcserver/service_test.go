@@ -12,6 +12,7 @@ import (
 	commonv1 "github.com/spice-framework/spice-agent/common/v1"
 	"github.com/spice-framework/spice-agent/daemon"
 	enginev1 "github.com/spice-framework/spice-agent/engine/v1"
+	"github.com/spice-framework/spice-agent/event"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -315,11 +316,12 @@ func TestServerLifecycleAndProtocolFailureSeparation(t *testing.T) {
 }
 
 type grpcFixtureHost struct {
-	description daemon.RunHostDescription
-	health      client.Health
-	describeErr error
-	healthErr   error
-	healthCalls atomic.Int32
+	description    daemon.RunHostDescription
+	health         client.Health
+	describeErr    error
+	healthErr      error
+	interactionErr error
+	healthCalls    atomic.Int32
 }
 
 func (host *grpcFixtureHost) Describe(ctx context.Context) (daemon.RunHostDescription, error) {
@@ -372,6 +374,35 @@ func (*grpcFixtureHost) Export(context.Context, daemon.Session, client.RunRef) (
 
 func (*grpcFixtureHost) Import(context.Context, daemon.Session, client.ImportRequest) (client.ImportResult, error) {
 	return client.ImportResult{}, daemon.ErrRunHostUnavailable
+}
+
+func (*grpcFixtureHost) ReplayEvents(
+	context.Context,
+	daemon.Session,
+	client.RunRef,
+	event.ReplayRequest,
+) (ownedEventObservation, error) {
+	return nil, daemon.ErrRunHostUnavailable
+}
+
+func (host *grpcFixtureHost) SnapshotInteractions(
+	context.Context,
+	daemon.Session,
+) (interactionObservation, error) {
+	if host.interactionErr != nil {
+		return nil, host.interactionErr
+	}
+	return nil, daemon.ErrRunHostUnavailable
+}
+
+func (host *grpcFixtureHost) SubscribeInteractions(
+	context.Context,
+	daemon.Session,
+) (interactionObservation, error) {
+	if host.interactionErr != nil {
+		return nil, host.interactionErr
+	}
+	return nil, daemon.ErrRunHostUnavailable
 }
 
 func grpcInitializeRequest(limits client.Limits) *enginev1.InitializeRequest {

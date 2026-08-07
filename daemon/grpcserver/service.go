@@ -146,6 +146,15 @@ func (service *engineService) requireAuthenticated(ctx context.Context) error {
 	return nil
 }
 
+func (service *engineService) streamContext(rpcContext context.Context) (context.Context, func()) {
+	ctx, cancel := context.WithCancel(rpcContext)
+	stopRoot := context.AfterFunc(service.root, cancel)
+	return ctx, func() {
+		stopRoot()
+		cancel()
+	}
+}
+
 func initializeContextOrFailure(
 	ctx context.Context,
 	err error,

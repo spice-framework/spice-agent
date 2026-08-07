@@ -5,7 +5,6 @@ import (
 
 	"github.com/spice-framework/spice-agent/client"
 	commonv1 "github.com/spice-framework/spice-agent/common/v1"
-	"github.com/spice-framework/spice-agent/daemon"
 	enginev1 "github.com/spice-framework/spice-agent/engine/v1"
 )
 
@@ -328,4 +327,4 @@ func protocolValid(err error) bool { return err == nil }
 
 func protocolValue[T any](value T, err error) (T, bool) { return value, err == nil }
 
-var _ runHostBoundary = (*daemon.RunHost)(nil)
+var _ runHostBoundary = runHostAdapter{}

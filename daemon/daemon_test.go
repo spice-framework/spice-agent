@@ -563,7 +563,9 @@ retainedBounded:
 	}
 	waitContext, cancelWait := context.WithTimeout(t.Context(), time.Second)
 	defer cancelWait()
-	if exhaustion, ok := errors.AsType[*daemon.ObserverExhaustedError](slow.Wait(waitContext)); !ok || exhaustion.LastDelivered != 0 {
+	if exhaustion, ok := errors.AsType[*daemon.ObserverExhaustedError](slow.Wait(waitContext)); !ok ||
+		exhaustion.LastDelivered != 0 || exhaustion.Resource() == "" ||
+		exhaustion.Limit() == 0 || exhaustion.Observed() <= exhaustion.Limit() {
 		t.Fatalf("observer byte exhaustion = %#v", exhaustion)
 	}
 	for _, cancel := range observerContexts {
@@ -640,7 +642,9 @@ func TestPendingSlowSubscriberReportsExactLastDelivered(t *testing.T) {
 	defer cancelWait()
 	err := subscription.Wait(waitContext)
 	exhausted, ok := errors.AsType[*daemon.ObserverExhaustedError](err)
-	if !ok || exhausted.LastDelivered != 1 || subscription.LastDelivered() != 1 {
+	if !ok || exhausted.LastDelivered != 1 || subscription.LastDelivered() != 1 ||
+		exhausted.Resource() != "pending_observer_queue_entries" ||
+		exhausted.Limit() != 1 || exhausted.Observed() != 2 {
 		t.Fatalf("slow observer error = %#v, last %d", err, subscription.LastDelivered())
 	}
 	for _, cancel := range contexts {

@@ -91,6 +91,13 @@ abandonment returned with a result remain committed uncertain outcomes.
   send the page cursor; absence is accepted only as the provisional non-paging,
   non-tailing compatibility shape. For current controls, `has_more` is exactly
   equivalent to `page_last_sequence < latest_sequence`.
+  Reconnect cancels the old observation and waits for its sender to exit before
+  advancing ownership, but server-side observation cancellation cannot
+  interrupt a gRPC `Send` already blocked by transport flow control. Managed
+  clients therefore cancel and join every old stream RPC, or close its old
+  transport, before attempting reconnect. A bounded reconnect may time out
+  while an old send remains blocked; that timeout does not advance the epoch,
+  and reconnect is retried only after the old RPC has exited.
 - `StreamInteractions` always sends a complete atomic snapshot of every pending
   prompt and its captured control first. If live tailing was requested,
   revision-contiguous opened/closed deltas follow that control. Reconnect never
@@ -150,9 +157,15 @@ authority or protocol behavior.
 ## Bounds and backpressure
 
 Every unary/stream request has encoded-byte, collection-count, and deadline
-limits. Server queues are bounded. A slow client is disconnected with last
-delivered sequence; it never backpressures kernel execution unless it explicitly
+limits. Server queues are bounded. Exhaustion terminates the observation with
+its exact last-delivered cursor; a transport already blocked in `Send` ends
+when the client cancels/closes it or bounded server shutdown force-stops gRPC.
+A slow client never backpressures kernel execution unless it explicitly
 configured a required durability observer outside this protocol.
+The reconnect fence bounds ownership rather than the transport implementation:
+it deliberately remains held while a gRPC send is blocked. Client adapters must
+cancel and join old stream RPCs (or close the old connection) before reconnect;
+they must not assume observation cancellation can forcibly interrupt `Send`.
 
 ## Compatibility
 

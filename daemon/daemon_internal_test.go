@@ -112,7 +112,11 @@ func TestPendingExhaustionThenContextCancellationPreservesTerminalCause(t *testi
 		t.Fatal(err)
 	}
 	hub.mu.Lock()
-	hub.finishWatcherLocked(subscription.watcher, nil, true)
+	hub.finishWatcherLocked(
+		subscription.watcher,
+		newObserverExhausted("pending_observer_queue_entries", 1, 2),
+		true,
+	)
 	hub.mu.Unlock()
 	cancel()
 	hub.detachWatcher(subscription.watcher, context.Canceled, false)
@@ -309,7 +313,11 @@ func TestPendingExhaustionCountsDeltaSentDuringDetach(t *testing.T) {
 	received := make(chan Delta, 1)
 	go func() { received <- <-subscription.Deltas() }()
 	delta := <-received
-	hub.finishWatcherLocked(subscription.watcher, nil, true)
+	hub.finishWatcherLocked(
+		subscription.watcher,
+		newObserverExhausted("pending_observer_queue_entries", 1, 2),
+		true,
+	)
 	hub.mu.Unlock()
 	err = subscription.Wait(t.Context())
 	exhausted, ok := errors.AsType[*ObserverExhaustedError](err)

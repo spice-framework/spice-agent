@@ -182,7 +182,8 @@ func TestLogReplayRejectsStaleFutureAndUnprogressablePages(t *testing.T) {
 		AfterSequence: earliest - 1, MaxEvents: 1, MaxBytes: 1,
 	})
 	var exhausted *event.ResourceExhaustedError
-	if !errors.As(err, &exhausted) || exhausted.LastDelivered != earliest-1 {
+	if !errors.As(err, &exhausted) || exhausted.LastDelivered != earliest-1 ||
+		exhausted.Resource() != "event_replay_bytes" || exhausted.Limit() != 1 || exhausted.Observed() <= 1 {
 		t.Fatalf("unprogressable page = %#v, %v", exhausted, err)
 	}
 	if log.Stats().SubscriptionExhaustions != 1 {
@@ -208,7 +209,8 @@ func TestLogReplaySlowTailDisconnectsAtPageCursorAndRecoversWithoutGap(t *testin
 		appendEnvelope(t, log, sequence, event.ModelDelta)
 	}
 	var exhausted *event.ResourceExhaustedError
-	if err = page.Tail.Wait(t.Context()); !errors.As(err, &exhausted) || exhausted.LastDelivered != 1 {
+	if err = page.Tail.Wait(t.Context()); !errors.As(err, &exhausted) || exhausted.LastDelivered != 1 ||
+		exhausted.Resource() != "event_subscription_events" || exhausted.Limit() != 2 || exhausted.Observed() != 3 {
 		t.Fatalf("slow tail = %#v, %v", exhausted, err)
 	}
 	recovery, err := log.Replay(t.Context(), event.ReplayRequest{
@@ -277,7 +279,9 @@ func TestLogTerminatesSlowAndCancelledSubscribers(t *testing.T) {
 		defer cancel()
 		err = subscription.Wait(ctx)
 		var exhausted *event.ResourceExhaustedError
-		if !errors.As(err, &exhausted) || exhausted.LastDelivered != 0 {
+		if !errors.As(err, &exhausted) || exhausted.LastDelivered != 0 ||
+			exhausted.Resource() != "event_subscription_events" ||
+			exhausted.Limit() != 2 || exhausted.Observed() != 3 {
 			t.Fatalf("slow subscription = %#v, %v", exhausted, err)
 		}
 		if exhausted.Error() == "" || subscription.LastDelivered() != 0 {
@@ -368,14 +372,18 @@ func TestLogRejectsReplayAndAuthoritativeExhaustion(t *testing.T) {
 	appendEnvelope(t, log, 2, event.ModelDelta)
 	_, err := log.Subscribe(t.Context(), 0)
 	var exhausted *event.ResourceExhaustedError
-	if !errors.As(err, &exhausted) || log.Stats().SubscriptionExhaustions != 1 {
+	if !errors.As(err, &exhausted) || log.Stats().SubscriptionExhaustions != 1 ||
+		exhausted.Resource() != "event_replay_events" ||
+		exhausted.Limit() != 1 || exhausted.Observed() != 2 {
 		t.Fatalf("subscription exhaustion = %v, %#v", err, log.Stats())
 	}
 	large, err := event.Reconstruct("run", 3, time.Unix(1, 0).UTC(), event.ModelDelta, json.RawMessage(`"`+strings.Repeat("x", 1800)+`"`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = log.Append(large); !errors.As(err, &exhausted) || log.Stats().AuthoritativeExhaustions != 1 {
+	if err = log.Append(large); !errors.As(err, &exhausted) || log.Stats().AuthoritativeExhaustions != 1 ||
+		exhausted.Resource() != "event_log_bytes" ||
+		exhausted.Limit() == 0 || exhausted.Observed() <= exhausted.Limit() {
 		t.Fatalf("authoritative exhaustion = %v, %#v", err, log.Stats())
 	}
 	if _, err = event.NewLog(" run", limits); err == nil {

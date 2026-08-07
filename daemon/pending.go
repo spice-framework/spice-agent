@@ -121,13 +121,49 @@ func (hub *PendingHub) snapshotCapacityUpperBound() (int, int) {
 	return items, bytes
 }
 
-// ObserverExhaustedError reports the exact last revision delivered to a slow
-// subscriber. Recovery creates a new client-scoped subscription and consumes
-// its mandatory complete snapshot.
-type ObserverExhaustedError struct{ LastDelivered uint64 }
+// ObserverExhaustedError reports the exact last revision and queue bound seen
+// by a slow subscriber. Recovery creates a new client-scoped subscription and
+// consumes its mandatory complete snapshot.
+type ObserverExhaustedError struct {
+	LastDelivered uint64
+	resource      string
+	limit         int
+	observed      int
+}
 
 func (failure *ObserverExhaustedError) Error() string {
-	return fmt.Sprintf("pending interaction observer exhausted after revision %d", failure.LastDelivered)
+	return fmt.Sprintf(
+		"pending interaction observer exceeded %s limit %d with %d after revision %d",
+		failure.resource, failure.limit, failure.observed, failure.LastDelivered,
+	)
+}
+
+// Resource identifies the exact safe protocol resource that was exhausted.
+func (failure *ObserverExhaustedError) Resource() string {
+	if failure == nil {
+		return ""
+	}
+	return failure.resource
+}
+
+// Limit returns the exact configured bound that was exceeded.
+func (failure *ObserverExhaustedError) Limit() uint64 {
+	if failure == nil || failure.limit < 0 {
+		return 0
+	}
+	return uint64(failure.limit)
+}
+
+// Observed returns the exact refused count or byte size.
+func (failure *ObserverExhaustedError) Observed() uint64 {
+	if failure == nil || failure.observed < 0 {
+		return 0
+	}
+	return uint64(failure.observed)
+}
+
+func newObserverExhausted(resource string, limit, observed int) *ObserverExhaustedError {
+	return &ObserverExhaustedError{resource: resource, limit: limit, observed: observed}
 }
 
 // Pending is one immutable pending interaction discovery value.
@@ -276,7 +312,13 @@ func (subscription *PendingSubscription) terminalError() error {
 	subscription.hub.mu.Lock()
 	defer subscription.hub.mu.Unlock()
 	if subscription.watcher.exhausted {
-		return &ObserverExhaustedError{LastDelivered: subscription.watcher.lastDelivered}
+		failure, ok := errors.AsType[*ObserverExhaustedError](subscription.watcher.err)
+		if !ok {
+			return errors.New("pending interaction observer exhausted without recovery facts")
+		}
+		result := *failure
+		result.LastDelivered = subscription.watcher.lastDelivered
+		return &result
 	}
 	return subscription.watcher.err
 }
@@ -816,24 +858,50 @@ func (hub *PendingHub) publishLocked(partition *pendingPartition, kind DeltaKind
 	ids := sortedWatcherIDs(partition.watchers)
 	for _, id := range ids {
 		watcher := partition.watchers[id]
-		if watcher != nil && !hub.enqueueLocked(watcher, delta) {
-			hub.finishWatcherLocked(watcher, nil, true)
+		if watcher == nil {
+			continue
+		}
+		if exhausted := hub.enqueueLocked(watcher, delta); exhausted != nil {
+			hub.finishWatcherLocked(watcher, exhausted, true)
 		}
 	}
 }
 
-func (hub *PendingHub) enqueueLocked(watcher *pendingWatcher, delta Delta) bool {
-	if !watcher.active || watcher.queuedCount >= hub.limits.ObserverQueueEntries {
-		return false
+func (hub *PendingHub) enqueueLocked(watcher *pendingWatcher, delta Delta) *ObserverExhaustedError {
+	if !watcher.active {
+		return nil
+	}
+	if watcher.queuedCount >= hub.limits.ObserverQueueEntries {
+		return newObserverExhausted(
+			"pending_observer_queue_entries", hub.limits.ObserverQueueEntries, watcher.queuedCount+1,
+		)
 	}
 	size := pendingDeltaBytes(delta)
-	if size > hub.limits.ObserverQueueBytes || watcher.queuedBytes > hub.limits.ObserverQueueBytes-size ||
-		hub.queuedEntries >= hub.limits.QueuedEntries ||
-		watcher.partition.queuedEntries >= hub.limits.QueuedEntriesPerClient ||
-		size > hub.limits.QueuedBytes || hub.queuedBytes > hub.limits.QueuedBytes-size ||
-		size > hub.limits.QueuedBytesPerClient ||
+	if size > hub.limits.ObserverQueueBytes || watcher.queuedBytes > hub.limits.ObserverQueueBytes-size {
+		return newObserverExhausted(
+			"pending_observer_queue_bytes", hub.limits.ObserverQueueBytes, watcher.queuedBytes+size,
+		)
+	}
+	if hub.queuedEntries >= hub.limits.QueuedEntries {
+		return newObserverExhausted("pending_observer_entries", hub.limits.QueuedEntries, hub.queuedEntries+1)
+	}
+	if watcher.partition.queuedEntries >= hub.limits.QueuedEntriesPerClient {
+		return newObserverExhausted(
+			"pending_observer_client_entries",
+			hub.limits.QueuedEntriesPerClient,
+			watcher.partition.queuedEntries+1,
+		)
+	}
+	if size > hub.limits.QueuedBytes || hub.queuedBytes > hub.limits.QueuedBytes-size {
+		return newObserverExhausted("pending_observer_bytes", hub.limits.QueuedBytes, hub.queuedBytes+size)
+	}
+	if size > hub.limits.QueuedBytesPerClient ||
 		watcher.partition.queuedBytes > hub.limits.QueuedBytesPerClient-size {
-		return false
+		return newObserverExhausted(
+			"pending_observer_client_bytes",
+			hub.limits.QueuedBytesPerClient,
+			watcher.partition.queuedBytes+size,
+		)
 	}
 	item := queuedDelta{delta: cloneDelta(delta), bytes: size}
 	select {
@@ -844,9 +912,11 @@ func (hub *PendingHub) enqueueLocked(watcher *pendingWatcher, delta Delta) bool 
 		watcher.partition.queuedBytes += size
 		hub.queuedEntries++
 		hub.queuedBytes += size
-		return true
+		return nil
 	default:
-		return false
+		return newObserverExhausted(
+			"pending_observer_queue_entries", cap(watcher.queue), len(watcher.queue)+1,
+		)
 	}
 }
 

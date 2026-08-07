@@ -3,9 +3,86 @@ package event
 import (
 	"context"
 	"errors"
+	"math"
 	"testing"
 	"time"
 )
+
+func TestNonnegativeUint64FailsClosed(t *testing.T) {
+	t.Parallel()
+	if got := nonnegativeUint64(-1); got != 0 {
+		t.Fatalf("negative conversion = %d", got)
+	}
+	if got := nonnegativeUint64(math.MaxInt); got != uint64(math.MaxInt) {
+		t.Fatalf("maximum conversion = %d", got)
+	}
+}
+
+func TestExhaustionFactsDoNotOverflowPlatformIntegers(t *testing.T) {
+	t.Parallel()
+	first, err := Reconstruct("run", 1, time.Unix(1, 0).UTC(), ModelDelta, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := Reconstruct("run", 2, time.Unix(2, 0).UTC(), ModelDelta, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("replay page uses subtraction before addition", func(t *testing.T) {
+		t.Parallel()
+		log := &Log{
+			limits: LogLimits{SubscriberMaxEvents: 2, SubscriberMaxBytes: math.MaxInt},
+			entries: []logEntry{
+				{envelope: first, bytes: math.MaxInt - 10},
+				{envelope: second, bytes: 20},
+			},
+			lastSequence: 2,
+		}
+		entries, page, replayErr := log.replayPageLocked(ReplayRequest{
+			MaxEvents: 2,
+			MaxBytes:  math.MaxInt,
+		})
+		if replayErr != nil || len(entries) != 1 || !page.HasMore || page.PageLastSequence != 1 {
+			t.Fatalf("overflow-bound replay = %#v, %#v, %v", entries, page, replayErr)
+		}
+	})
+
+	t.Run("replay exhaustion preserves an observation above max int", func(t *testing.T) {
+		t.Parallel()
+		log := &Log{
+			limits:  LogLimits{SubscriberMaxEvents: math.MaxInt, SubscriberMaxBytes: math.MaxInt},
+			entries: []logEntry{{envelope: second, bytes: 20}},
+		}
+		failure, replayErr := log.replayExhaustionLocked(1, []logEntry{{
+			envelope: first,
+			bytes:    math.MaxInt - 10,
+		}})
+		wantObserved := uint64(math.MaxInt) + 10
+		if replayErr != nil || failure.Resource() != "event_replay_bytes" ||
+			failure.Limit() != uint64(math.MaxInt) || failure.Observed() != wantObserved {
+			t.Fatalf("overflow-bound exhaustion = %#v, %v; want observed %d", failure, replayErr, wantObserved)
+		}
+	})
+
+	t.Run("subscription exhaustion preserves an observation above max int", func(t *testing.T) {
+		t.Parallel()
+		subscription := newSubscription(t.Context(), 0, LogLimits{
+			SubscriberMaxEvents: 1,
+			SubscriberMaxBytes:  math.MaxInt,
+		}, nil)
+		subscription.queuedBytes = math.MaxInt - 10
+		if !subscription.offer(logEntry{envelope: first, bytes: 20}) {
+			t.Fatal("overflow-bound subscription accepted")
+		}
+		failure, ok := errors.AsType[*ResourceExhaustedError](subscription.err)
+		wantObserved := uint64(math.MaxInt) + 10
+		if !ok || failure.Resource() != "event_subscription_bytes" ||
+			failure.Limit() != uint64(math.MaxInt) || failure.Observed() != wantObserved {
+			t.Fatalf("overflow-bound subscription = %#v; want observed %d", failure, wantObserved)
+		}
+	})
+}
 
 func TestDeliveryCommitReconcilesConcurrentCancellationAndExhaustion(t *testing.T) {
 	t.Parallel()
@@ -23,7 +100,7 @@ func TestDeliveryCommitReconcilesConcurrentCancellationAndExhaustion(t *testing.
 		ctx, cancel := context.WithCancel(t.Context())
 		limits := DefaultLogLimits()
 		subscription := newSubscription(
-			ctx, 0, limits, []logEntry{{envelope: first, bytes: first.EncodedSize()}}, nil,
+			ctx, 0, limits, []logEntry{{envelope: first, bytes: first.EncodedSize()}},
 		)
 		committed := make(chan struct{})
 		continueDelivery := make(chan struct{})
@@ -55,7 +132,7 @@ func TestDeliveryCommitReconcilesConcurrentCancellationAndExhaustion(t *testing.
 		limits.SubscriberMaxEvents = 1
 		subscription := newSubscription(
 			t.Context(), 0, limits,
-			[]logEntry{{envelope: first, bytes: first.EncodedSize()}}, nil,
+			[]logEntry{{envelope: first, bytes: first.EncodedSize()}},
 		)
 		committed := make(chan struct{})
 		continueDelivery := make(chan struct{})
