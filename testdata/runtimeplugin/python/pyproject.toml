@@ -1,0 +1,28 @@
+[project]
+name = "spice-agent-runtime-plugin-python-fixture"
+version = "0.1.0"
+description = "Independent Python conformance fixture for Spice Agent plugin/v1"
+requires-python = ">=3.12"
+dependencies = [
+    "grpcio==1.75.1",
+    "protobuf==6.32.1",
+]
+
+[project.scripts]
+spice-agent-python-plugin-fixture = "spice_agent_python_fixture.main:main"
+
+[dependency-groups]
+dev = [
+    "grpcio-tools==1.75.1",
+    "hatchling==1.27.0",
+]
+
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/spice_agent_python_fixture", "src/spice"]
+
+[tool.uv]
+package = true

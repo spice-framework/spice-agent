@@ -982,8 +982,10 @@ func (x *ExecutionFailure) GetSafeMessage() string {
 	return ""
 }
 
-// ExecuteResponse is one strictly increasing stream frame. Progress precedes
-// exactly one terminal result or failure.
+// ExecuteResponse is one strictly increasing stream frame. Every normally
+// completed stream has zero or more progress frames followed by exactly one
+// terminal result or failure. Transport cancellation may preempt that terminal
+// and is not normal stream completion.
 type ExecuteResponse struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	CallId   string                 `protobuf:"bytes,1,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`

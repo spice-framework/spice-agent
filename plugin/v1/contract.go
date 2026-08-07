@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,8 +47,6 @@ const (
 	maximumToolCount        = 4096
 	maximumConcurrentCalls  = 4096
 )
-
-var handshakeDomain = []byte("spice-agent/plugin/v1/initialize\x00")
 
 // SupportedProtocolRange returns the exact protocol range implemented here.
 func SupportedProtocolRange() *commonv1.ProtocolRange {
@@ -209,7 +206,8 @@ func ValidateInitializeResponseForRequest(
 }
 
 // SignInitializeResponse returns a deep copy with an HMAC-SHA256 proof over
-// the complete deterministic request and response, including unknown fields.
+// the versioned canonical request and response transcript, including unknown
+// fields at every known message boundary.
 func SignInitializeResponse(
 	request *InitializeRequest,
 	response *InitializeResponse,
@@ -286,32 +284,13 @@ func initializeProof(
 	if request == nil || response == nil {
 		return nil, errors.New("plugin handshake transcript is required")
 	}
-	requestBytes, err := proto.MarshalOptions{Deterministic: true}.Marshal(request)
+	transcript, err := CanonicalInitializeTranscript(request, response)
 	if err != nil {
-		return nil, errors.New("encode plugin handshake request")
-	}
-	unsigned := clone(response)
-	unsigned.HandshakeProof = nil
-	responseBytes, err := proto.MarshalOptions{Deterministic: true}.Marshal(unsigned)
-	if err != nil {
-		return nil, errors.New("encode plugin handshake response")
+		return nil, err
 	}
 	mac := hmac.New(sha256.New, secret)
-	_, _ = mac.Write(handshakeDomain)
-	writeProofField(mac, requestBytes)
-	writeProofField(mac, responseBytes)
+	_, _ = mac.Write(transcript)
 	return mac.Sum(nil), nil
-}
-
-type proofWriter interface {
-	Write([]byte) (int, error)
-}
-
-func writeProofField(destination proofWriter, value []byte) {
-	var size [8]byte
-	binary.BigEndian.PutUint64(size[:], uint64(len(value)))
-	_, _ = destination.Write(size[:])
-	_, _ = destination.Write(value)
 }
 
 // Catalog is an immutable validated plugin identity and tool-definition set.
@@ -495,6 +474,12 @@ func DecodeExecuteRequest(value *ExecuteRequest, expectedSession []byte, limits 
 	}
 	if err := ValidateLimits(limits); err != nil {
 		return tool.Call{}, err
+	}
+	if err := token("plugin call identity", value.GetCallId(), 128); err != nil {
+		return tool.Call{}, errors.New("plugin execute request contains an invalid call identity")
+	}
+	if err := token("plugin tool name", value.GetToolName(), 128); err != nil {
+		return tool.Call{}, errors.New("plugin execute request contains an invalid tool name")
 	}
 	if uint64(len(value.GetArgumentsJson())) > limits.GetMaxCallArgumentBytes() {
 		return tool.Call{}, errors.New("plugin call arguments exceed the negotiated limit")

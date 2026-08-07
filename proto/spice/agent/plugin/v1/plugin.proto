@@ -133,8 +133,10 @@ message ExecutionFailure {
   string safe_message = 3;
 }
 
-// ExecuteResponse is one strictly increasing stream frame. Progress precedes
-// exactly one terminal result or failure.
+// ExecuteResponse is one strictly increasing stream frame. Every normally
+// completed stream has zero or more progress frames followed by exactly one
+// terminal result or failure. Transport cancellation may preempt that terminal
+// and is not normal stream completion.
 message ExecuteResponse {
   string call_id = 1;
   uint64 sequence = 2;
@@ -170,7 +172,8 @@ message ShutdownResponse {
 service PluginService {
   // Initialize authenticates and freezes one candidate connection.
   rpc Initialize(InitializeRequest) returns (InitializeResponse);
-  // Execute streams progress and exactly one terminal frame.
+  // Execute streams progress and one terminal frame unless transport
+  // cancellation preempts normal completion.
   rpc Execute(ExecuteRequest) returns (stream ExecuteResponse);
   // Drain stops admission and joins admitted calls.
   rpc Drain(DrainRequest) returns (DrainResponse);

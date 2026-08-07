@@ -147,6 +147,33 @@ func TestInitializeValidationFailsClosedAndDoesNotReflectSecrets(t *testing.T) {
 	}
 }
 
+func TestInitializeResponseRejectsIncompleteSuccessShapes(t *testing.T) {
+	t.Parallel()
+	request := validInitializeRequest()
+	if err := pluginv1.ValidateInitializeResponseForRequest(request, nil, handshakeSecret()); err == nil {
+		t.Fatal("nil initialize response succeeded")
+	}
+	for name, mutate := range map[string]func(*pluginv1.InitializeResponse){
+		"status":       func(value *pluginv1.InitializeResponse) { value.Status = nil },
+		"build":        func(value *pluginv1.InitializeResponse) { value.Plugin = nil },
+		"capabilities": func(value *pluginv1.InitializeResponse) { value.Capabilities = nil },
+		"limits":       func(value *pluginv1.InitializeResponse) { value.Limits = nil },
+		"manifest":     func(value *pluginv1.InitializeResponse) { value.Manifest = nil },
+		"session":      func(value *pluginv1.InitializeResponse) { value.SessionId = nil },
+		"proof":        func(value *pluginv1.InitializeResponse) { value.HandshakeProof = nil },
+	} {
+		response := validInitializeResponse(t)
+		signed, err := pluginv1.SignInitializeResponse(request, response, handshakeSecret())
+		if err != nil {
+			t.Fatal(err)
+		}
+		mutate(signed)
+		if err = pluginv1.ValidateInitializeResponseForRequest(request, signed, handshakeSecret()); err == nil {
+			t.Errorf("incomplete %s response succeeded", name)
+		}
+	}
+}
+
 func TestCatalogConvertsToImmutableKernelDefinitions(t *testing.T) {
 	t.Parallel()
 	read, err := tool.NewDefinition(
@@ -241,7 +268,8 @@ func TestExecuteStreamConvertsProgressResultAndRejectsPostTerminal(t *testing.T)
 		t.Fatal(err)
 	}
 	progress, ok := progressFrame.Progress()
-	if !ok || progress.CallID() != tool.CallID(request.GetCallId()) || progress.Message() != "working" {
+	if progressFrame.Kind() != pluginv1.FrameProgress || !ok ||
+		progress.CallID() != tool.CallID(request.GetCallId()) || progress.Message() != "working" {
 		t.Fatalf("progress = %#v %t", progress, ok)
 	}
 	resultFrame, err := validator.Accept(&pluginv1.ExecuteResponse{
@@ -253,7 +281,8 @@ func TestExecuteStreamConvertsProgressResultAndRejectsPostTerminal(t *testing.T)
 		t.Fatal(err)
 	}
 	result, ok := resultFrame.Result()
-	if !ok || result.CallID() != tool.CallID(request.GetCallId()) || string(result.Content()) != `{"ok":true}` {
+	if resultFrame.Kind() != pluginv1.FrameResult || !ok ||
+		result.CallID() != tool.CallID(request.GetCallId()) || string(result.Content()) != `{"ok":true}` {
 		t.Fatalf("result = %#v %t", result, ok)
 	}
 	if err = validator.Finish(); err != nil {
@@ -287,7 +316,7 @@ func TestExecuteStreamConvertsTypedFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	failure, ok := frame.Failure()
-	if !ok || failure.CallID() != tool.CallID(request.GetCallId()) ||
+	if frame.Kind() != pluginv1.FrameFailure || !ok || failure.CallID() != tool.CallID(request.GetCallId()) ||
 		failure.State() != tool.ExecutionUncertain || failure.RetryDisposition() != tool.RetryNever {
 		t.Fatalf("failure = %#v %t", failure, ok)
 	}
@@ -400,6 +429,22 @@ func TestExecuteRequestAndLifecycleAreSessionBounded(t *testing.T) {
 	if _, err = pluginv1.DecodeExecuteRequest(request, wrong, validLimits()); err == nil {
 		t.Fatal("wrong execute session succeeded")
 	}
+	for name, mutate := range map[string]func(*pluginv1.ExecuteRequest){
+		"call control": func(value *pluginv1.ExecuteRequest) { value.CallId = "bad\ncall" },
+		"call UTF-8": func(value *pluginv1.ExecuteRequest) {
+			value.CallId = string([]byte{'b', 0xff})
+		},
+		"tool control": func(value *pluginv1.ExecuteRequest) { value.ToolName = "bad\ttool" },
+		"tool UTF-8": func(value *pluginv1.ExecuteRequest) {
+			value.ToolName = string([]byte{'b', 0xff})
+		},
+	} {
+		invalid := validExecuteRequest()
+		mutate(invalid)
+		if _, err = pluginv1.DecodeExecuteRequest(invalid, sessionID(), validLimits()); err == nil {
+			t.Errorf("invalid %s succeeded", name)
+		}
+	}
 	if err = pluginv1.ValidateDrainRequest(&pluginv1.DrainRequest{SessionId: sessionID()}, sessionID(), validLimits()); err != nil {
 		t.Fatal(err)
 	}
@@ -414,6 +459,48 @@ func TestExecuteRequestAndLifecycleAreSessionBounded(t *testing.T) {
 	}
 	if err = pluginv1.ValidateShutdownResponse(&pluginv1.ShutdownResponse{Status: commonv1.OKStatus()}, validLimits()); err != nil {
 		t.Fatal(err)
+	}
+	for name, validate := range map[string]func() error{
+		"nil drain request": func() error {
+			return pluginv1.ValidateDrainRequest(nil, sessionID(), validLimits())
+		},
+		"nil drain response": func() error {
+			return pluginv1.ValidateDrainResponse(nil, validLimits())
+		},
+		"invalid drain status": func() error {
+			return pluginv1.ValidateDrainResponse(&pluginv1.DrainResponse{}, validLimits())
+		},
+		"large active drain": func() error {
+			return pluginv1.ValidateDrainResponse(&pluginv1.DrainResponse{
+				Status:      &commonv1.Status{Code: commonv1.ErrorCode_ERROR_CODE_UNAVAILABLE, Message: "still active"},
+				ActiveCalls: validLimits().GetMaxConcurrentCalls() + 1,
+			}, validLimits())
+		},
+		"nil shutdown request": func() error {
+			return pluginv1.ValidateShutdownRequest(nil, sessionID(), validLimits())
+		},
+		"nil shutdown response": func() error {
+			return pluginv1.ValidateShutdownResponse(nil, validLimits())
+		},
+		"invalid shutdown status": func() error {
+			return pluginv1.ValidateShutdownResponse(&pluginv1.ShutdownResponse{}, validLimits())
+		},
+		"nil lifecycle limits": func() error {
+			return pluginv1.ValidateShutdownResponse(&pluginv1.ShutdownResponse{Status: commonv1.OKStatus()}, nil)
+		},
+	} {
+		if err = validate(); err == nil {
+			t.Errorf("invalid %s succeeded", name)
+		}
+	}
+	if _, err = pluginv1.DecodeExecuteRequest(nil, sessionID(), validLimits()); err == nil {
+		t.Fatal("nil execute request succeeded")
+	}
+	if _, err = pluginv1.NewStreamValidator(nil, sessionID(), validLimits()); err == nil {
+		t.Fatal("nil stream request succeeded")
+	}
+	if _, err = (pluginv1.Catalog{}).Manifest(); err == nil {
+		t.Fatal("zero catalog manifest succeeded")
 	}
 }
 
@@ -477,6 +564,12 @@ func TestLimitNegotiationAndFailures(t *testing.T) {
 		if err = pluginv1.ValidateLimits(value); err == nil {
 			t.Errorf("invalid %s limits succeeded", name)
 		}
+	}
+	if _, err = pluginv1.NegotiateLimits(nil, validLimits()); err == nil {
+		t.Fatal("nil requested limits succeeded")
+	}
+	if _, err = pluginv1.NegotiateLimits(validLimits(), nil); err == nil {
+		t.Fatal("nil available limits succeeded")
 	}
 }
 

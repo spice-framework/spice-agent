@@ -22,14 +22,24 @@ process host, daemon integration, or activation manager.
 The initial Phase 5.1 `plugin/v1` runtime-tool wire contract is frozen. It
 defines authenticated protocol/build/limit/manifest initialization, immutable
 tool definitions converted to the kernel's existing `tool.Definition`, one
-contiguous Execute server stream with exactly one terminal result or correlated
-typed failure, and session-bound Drain/Shutdown lifecycle. The launch secret is
-never serialized; HMAC-SHA256 authenticates the deterministic complete
-handshake transcript. Handwritten validators count unknown fields toward
-bounds, preserve them on wire round trips, and fail closed on duplicate tools,
-unknown enums/capabilities, correlation or sequence mismatch, oversized JSON,
-missing terminals, and post-terminal frames. This protocol slice contains no
-process host, digest verifier, generation activation, or language fixture.
+contiguous normally completed Execute server stream with exactly one terminal
+result or correlated typed failure, and session-bound Drain/Shutdown lifecycle.
+The launch secret is never serialized; HMAC-SHA256 authenticates the
+deterministic complete handshake transcript. Handwritten validators count
+unknown fields toward bounds, preserve them on wire round trips, and fail closed
+on duplicate tools, unknown enums/capabilities, correlation or sequence
+mismatch, oversized JSON,
+missing terminals, and post-terminal frames. A reusable black-box conformance
+harness and independent Go fixture process prove bounded private-stdin
+bootstrap, exact stdout readiness with no contamination, current-user local
+gRPC, authenticated initialization, immutable manifest, success and
+typed-failure streams, unknown fields, malformed/oversized input, transport
+cancellation, Drain, and Shutdown. This is test infrastructure, not a process
+host, digest verifier, or generation activation manager. The independent
+Python 3.12+ fixture uses locked `grpcio`
+and Protobuf dependencies and passes the same public harness over an absolute
+AF_UNIX socket on Windows, Linux, and macOS. This fixture-specific Windows
+choice does not change the production named-pipe transport.
 
 ## Runtime-plugin contracts
 
@@ -74,6 +84,7 @@ the active/failed generation; no partial generated tree is activated.
 4. Provide optional Spice auto-configuration that decorates/injects the dynamic
    tool source through normal static DI.
 5. Ship Go and Python echo/filesystem-neutral fixture tools and conformance CLI.
+   **Complete for the initial runtime-tool profile.**
 6. Integrate last-known-good `spice dev` for generated daemon/TUI targets.
 
 ## Exclusions
@@ -105,6 +116,6 @@ unbounded queue. Evidence includes digests, generation/lease timelines, process
 logs, conformance versions, and failure-injection results.
 
 Status is **in progress**. The execution-outcome and kernel plan-lease
-prerequisites and initial runtime-tool protocol are implemented. Process/digest
-ownership, generation management, Go/Python fixtures, conformance, and the
-developer loop remain pending.
+prerequisites, initial runtime-tool protocol, reusable conformance harness, and
+independent Go/Python fixtures are implemented. Process/digest ownership,
+generation management, and the developer loop remain pending.

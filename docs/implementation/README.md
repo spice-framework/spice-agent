@@ -9,8 +9,8 @@ Repository roadmaps link here and must not duplicate status.
 | 1 — Spice-native composition | Complete for preview | generated static DI, auto-configuration, cross-repository continuation |
 | 2 — deterministic kernel | Complete for preview | `841edd3`; deterministic lifecycle, interaction, snapshot, race/fuzz proof |
 | 3 — provider and coding tools | In progress | generated cross-repository continuation and opt-in live acceptance |
-| 4 — daemon and TUI | In progress | host/local IPC/current-user candidate libraries proven; distribution process and TUI workflow pending |
-| 5 — runtime plugins | In progress | execution-outcome, plan-lease, and frozen plugin/v1 wire prerequisites complete; host/conformance pending |
+| 4 — daemon and TUI | In progress | generated daemon/TUI distribution targets and managed local composition proven; installed Windows/Linux terminal interaction pending |
+| 5 — runtime plugins | In progress | frozen plugin/v1 plus independent Go/Python conformance complete; production host and activation pending |
 | 6 — architecture proof | Planned | signed `v0.1.0-preview.1` distribution |
 | 7 — stress prototypes | Planned | permission, SQLite, alternate UI, two-worker experiments |
 | 8 — stabilization | Planned | external authors and frozen compatibility policy |
@@ -323,6 +323,24 @@ toward limits; duplicates, unknown enums/capabilities, mismatches, oversized
 payloads, missing terminals, and post-terminal traffic fail closed. This slice
 does not claim executable/digest ownership, process launch, activation, leases,
 fixtures, or capability enforcement. Exact acceptance is in
+[`evidence/phase5-runtime-plugin-protocol.md`](evidence/phase5-runtime-plugin-protocol.md).
+
+## Phase 5.2 cross-language conformance
+
+`plugin/conformance` now provides a reusable black-box suite over only the
+generated public client. An independent fixture executable accepts a bounded
+address/secret bootstrap through stdin, emits exactly one readiness record on
+stdout, and serves over current-user Unix-socket or Windows-pipe gRPC. The suite
+proves authenticated initialization (including unknown fields), canonical
+manifest metadata, contiguous success and typed-failure streams, malformed and
+oversized rejection, real RPC cancellation, drain admission fencing, and clean
+shutdown. Normally completed streams require exactly one terminal frame;
+client transport cancellation is the explicit preempting case. An independent
+Python 3.12+ implementation uses pinned `grpcio` and Protobuf dependencies and
+passes the same public Go harness. On Windows it uses a private absolute AF_UNIX
+socket because Python gRPC does not serve named pipes; the production Go daemon
+transport remains unchanged. This remains conformance infrastructure, not the
+digest-owning process host or activation manager. Evidence is appended to
 [`evidence/phase5-runtime-plugin-protocol.md`](evidence/phase5-runtime-plugin-protocol.md).
 
 ## Current infrastructure blocker

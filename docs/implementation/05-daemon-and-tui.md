@@ -253,11 +253,13 @@ The TUI composition half of slice 4 is implemented independently at
 types, Spice generates the renderer/theme/binding/I/O/shell graph, cancellation
 has an independent control lane, and external acceptance executes the actual
 injected terminal shell through explicit application start and stop. Its full
-gate passed in 158.4 seconds at 90.1% product coverage. Distribution-owned
-process launch, daemon attachment, reconnect, and the real terminal workflow
-remain pending. The remainder of slices 3 through 6 includes the managed
-process implementation, the daemon-to-TUI bridge, and
-real Windows/Linux reconnect acceptance. See
+gate passed in 158.4 seconds at 90.1% product coverage. The distribution now
+pins the later TUI commit `a0d4824` and generates separate daemon and terminal
+applications at `spice-agent-coding` commit `8f92368`. Managed attach-or-start,
+explicit attach, the protocol-1.3 session bridge, injected native process
+containment, deterministic source mapping, and I/O-lazy `--check` composition
+are implemented. Real installed-terminal Windows/Linux reconnect interaction
+and release packaging remain pending. See
 [`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
 Foundation-specific evidence is in
 [`evidence/phase4-host-foundation.md`](evidence/phase4-host-foundation.md).
@@ -291,10 +293,10 @@ Current-user scope, explicit-attach, and managed-candidate evidence is in
 [`evidence/phase4-managed-local-lifecycle.md`](evidence/phase4-managed-local-lifecycle.md).
 
 The baseline remains intentionally provisional. The host and authenticated
-local-client libraries prove the protocol, authority, IPC, explicit-attach, and
-managed-candidate seams, while Buf protects the committed schema baseline.
-Before the final Phase 4 freeze, the distribution must provide the real process
-starter and generated daemon/TUI applications, prove one-command and explicit
-serve/attach behavior through actual Windows and Linux processes and terminals,
-and resolve or formally bound the engine's service-lifetime run-identity
-tombstones.
+local-client libraries plus both generated distribution targets prove protocol,
+authority, IPC, explicit attach, managed startup, and owned process containment.
+Before the final Phase 4 freeze, installed Windows/Linux terminals must still
+prove one-command startup, explicit serve/attach, resize, reconnect, and clean
+shutdown, and the engine's service-lifetime run-identity tombstones must be
+resolved or formally bounded. Exact distribution evidence is in
+[`evidence/phase4-distribution-targets.md`](evidence/phase4-distribution-targets.md).

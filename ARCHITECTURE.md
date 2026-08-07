@@ -235,10 +235,13 @@ containment join retains ownership. Retryable or unclassified failures permit
 a later proof attempt. An explicitly non-retryable containment failure is
 cached and returned without repeating cleanup actions; ownership remains for
 manual recovery. Root-process exit alone never proves safe release. The
-distribution still must supply the
-concrete process starter and compose these libraries into managed and explicit
-commands. Current evidence is in
-[`docs/implementation/evidence/phase4-managed-local-lifecycle.md`](docs/implementation/evidence/phase4-managed-local-lifecycle.md).
+reference distribution now supplies injected platform resolvers and launchers
+and composes generated daemon and terminal targets for managed attach-or-start
+and explicit attach. Installed-terminal acceptance and cross-platform release
+evidence remain pending. Current evidence is in
+[`docs/implementation/evidence/phase4-managed-local-lifecycle.md`](docs/implementation/evidence/phase4-managed-local-lifecycle.md)
+and
+[`docs/implementation/evidence/phase4-distribution-targets.md`](docs/implementation/evidence/phase4-distribution-targets.md).
 
 `common/v1`, `engine/v1`, and `plugin/v1` are the initial Protobuf process
 boundaries. `plugin/v1` is runtime-tool-only: one authenticated initialization
@@ -251,6 +254,14 @@ wire. The handwritten layer converts manifests and calls to the existing
 `tool` values; it introduces no second tool model, registry, or retry policy.
 The protocol alone does not verify an executable digest, own a process, activate
 a generation, enforce declared capabilities, or prove process-tree cleanup.
+`plugin/conformance` is the reusable black-box contract suite. Independent Go
+and Python 3.12+ fixture commands receive their address and one-use secret
+through bounded private stdin bootstrap, emit one exact readiness record on
+stdout, and serve the public API over current-user local IPC. They demonstrate
+the protocol but are not production launchers or hosts. Normally completed
+Execute streams end in exactly one terminal frame; client transport
+cancellation may preempt that terminal and is verified separately as a
+canceled RPC.
 
 `common/v1` and `engine/v1` define the daemon/client process boundary.
 They encode protocol negotiation, typed status, server-owned definitions,

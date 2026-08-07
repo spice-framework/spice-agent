@@ -465,6 +465,7 @@ func fuzzTargets() []fuzzTarget {
 		{"./common/v1", "FuzzCommonEnvelope"},
 		{"./engine/v1", "FuzzEngineEnvelope"},
 		{"./plugin/v1", "FuzzPluginEnvelope"},
+		{"./internal/pluginfixture", "FuzzBootstrap"},
 		{"./daemon/endpoint", "FuzzDecodeMetadata"},
 	}
 }

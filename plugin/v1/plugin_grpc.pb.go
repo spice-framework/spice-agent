@@ -33,7 +33,8 @@ const (
 type PluginServiceClient interface {
 	// Initialize authenticates and freezes one candidate connection.
 	Initialize(ctx context.Context, in *InitializeRequest, opts ...grpc.CallOption) (*InitializeResponse, error)
-	// Execute streams progress and exactly one terminal frame.
+	// Execute streams progress and one terminal frame unless transport
+	// cancellation preempts normal completion.
 	Execute(ctx context.Context, in *ExecuteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecuteResponse], error)
 	// Drain stops admission and joins admitted calls.
 	Drain(ctx context.Context, in *DrainRequest, opts ...grpc.CallOption) (*DrainResponse, error)
@@ -106,7 +107,8 @@ func (c *pluginServiceClient) Shutdown(ctx context.Context, in *ShutdownRequest,
 type PluginServiceServer interface {
 	// Initialize authenticates and freezes one candidate connection.
 	Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error)
-	// Execute streams progress and exactly one terminal frame.
+	// Execute streams progress and one terminal frame unless transport
+	// cancellation preempts normal completion.
 	Execute(*ExecuteRequest, grpc.ServerStreamingServer[ExecuteResponse]) error
 	// Drain stops admission and joins admitted calls.
 	Drain(context.Context, *DrainRequest) (*DrainResponse, error)

@@ -150,9 +150,13 @@ func TestPluginFuzzContractRemainsInTheReleaseGate(t *testing.T) {
 	for _, target := range fuzzTargets() {
 		seen[target]++
 	}
-	target := fuzzTarget{"./plugin/v1", "FuzzPluginEnvelope"}
-	if seen[target] != 1 {
-		t.Fatalf("fuzz target %#v occurs %d times", target, seen[target])
+	for _, target := range []fuzzTarget{
+		{"./plugin/v1", "FuzzPluginEnvelope"},
+		{"./internal/pluginfixture", "FuzzBootstrap"},
+	} {
+		if seen[target] != 1 {
+			t.Fatalf("fuzz target %#v occurs %d times", target, seen[target])
+		}
 	}
 }
 

@@ -154,6 +154,65 @@ func TestValuesRejectInvalidAndOversizedInput(t *testing.T) {
 	}
 }
 
+func TestJSONValuesRejectInvalidUTF8(t *testing.T) {
+	t.Parallel()
+	invalid := json.RawMessage{'"', 0xff, '"'}
+	for name, construct := range map[string]func() error{
+		"definition": func() error {
+			_, err := tool.NewDefinition("read", "Read.", invalid, tool.EffectReadOnly, tool.ReplaySafe)
+			return err
+		},
+		"call": func() error {
+			_, err := tool.NewCall("call-1", "read", invalid)
+			return err
+		},
+		"result": func() error {
+			_, err := tool.NewResult("call-1", invalid)
+			return err
+		},
+	} {
+		if err := construct(); err == nil {
+			t.Errorf("invalid UTF-8 %s JSON succeeded", name)
+		}
+	}
+}
+
+func TestIdentitiesRejectControlsAndInvalidUTF8(t *testing.T) {
+	t.Parallel()
+	for name, value := range map[string]string{
+		"control": "bad\nidentity",
+		"UTF-8":   string([]byte{'b', 0xff}),
+	} {
+		constructors := map[string]func() error{
+			"definition": func() error {
+				_, err := tool.NewDefinition(value, "Read.", json.RawMessage(`{}`), tool.EffectReadOnly, tool.ReplaySafe)
+				return err
+			},
+			"call ID": func() error {
+				_, err := tool.NewCall(tool.CallID(value), "read", json.RawMessage(`{}`))
+				return err
+			},
+			"call name": func() error {
+				_, err := tool.NewCall("call-1", value, json.RawMessage(`{}`))
+				return err
+			},
+			"result": func() error {
+				_, err := tool.NewResult(tool.CallID(value), json.RawMessage(`{}`))
+				return err
+			},
+			"progress": func() error {
+				_, err := tool.NewProgress(tool.CallID(value), "working")
+				return err
+			},
+		}
+		for contract, construct := range constructors {
+			if err := construct(); err == nil {
+				t.Errorf("%s %s identity succeeded", name, contract)
+			}
+		}
+	}
+}
+
 func TestDefinitionRejectsMissingAndInvalidExecutionMetadata(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct {
