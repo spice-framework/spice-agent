@@ -113,7 +113,7 @@ func TestSnapshotImportRejectsEveryAuthenticatedTamper(t *testing.T) {
 			if validationErr := enginev1.ValidateSnapshotEnvelope(candidate); validationErr != nil {
 				t.Fatalf("tamper was not structurally valid: %v", validationErr)
 			}
-			importErr := enginev1.ValidateImportSnapshotRequest(context.Background(), requestFor(candidate), codec)
+			importErr := enginev1.ValidateImportSnapshotRequest(context.Background(), requestFor(candidate), codec, protocolLimits())
 			if !errors.Is(importErr, enginev1.ErrSnapshotAuthorityVerification) {
 				t.Fatalf("tampered import error = %v", importErr)
 			}
@@ -215,7 +215,7 @@ func TestSnapshotAuthoritySignerVerifierFailureAndCancellationAreContained(t *te
 			panic("verification-secret")
 		}),
 	} {
-		err = enginev1.ValidateImportSnapshotRequest(ctx, request, verifier)
+		err = enginev1.ValidateImportSnapshotRequest(ctx, request, verifier, protocolLimits())
 		if !errors.Is(err, enginev1.ErrSnapshotAuthorityVerification) || strings.Contains(fmt.Sprint(err), "secret") {
 			t.Errorf("%s verifier error = %v", name, err)
 		}
@@ -230,6 +230,7 @@ func TestSnapshotAuthoritySignerVerifierFailureAndCancellationAreContained(t *te
 			<-ctx.Done()
 			return ctx.Err()
 		}),
+		protocolLimits(),
 	)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("cancelled verifier error = %v", err)
@@ -248,6 +249,7 @@ func TestSnapshotAuthoritySignerVerifierFailureAndCancellationAreContained(t *te
 				<-ignoringVerifierRelease
 				return nil
 			}),
+			protocolLimits(),
 		)
 		ignoringVerifierResult <- validationErr
 	}()
@@ -298,7 +300,7 @@ func TestSnapshotAuthorityDescriptorAndUnknownFields(t *testing.T) {
 	request := &enginev1.ImportSnapshotRequest{
 		ClientId: "client", OwnershipEpoch: 1, ClientOperationId: "import-1", Snapshot: snapshot,
 	}
-	if err = enginev1.ValidateImportSnapshotRequest(context.Background(), request, codec); err != nil {
+	if err = enginev1.ValidateImportSnapshotRequest(context.Background(), request, codec, protocolLimits()); err != nil {
 		t.Fatalf("unknown authority field changed known semantics: %v", err)
 	}
 	roundTrip, err := proto.Marshal(snapshot.GetAuthority())

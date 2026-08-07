@@ -12,10 +12,19 @@ import (
 	"strings"
 	"testing"
 
+	commonv1 "github.com/spice-framework/spice-agent/common/v1"
 	"github.com/spice-framework/spice-agent/daemon"
 	enginev1 "github.com/spice-framework/spice-agent/engine/v1"
 	"google.golang.org/protobuf/proto"
 )
+
+func authorityProtocolLimits() *commonv1.Limits {
+	return &commonv1.Limits{
+		MaxMessageBytes:    uint64(enginev1.MaximumSnapshotEnvelopeBytes + 1024),
+		MaxCollectionItems: 1, MaxReplayEvents: 1, MaxReplayBytes: 1,
+		MaxConcurrentStreams: 1, MaxActiveRuns: 1,
+	}
+}
 
 func TestRunAuthoritySuspensionImportAndGenerationSeparation(t *testing.T) {
 	directory := filepath.Join(authorityTestRoot(t), "authority")
@@ -45,7 +54,7 @@ func TestRunAuthoritySuspensionImportAndGenerationSeparation(t *testing.T) {
 	request := &enginev1.ImportSnapshotRequest{
 		ClientId: "client", OwnershipEpoch: 1, ClientOperationId: "import", Snapshot: snapshot,
 	}
-	if err = enginev1.ValidateImportSnapshotRequest(t.Context(), request, prepared); err != nil {
+	if err = enginev1.ValidateImportSnapshotRequest(t.Context(), request, prepared, authorityProtocolLimits()); err != nil {
 		t.Fatalf("prepared verifier = %v", err)
 	}
 	if _, err = authority.PrepareImport(t.Context(), snapshot); !errors.Is(err, daemon.ErrRunAuthorityBusy) {

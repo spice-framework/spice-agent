@@ -12,8 +12,17 @@ import (
 	"testing"
 	"time"
 
+	commonv1 "github.com/spice-framework/spice-agent/common/v1"
 	enginev1 "github.com/spice-framework/spice-agent/engine/v1"
 )
+
+func testProtocolLimits() *commonv1.Limits {
+	return &commonv1.Limits{
+		MaxMessageBytes:    uint64(enginev1.MaximumSnapshotEnvelopeBytes + 1024),
+		MaxCollectionItems: 1, MaxReplayEvents: 1, MaxReplayBytes: 1,
+		MaxConcurrentStreams: 1, MaxActiveRuns: 1,
+	}
+}
 
 func TestStoreLifecycleAndKeyGeneration(t *testing.T) {
 	store := openTestStore(t, filepath.Join(authorityTestRoot(t), "authority"))
@@ -41,13 +50,13 @@ func TestStoreLifecycleAndKeyGeneration(t *testing.T) {
 	request := &enginev1.ImportSnapshotRequest{
 		ClientId: "client", OwnershipEpoch: 1, ClientOperationId: "operation", Snapshot: snapshot,
 	}
-	if err = enginev1.ValidateImportSnapshotRequest(t.Context(), request, transaction); err != nil {
+	if err = enginev1.ValidateImportSnapshotRequest(t.Context(), request, transaction, testProtocolLimits()); err != nil {
 		t.Fatal(err)
 	}
 	if err = transaction.Consume(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	if err = enginev1.ValidateImportSnapshotRequest(t.Context(), request, transaction); err == nil {
+	if err = enginev1.ValidateImportSnapshotRequest(t.Context(), request, transaction, testProtocolLimits()); err == nil {
 		t.Fatal("consumed transaction remained a verifier")
 	}
 	resumed, err := transaction.Activate(t.Context())

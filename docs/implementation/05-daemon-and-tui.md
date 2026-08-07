@@ -120,6 +120,13 @@ transactional prepared start/resume handles: preparation yields a stable run ID
 and exact leased plan without registration or execution, then commit accepts
 the separately owned run root. This is the authority-acquisition seam, not an
 authority implementation.
+Prepared starts and imported resumes additionally support an inert registered
+state. `CommitPaused` reserves the engine identity and leased plan while
+withholding all events and extension work; the host may durably activate
+authority and only then release execution through an exactly-once gate. Root
+cancellation cannot guess that external decision, and abort performs bounded
+zero-event cleanup. This closes the kernel publication gap but is not yet a
+daemon `RunHost`.
 Locally suspended runs additionally expose an inert prepared-resume boundary.
 The host can reserve the exact next event sequence, durably invalidate the old
 snapshot through `RunAuthority`, and only then release kernel execution.
@@ -148,6 +155,10 @@ The standard-library-only public client contract is recorded in
 [`evidence/phase4-client-contract.md`](evidence/phase4-client-contract.md).
 Session gate evidence is in
 [`evidence/phase4-session-gates.md`](evidence/phase4-session-gates.md).
+Protocol prerequisite evidence is in
+[`evidence/phase4-protocol-prerequisites.md`](evidence/phase4-protocol-prerequisites.md).
+Kernel activation-gate evidence is in
+[`evidence/phase4-kernel-activation-gate.md`](evidence/phase4-kernel-activation-gate.md).
 
 The baseline remains intentionally provisional. The pre-host repair closes the
 schema and kernel seams for interaction discovery/run identity, reconnect CAS,

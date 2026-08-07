@@ -17,11 +17,21 @@ New and resumed execution use a transactional kernel boundary. `PrepareStart`
 allocates the stable run ID and acquires the current immutable plan; snapshot
 preparation acquires the exact recorded generation. Both validate and build an
 unregistered event log without publishing events or starting execution. An
-outer host can therefore acquire authority before `Commit` atomically registers
-the run and starts it with a separately supplied caller-owned root context.
-`Abort`/`Close` release the uncommitted log and lease exactly once. Preparation
-contexts never become run lifetimes, and no protocol or daemon authority policy
-is embedded in the kernel.
+outer host can therefore acquire prerequisite authority resources before an
+ordinary `Commit` atomically registers the run and starts it with a separately
+supplied caller-owned root context. `Abort`/`Close` release the uncommitted log
+and lease exactly once. Preparation contexts never become run lifetimes, and no
+protocol or daemon authority policy is embedded in the kernel.
+
+Authority transitions that can become uncertain use a stricter publication
+gate. `CommitPaused` registers the run identity, replay log, and exact plan lease
+without allowing an event, observer, provider, stage, tool, or interaction to
+run. It exposes only the stable run ID. The host first completes its durable
+authority transition, then calls the context-free, exactly-once `Activate` to
+obtain and publish the run. Root cancellation and engine shutdown latch behind
+that decision; `Abort` finalizes an inert registration without emitting a
+lifecycle event. The ordinary `Commit` APIs remain atomic pre-activated wrappers
+for embedded callers that do not own an external authority transaction.
 
 Runtime plugins are the sole dynamic graph. A run leases one immutable plugin
 generation; activation never changes existing runs and never alters compiled DI.

@@ -1,0 +1,264 @@
+package enginev1
+
+import (
+	"errors"
+	"fmt"
+	"math"
+	"strings"
+
+	commonv1 "github.com/spice-framework/spice-agent/common/v1"
+	"google.golang.org/protobuf/proto"
+)
+
+// InitializeNegotiation is the immutable result of pure initialization
+// negotiation. A host allocates or reconnects a client session only after this
+// value exists, then completes the response with the resulting ownership.
+type InitializeNegotiation struct {
+	reconnectClaim *ReconnectClaim
+	protocol       *commonv1.ProtocolVersion
+	server         *commonv1.BuildIdentity
+	capabilities   *commonv1.CapabilitySet
+	limits         *commonv1.Limits
+	health         *commonv1.Health
+	definitions    *DefinitionSet
+}
+
+// ReconnectClaim returns the validated reconnect claim, or nil for a new
+// client. The returned Protobuf value owns independent storage.
+func (negotiation *InitializeNegotiation) ReconnectClaim() *ReconnectClaim {
+	if negotiation == nil || negotiation.reconnectClaim == nil {
+		return nil
+	}
+	return clone(negotiation.reconnectClaim)
+}
+
+// ValidateInitializeRequest applies the fixed bootstrap contract before any
+// negotiated session limit or ownership state exists.
+func ValidateInitializeRequest(request *InitializeRequest) error {
+	if request == nil {
+		return errors.New("initialize request is required")
+	}
+	if err := commonv1.ValidateProtocolRange(request.GetProtocol()); err != nil {
+		return err
+	}
+	if err := commonv1.ValidateBuildIdentity(request.GetClient()); err != nil {
+		return fmt.Errorf("client build identity: %w", err)
+	}
+	if err := commonv1.ValidateCapabilities(request.GetSupportedCapabilities()); err != nil {
+		return fmt.Errorf("client supported capabilities: %w", err)
+	}
+	if err := commonv1.ValidateCapabilities(request.GetRequiredCapabilities()); err != nil {
+		return fmt.Errorf("client required capabilities: %w", err)
+	}
+	for _, required := range request.GetRequiredCapabilities().GetNames() {
+		if !containsCapability(request.GetSupportedCapabilities(), required) {
+			return errors.New("required capabilities must be client-supported")
+		}
+	}
+	if err := commonv1.ValidateLimits(request.GetRequestedLimits()); err != nil {
+		return err
+	}
+	if err := validateReconnectClaim(request.GetReconnectClaim()); err != nil {
+		return err
+	}
+	return commonv1.ValidateEncodedSize(request, InitializeBootstrapMaximumBytes)
+}
+
+// PreflightInitialize validates and negotiates every transport-independent
+// field without allocating or mutating client-session state. On failure it
+// returns an error-only wire response and no negotiation value.
+func PreflightInitialize(
+	request *InitializeRequest,
+	serverRange *commonv1.ProtocolRange,
+	serverBuild *commonv1.BuildIdentity,
+	serverCapabilities *commonv1.CapabilitySet,
+	serverLimits *commonv1.Limits,
+	health *commonv1.Health,
+	definitions *DefinitionSet,
+) (*InitializeNegotiation, *InitializeResponse) {
+	invalid := func(message string) (*InitializeNegotiation, *InitializeResponse) {
+		return nil, initializeFailure(commonv1.ErrorCode_ERROR_CODE_INVALID_ARGUMENT, message)
+	}
+	internal := func(message string) (*InitializeNegotiation, *InitializeResponse) {
+		return nil, initializeFailure(commonv1.ErrorCode_ERROR_CODE_INTERNAL, message)
+	}
+	if err := ValidateInitializeRequest(request); err != nil {
+		return invalid(err.Error())
+	}
+	if err := commonv1.ValidateProtocolRange(serverRange); err != nil {
+		return internal("server protocol range is invalid")
+	}
+	if err := commonv1.ValidateBuildIdentity(serverBuild); err != nil {
+		return internal("server build identity is invalid")
+	}
+	if err := commonv1.ValidateCapabilities(serverCapabilities); err != nil {
+		return internal("server capabilities are invalid")
+	}
+	if err := commonv1.ValidateLimits(serverLimits); err != nil {
+		return internal("server limits are invalid")
+	}
+	if err := commonv1.ValidateHealth(health); err != nil {
+		return internal("server health is invalid")
+	}
+	if !proto.Equal(health.GetLimits(), serverLimits) {
+		return internal("server health limits do not match server limits")
+	}
+	if err := ValidateDefinitionSet(definitions, serverLimits); err != nil {
+		return internal("server definition set is invalid")
+	}
+
+	version, status := commonv1.NegotiateProtocol(request.GetProtocol(), serverRange)
+	if status.GetCode() != commonv1.ErrorCode_ERROR_CODE_OK {
+		return nil, initializeStatusFailure(status)
+	}
+	if err := validateNegotiatedProtocol(version); err != nil {
+		return internal("server negotiated an unsupported protocol")
+	}
+	limits, status := commonv1.NegotiateLimits(request.GetRequestedLimits(), serverLimits)
+	if status.GetCode() != commonv1.ErrorCode_ERROR_CODE_OK {
+		return nil, initializeStatusFailure(status)
+	}
+	if err := commonv1.ValidateEncodedSize(request, limits.GetMaxMessageBytes()); err != nil {
+		return invalid(err.Error())
+	}
+	capabilities, status := commonv1.NegotiateCapabilities(
+		request.GetSupportedCapabilities(),
+		request.GetRequiredCapabilities(),
+		snapshotCapabilitiesForProtocol(version, serverCapabilities),
+	)
+	if status.GetCode() != commonv1.ErrorCode_ERROR_CODE_OK {
+		return nil, initializeStatusFailure(status)
+	}
+	if len(capabilities.GetNames()) > int(limits.GetMaxCollectionItems()) {
+		return invalid("negotiated capability count exceeds negotiated collection limit")
+	}
+	if len(health.GetDegradedReasons()) > int(limits.GetMaxCollectionItems()) {
+		return invalid("health degraded reason count exceeds negotiated collection limit")
+	}
+	if err := ValidateDefinitionSet(definitions, limits); err != nil {
+		return invalid("server definition set exceeds negotiated limits")
+	}
+
+	var reconnectClaim *ReconnectClaim
+	if request.GetReconnectClaim() != nil {
+		reconnectClaim = clone(request.GetReconnectClaim())
+	}
+	negotiation := &InitializeNegotiation{
+		reconnectClaim: reconnectClaim,
+		protocol:       clone(version),
+		server:         clone(serverBuild),
+		capabilities:   clone(capabilities),
+		limits:         clone(limits),
+		health:         clone(health),
+		definitions:    clone(definitions),
+	}
+	preview := initializeSuccessResponse(negotiation, strings.Repeat("c", 128), math.MaxUint64)
+	if err := commonv1.ValidateEncodedSize(preview, limits.GetMaxMessageBytes()); err != nil {
+		return invalid("initialize success response exceeds negotiated message limit")
+	}
+	if err := ValidateInitializeResponse(preview); err != nil {
+		return internal("initialize success response is invalid")
+	}
+	return negotiation, nil
+}
+
+// CompleteInitialize binds a successful pure negotiation to one newly
+// allocated or atomically reconnected client ownership result. The host owns
+// the remaining allocator invariant: client IDs are valid tokens of at most
+// 128 bytes and ownership epochs are positive and reconnect-consistent.
+func CompleteInitialize(
+	negotiation *InitializeNegotiation,
+	clientID string,
+	ownershipEpoch uint64,
+) *InitializeResponse {
+	if negotiation == nil || negotiation.protocol == nil || negotiation.server == nil ||
+		negotiation.capabilities == nil || negotiation.limits == nil || negotiation.health == nil ||
+		negotiation.definitions == nil {
+		return initializeFailure(commonv1.ErrorCode_ERROR_CODE_INTERNAL, "initialize negotiation is invalid")
+	}
+	if err := validateReconnectResult(negotiation.reconnectClaim, clientID, ownershipEpoch); err != nil {
+		return initializeFailure(commonv1.ErrorCode_ERROR_CODE_INTERNAL, "server client ownership is invalid")
+	}
+	response := initializeSuccessResponse(negotiation, clientID, ownershipEpoch)
+	if err := commonv1.ValidateEncodedSize(response, negotiation.limits.GetMaxMessageBytes()); err != nil {
+		return initializeFailure(commonv1.ErrorCode_ERROR_CODE_INTERNAL, "initialize response exceeds negotiated message limit")
+	}
+	return response
+}
+
+func initializeSuccessResponse(
+	negotiation *InitializeNegotiation,
+	clientID string,
+	ownershipEpoch uint64,
+) *InitializeResponse {
+	return &InitializeResponse{
+		Status:         commonv1.OKStatus(),
+		Protocol:       clone(negotiation.protocol),
+		Server:         clone(negotiation.server),
+		Capabilities:   clone(negotiation.capabilities),
+		Limits:         clone(negotiation.limits),
+		Health:         clone(negotiation.health),
+		ClientId:       clientID,
+		OwnershipEpoch: ownershipEpoch,
+		Definitions:    clone(negotiation.definitions),
+	}
+}
+
+func initializeFailure(code commonv1.ErrorCode, message string) *InitializeResponse {
+	return initializeStatusFailure(protocolStatus(code, message))
+}
+
+func initializeStatusFailure(status *commonv1.Status) *InitializeResponse {
+	response := &InitializeResponse{Status: clone(status)}
+	if commonv1.ValidateEncodedSize(response, InitializeBootstrapMaximumBytes) == nil {
+		return response
+	}
+	return &InitializeResponse{Status: protocolStatus(commonv1.ErrorCode_ERROR_CODE_INTERNAL, "initialize negotiation failed")}
+}
+
+func validateInitializeProtocolSelection(request *InitializeRequest, response *InitializeResponse) error {
+	selected := &commonv1.ProtocolRange{Minimum: response.GetProtocol(), Maximum: response.GetProtocol()}
+	negotiated, status := commonv1.NegotiateProtocol(selected, request.GetProtocol())
+	if status.GetCode() != commonv1.ErrorCode_ERROR_CODE_OK || !proto.Equal(negotiated, response.GetProtocol()) {
+		return errors.New("initialize protocol is outside the requested range")
+	}
+	return nil
+}
+
+func validateInitializeCapabilitySelection(request *InitializeRequest, response *InitializeResponse) error {
+	for _, selected := range response.GetCapabilities().GetNames() {
+		if !containsCapability(request.GetSupportedCapabilities(), selected) {
+			return errors.New("initialize response selected an unsupported capability")
+		}
+	}
+	for _, required := range request.GetRequiredCapabilities().GetNames() {
+		if !containsCapability(response.GetCapabilities(), required) {
+			return errors.New("initialize response omitted a required capability")
+		}
+	}
+	return nil
+}
+
+func validateInitializeLimitSelection(request *InitializeRequest, response *InitializeResponse) error {
+	requested, selected, capacity := request.GetRequestedLimits(), response.GetLimits(), response.GetHealth().GetLimits()
+	if selected.GetMaxMessageBytes() > requested.GetMaxMessageBytes() ||
+		selected.GetMaxCollectionItems() > requested.GetMaxCollectionItems() ||
+		selected.GetMaxReplayEvents() > requested.GetMaxReplayEvents() ||
+		selected.GetMaxReplayBytes() > requested.GetMaxReplayBytes() ||
+		selected.GetMaxConcurrentStreams() > requested.GetMaxConcurrentStreams() ||
+		selected.GetMaxActiveRuns() > requested.GetMaxActiveRuns() {
+		return errors.New("initialize response exceeds requested limits")
+	}
+	if err := commonv1.ValidateEncodedSize(request, selected.GetMaxMessageBytes()); err != nil {
+		return fmt.Errorf("initialize request exceeds selected message limit: %w", err)
+	}
+	if selected.GetMaxMessageBytes() > capacity.GetMaxMessageBytes() ||
+		selected.GetMaxCollectionItems() > capacity.GetMaxCollectionItems() ||
+		selected.GetMaxReplayEvents() > capacity.GetMaxReplayEvents() ||
+		selected.GetMaxReplayBytes() > capacity.GetMaxReplayBytes() ||
+		selected.GetMaxConcurrentStreams() > capacity.GetMaxConcurrentStreams() ||
+		selected.GetMaxActiveRuns() > capacity.GetMaxActiveRuns() {
+		return errors.New("initialize response exceeds advertised server capacity")
+	}
+	return nil
+}

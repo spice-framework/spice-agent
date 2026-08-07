@@ -6,14 +6,24 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"unicode/utf8"
 
 	commonv1 "github.com/spice-framework/spice-agent/common/v1"
 	"google.golang.org/protobuf/proto"
 )
 
 const (
+	// InitializeBootstrapMaximumBytes is the fixed pre-negotiation receive and
+	// error-response bound used before connection limits exist.
+	InitializeBootstrapMaximumBytes = 1 << 20
 	// MaximumSnapshotBytes matches the bounded kernel snapshot contract.
-	MaximumSnapshotBytes    = 16 << 20
+	MaximumSnapshotBytes = 16 << 20
+	// MaximumSnapshotEnvelopeOverheadBytes is the exact deterministic Protobuf
+	// overhead for the current maximum-width engine/v1 signed envelope shape.
+	MaximumSnapshotEnvelopeOverheadBytes = 295
+	// MaximumSnapshotEnvelopeBytes bounds a complete signed snapshot transfer.
+	MaximumSnapshotEnvelopeBytes = MaximumSnapshotBytes + MaximumSnapshotEnvelopeOverheadBytes
+
 	maximumJSONBytes        = 1 << 20
 	maximumInteractionBytes = 512 << 10
 	maximumTokenBytes       = 256
@@ -34,57 +44,19 @@ func NegotiateInitialize(
 	clientID string,
 	ownershipEpoch uint64,
 ) *InitializeResponse {
-	invalid := func(message string) *InitializeResponse {
-		return &InitializeResponse{Status: protocolStatus(commonv1.ErrorCode_ERROR_CODE_INVALID_ARGUMENT, message)}
-	}
-	if request == nil {
-		return invalid("initialize request is required")
-	}
-	if err := commonv1.ValidateBuildIdentity(request.GetClient()); err != nil {
-		return invalid("client build identity: " + err.Error())
-	}
-	if err := validateReconnectClaim(request.GetReconnectClaim()); err != nil {
-		return invalid("reconnect claim: " + err.Error())
-	}
-	if err := commonv1.ValidateBuildIdentity(serverBuild); err != nil {
-		return &InitializeResponse{Status: protocolStatus(commonv1.ErrorCode_ERROR_CODE_INTERNAL, "server build identity is invalid")}
-	}
-	if err := commonv1.ValidateHealth(health); err != nil {
-		return &InitializeResponse{Status: protocolStatus(commonv1.ErrorCode_ERROR_CODE_INTERNAL, "server health is invalid")}
-	}
-	if err := ValidateDefinitionSet(definitions, serverLimits); err != nil {
-		return &InitializeResponse{Status: protocolStatus(commonv1.ErrorCode_ERROR_CODE_INTERNAL, "server definition set is invalid")}
-	}
-	if err := validateReconnectResult(request.GetReconnectClaim(), clientID, ownershipEpoch); err != nil {
-		return &InitializeResponse{Status: protocolStatus(commonv1.ErrorCode_ERROR_CODE_INTERNAL, "server client ownership is invalid")}
-	}
-	version, negotiationStatus := commonv1.NegotiateProtocol(request.GetProtocol(), serverRange)
-	if negotiationStatus.GetCode() != commonv1.ErrorCode_ERROR_CODE_OK {
-		return &InitializeResponse{Status: negotiationStatus}
-	}
-	capabilities, negotiationStatus := commonv1.NegotiateCapabilities(
-		request.GetSupportedCapabilities(),
-		request.GetRequiredCapabilities(),
-		snapshotCapabilitiesForProtocol(version, serverCapabilities),
+	negotiation, failure := PreflightInitialize(
+		request,
+		serverRange,
+		serverBuild,
+		serverCapabilities,
+		serverLimits,
+		health,
+		definitions,
 	)
-	if negotiationStatus.GetCode() != commonv1.ErrorCode_ERROR_CODE_OK {
-		return &InitializeResponse{Status: negotiationStatus}
+	if failure != nil {
+		return failure
 	}
-	limits, negotiationStatus := commonv1.NegotiateLimits(request.GetRequestedLimits(), serverLimits)
-	if negotiationStatus.GetCode() != commonv1.ErrorCode_ERROR_CODE_OK {
-		return &InitializeResponse{Status: negotiationStatus}
-	}
-	return &InitializeResponse{
-		Status:         commonv1.OKStatus(),
-		Protocol:       version,
-		Server:         clone(serverBuild),
-		Capabilities:   capabilities,
-		Limits:         limits,
-		Health:         clone(health),
-		ClientId:       clientID,
-		OwnershipEpoch: ownershipEpoch,
-		Definitions:    clone(definitions),
-	}
+	return CompleteInitialize(negotiation, clientID, ownershipEpoch)
 }
 
 // ValidateInitializeResponse lets a client fail closed on malformed negotiation.
@@ -96,12 +68,15 @@ func ValidateInitializeResponse(response *InitializeResponse) error {
 		return err
 	}
 	if statusErr := commonv1.AsError(response.GetStatus()); statusErr != nil {
+		if initializeResponseHasNegotiatedFields(response) {
+			return errors.New("failed initialize response contains negotiated fields")
+		}
+		if err := commonv1.ValidateEncodedSize(response, InitializeBootstrapMaximumBytes); err != nil {
+			return err
+		}
 		return statusErr
 	}
-	if err := commonv1.ValidateProtocolRange(&commonv1.ProtocolRange{
-		Minimum: response.GetProtocol(),
-		Maximum: response.GetProtocol(),
-	}); err != nil {
+	if err := validateNegotiatedProtocol(response.GetProtocol()); err != nil {
 		return err
 	}
 	if err := commonv1.ValidateBuildIdentity(response.GetServer()); err != nil {
@@ -118,8 +93,14 @@ func ValidateInitializeResponse(response *InitializeResponse) error {
 	if err := commonv1.ValidateLimits(response.GetLimits()); err != nil {
 		return err
 	}
+	if len(response.GetCapabilities().GetNames()) > int(response.GetLimits().GetMaxCollectionItems()) {
+		return errors.New("initialize capability count exceeds the negotiated collection limit")
+	}
 	if err := commonv1.ValidateHealth(response.GetHealth()); err != nil {
 		return err
+	}
+	if len(response.GetHealth().GetDegradedReasons()) > int(response.GetLimits().GetMaxCollectionItems()) {
+		return errors.New("initialize health reason count exceeds the negotiated collection limit")
 	}
 	if err := token("client ID", response.GetClientId(), 128); err != nil {
 		return err
@@ -133,16 +114,28 @@ func ValidateInitializeResponse(response *InitializeResponse) error {
 	return commonv1.ValidateEncodedSize(response, response.GetLimits().GetMaxMessageBytes())
 }
 
+func initializeResponseHasNegotiatedFields(response *InitializeResponse) bool {
+	return response.GetProtocol() != nil || response.GetServer() != nil || response.GetCapabilities() != nil ||
+		response.GetLimits() != nil || response.GetHealth() != nil || response.GetClientId() != "" ||
+		response.GetOwnershipEpoch() != 0 || response.GetDefinitions() != nil
+}
+
 // ValidateInitializeResponseForRequest additionally verifies that ownership is
 // the exact result of the request's new-owner or reconnect CAS contract.
 func ValidateInitializeResponseForRequest(request *InitializeRequest, response *InitializeResponse) error {
-	if request == nil {
-		return errors.New("initialize request is required")
-	}
-	if err := validateReconnectClaim(request.GetReconnectClaim()); err != nil {
+	if err := ValidateInitializeRequest(request); err != nil {
 		return err
 	}
 	if err := ValidateInitializeResponse(response); err != nil {
+		return err
+	}
+	if err := validateInitializeProtocolSelection(request, response); err != nil {
+		return err
+	}
+	if err := validateInitializeCapabilitySelection(request, response); err != nil {
+		return err
+	}
+	if err := validateInitializeLimitSelection(request, response); err != nil {
 		return err
 	}
 	return validateReconnectResult(request.GetReconnectClaim(), response.GetClientId(), response.GetOwnershipEpoch())
@@ -277,6 +270,9 @@ func ValidateStartRunRequest(request *StartRunRequest, limits *commonv1.Limits) 
 	if request == nil {
 		return errors.New("start run request is required")
 	}
+	if err := commonv1.ValidateLimits(limits); err != nil {
+		return err
+	}
 	if err := validateClientMutation(
 		request.GetClientId(),
 		request.GetOwnershipEpoch(),
@@ -301,6 +297,9 @@ func ValidateStartRunRequest(request *StartRunRequest, limits *commonv1.Limits) 
 	}
 	if request.GetInput().GetRole() != MessageRole_MESSAGE_ROLE_USER {
 		return errors.New("initial message must have the user role")
+	}
+	if len(request.GetInput().GetParts()) > int(limits.GetMaxCollectionItems()) {
+		return fmt.Errorf("initial message part count exceeds %d", limits.GetMaxCollectionItems())
 	}
 	return commonv1.ValidateEncodedSize(request, limits.GetMaxMessageBytes())
 }
@@ -687,8 +686,8 @@ func OverloadStatus(resource string, limit, observed uint64) *commonv1.Status {
 	}
 }
 
-// ValidateCancelRunRequest validates an idempotent cancellation mutation.
-func ValidateCancelRunRequest(request *CancelRunRequest) error {
+// ValidateCancelRunRequest validates a bounded idempotent cancellation mutation.
+func ValidateCancelRunRequest(request *CancelRunRequest, limits *commonv1.Limits) error {
 	if request == nil {
 		return errors.New("cancel run request is required")
 	}
@@ -703,25 +702,33 @@ func ValidateCancelRunRequest(request *CancelRunRequest) error {
 		return err
 	}
 	if request.GetReason() != "" {
-		return token("cancellation reason", request.GetReason(), 1024)
+		if err := token("cancellation reason", request.GetReason(), 1024); err != nil {
+			return err
+		}
 	}
-	return nil
+	return validateUnarySize(request, limits)
 }
 
-// ValidateSuspendRunRequest validates one idempotent safe-boundary mutation.
-func ValidateSuspendRunRequest(request *SuspendRunRequest) error {
+// ValidateSuspendRunRequest validates one bounded idempotent safe-boundary mutation.
+func ValidateSuspendRunRequest(request *SuspendRunRequest, limits *commonv1.Limits) error {
 	if request == nil {
 		return errors.New("suspend run request is required")
 	}
-	return validateRunMutation(request.GetClientId(), request.GetOwnershipEpoch(), request.GetClientOperationId(), request.GetRunId())
+	if err := validateRunMutation(request.GetClientId(), request.GetOwnershipEpoch(), request.GetClientOperationId(), request.GetRunId()); err != nil {
+		return err
+	}
+	return validateUnarySize(request, limits)
 }
 
-// ValidateResumeRunRequest validates one idempotent local-resume mutation.
-func ValidateResumeRunRequest(request *ResumeRunRequest) error {
+// ValidateResumeRunRequest validates one bounded idempotent local-resume mutation.
+func ValidateResumeRunRequest(request *ResumeRunRequest, limits *commonv1.Limits) error {
 	if request == nil {
 		return errors.New("resume run request is required")
 	}
-	return validateRunMutation(request.GetClientId(), request.GetOwnershipEpoch(), request.GetClientOperationId(), request.GetRunId())
+	if err := validateRunMutation(request.GetClientId(), request.GetOwnershipEpoch(), request.GetClientOperationId(), request.GetRunId()); err != nil {
+		return err
+	}
+	return validateUnarySize(request, limits)
 }
 
 // ValidateInteractionResponse rejects stale ownership, wrong correlation, and
@@ -744,21 +751,11 @@ func ValidateInteractionResponse(
 	); stale != nil {
 		return stale
 	}
-	for _, field := range [][2]string{
-		{"client operation ID", request.GetClientOperationId()},
-		{"run ID", request.GetRunId()},
-		{"interaction ID", request.GetInteractionId()},
-	} {
-		if err := token(field[0], field[1], 128); err != nil {
-			return protocolStatus(commonv1.ErrorCode_ERROR_CODE_INVALID_ARGUMENT, err.Error())
-		}
+	if err := validateRespondInteractionFields(request); err != nil {
+		return protocolStatus(commonv1.ErrorCode_ERROR_CODE_INVALID_ARGUMENT, err.Error())
 	}
 	if request.GetRunId() != expectedRunID || request.GetInteractionId() != expectedInteractionID {
 		return protocolStatus(commonv1.ErrorCode_ERROR_CODE_CONFLICT, "interaction correlation does not match the pending request")
-	}
-	if len(request.GetValueJson()) == 0 || len(request.GetValueJson()) > maximumInteractionBytes ||
-		!json.Valid(request.GetValueJson()) {
-		return protocolStatus(commonv1.ErrorCode_ERROR_CODE_INVALID_ARGUMENT, "interaction response must be bounded valid JSON")
 	}
 	return commonv1.OKStatus()
 }
@@ -890,6 +887,12 @@ func terminalEventKind(kind EventKind) bool {
 func token(label, value string, maximum int) error {
 	if value == "" || value != strings.TrimSpace(value) {
 		return fmt.Errorf("%s must be non-empty without surrounding whitespace", label)
+	}
+	if !utf8.ValidString(value) {
+		return fmt.Errorf("%s must be valid UTF-8", label)
+	}
+	if strings.ContainsAny(value, "\x00\r\n\t") {
+		return fmt.Errorf("%s must not contain control characters", label)
 	}
 	if len(value) > maximum {
 		return fmt.Errorf("%s exceeds %d bytes", label, maximum)

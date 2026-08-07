@@ -132,6 +132,15 @@ secret-safe structured values, snapshot/health contracts, and lossless typed
 recovery using only the Go standard library. It deliberately does not claim a
 gRPC adapter, authentication, discovery, or OS endpoint. Evidence is in
 [`evidence/phase4-client-contract.md`](evidence/phase4-client-contract.md).
+Transport-independent protocol prerequisites now split initialization into pure
+preflight and ownership completion, validate every unary success/error shape
+against negotiated byte and collection limits, and define the exact maximum
+opaque snapshot-envelope size. Evidence is in
+[`evidence/phase4-protocol-prerequisites.md`](evidence/phase4-protocol-prerequisites.md).
+Prepared starts and imported resumes can now be registered behind an inert
+kernel activation gate. Only a successful durable daemon authority transition
+may release execution; abort remains event- and extension-free. Evidence is in
+[`evidence/phase4-kernel-activation-gate.md`](evidence/phase4-kernel-activation-gate.md).
 The independent TUI repository now exposes an immutable UI-neutral session
 port and a public terminal shell while keeping Bubble Tea and presentation
 messages internal. Commit `82adb45` generates its renderer, theme, ordered key

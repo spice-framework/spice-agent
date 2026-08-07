@@ -60,7 +60,9 @@ message CapabilitySet {
   repeated string names = 1;
 }
 
-// Limits are the negotiated upper bounds for one local protocol connection.
+// Limits are bounded protocol capacities. In initialization request/response
+// fields they are per-connection requested/selected limits. In Health.limits
+// they are the server-configured global capacities used to validate health.
 message Limits {
   uint64 max_message_bytes = 1;
   uint32 max_collection_items = 2;
@@ -75,6 +77,8 @@ message Health {
   HealthState state = 1;
   repeated string degraded_reasons = 2;
   uint64 active_runs = 3;
+  // limits are server-global configured capacities, not the potentially lower
+  // limits negotiated for one client connection.
   Limits limits = 4;
 }
 

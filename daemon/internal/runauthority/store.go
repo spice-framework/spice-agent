@@ -20,6 +20,7 @@ import (
 	"sync"
 	"unicode"
 
+	commonv1 "github.com/spice-framework/spice-agent/common/v1"
 	enginev1 "github.com/spice-framework/spice-agent/engine/v1"
 )
 
@@ -288,7 +289,7 @@ func (store *Store) PrepareImport(ctx context.Context, snapshot *enginev1.Snapsh
 	request := &enginev1.ImportSnapshotRequest{
 		ClientId: "run-authority", OwnershipEpoch: 1, ClientOperationId: "prepare-import", Snapshot: snapshot,
 	}
-	if err = enginev1.ValidateImportSnapshotRequest(ctx, request, codec); err != nil {
+	if err = enginev1.ValidateImportSnapshotRequest(ctx, request, codec, snapshotImportLimits()); err != nil {
 		_ = lock.close()
 		if cause := context.Cause(ctx); cause != nil {
 			return nil, cause
@@ -301,6 +302,14 @@ func (store *Store) PrepareImport(ctx context.Context, snapshot *enginev1.Snapsh
 		expectedScope: slices.Clone(snapshot.GetAuthority().GetScopeId()),
 		expectedMAC:   slices.Clone(snapshot.GetAuthority().GetHmacSha256()), codec: codec,
 	}, nil
+}
+
+func snapshotImportLimits() *commonv1.Limits {
+	return &commonv1.Limits{
+		MaxMessageBytes:    uint64(enginev1.MaximumSnapshotEnvelopeBytes + 1024),
+		MaxCollectionItems: 1, MaxReplayEvents: 1, MaxReplayBytes: 1,
+		MaxConcurrentStreams: 1, MaxActiveRuns: 1,
+	}
 }
 
 func (store *Store) baseRecord(runID string, runGeneration uint64, phase Phase) record {

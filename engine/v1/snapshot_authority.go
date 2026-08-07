@@ -345,6 +345,7 @@ func ValidateImportSnapshotRequest(
 	ctx context.Context,
 	request *ImportSnapshotRequest,
 	verifier SnapshotAuthorityVerifier,
+	limits *commonv1.Limits,
 ) error {
 	if request == nil {
 		return errors.New("import snapshot request is required")
@@ -360,6 +361,9 @@ func ValidateImportSnapshotRequest(
 		request.GetOwnershipEpoch(),
 		request.GetClientOperationId(),
 	); err != nil {
+		return err
+	}
+	if err := validateUnarySize(request, limits); err != nil {
 		return err
 	}
 	if err := ValidateSnapshotEnvelope(request.GetSnapshot()); err != nil {

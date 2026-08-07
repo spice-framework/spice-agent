@@ -397,7 +397,9 @@ func (x *CapabilitySet) GetNames() []string {
 	return nil
 }
 
-// Limits are the negotiated upper bounds for one local protocol connection.
+// Limits are bounded protocol capacities. In initialization request/response
+// fields they are per-connection requested/selected limits. In Health.limits
+// they are the server-configured global capacities used to validate health.
 type Limits struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	MaxMessageBytes      uint64                 `protobuf:"varint,1,opt,name=max_message_bytes,json=maxMessageBytes,proto3" json:"max_message_bytes,omitempty"`
@@ -488,9 +490,11 @@ type Health struct {
 	State           HealthState            `protobuf:"varint,1,opt,name=state,proto3,enum=spice.agent.common.v1.HealthState" json:"state,omitempty"`
 	DegradedReasons []string               `protobuf:"bytes,2,rep,name=degraded_reasons,json=degradedReasons,proto3" json:"degraded_reasons,omitempty"`
 	ActiveRuns      uint64                 `protobuf:"varint,3,opt,name=active_runs,json=activeRuns,proto3" json:"active_runs,omitempty"`
-	Limits          *Limits                `protobuf:"bytes,4,opt,name=limits,proto3" json:"limits,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// limits are server-global configured capacities, not the potentially lower
+	// limits negotiated for one client connection.
+	Limits        *Limits `protobuf:"bytes,4,opt,name=limits,proto3" json:"limits,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Health) Reset() {

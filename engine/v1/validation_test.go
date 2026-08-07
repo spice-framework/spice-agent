@@ -152,13 +152,13 @@ func TestStreamReplayEventAndCancellationBoundaries(t *testing.T) {
 		t.Fatal("oversized event bytes succeeded")
 	}
 
-	if err := enginev1.ValidateCancelRunRequest(nil); err == nil {
+	if err := enginev1.ValidateCancelRunRequest(nil, protocolLimits()); err == nil {
 		t.Fatal("nil cancellation succeeded")
 	}
 	if err := enginev1.ValidateCancelRunRequest(&enginev1.CancelRunRequest{
 		ClientId: "client", OwnershipEpoch: 1, ClientOperationId: "cancel", RunId: "run",
 		Reason: strings.Repeat("x", 1025),
-	}); err == nil {
+	}, protocolLimits()); err == nil {
 		t.Fatal("unbounded cancellation reason succeeded")
 	}
 }
@@ -201,13 +201,13 @@ func TestInteractionAndSnapshotFailureBoundaries(t *testing.T) {
 	); err == nil {
 		t.Fatal("invalid snapshot construction succeeded")
 	}
-	if err = enginev1.ValidateImportSnapshotRequest(context.Background(), nil, snapshotAuthority(t)); err == nil {
+	if err = enginev1.ValidateImportSnapshotRequest(context.Background(), nil, snapshotAuthority(t), protocolLimits()); err == nil {
 		t.Fatal("nil snapshot import succeeded")
 	}
 	if err = enginev1.ValidateImportSnapshotRequest(context.Background(), &enginev1.ImportSnapshotRequest{
 		ClientId: "client", OwnershipEpoch: 1, ClientOperationId: "import",
 		Snapshot: valid,
-	}, snapshotAuthority(t)); err != nil {
+	}, snapshotAuthority(t), protocolLimits()); err != nil {
 		t.Fatal(err)
 	}
 }

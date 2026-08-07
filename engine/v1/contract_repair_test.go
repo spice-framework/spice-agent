@@ -193,15 +193,15 @@ func TestSuspendResumeAndSnapshotImportPreserveRunIdentity(t *testing.T) {
 	t.Parallel()
 	if err := enginev1.ValidateSuspendRunRequest(&enginev1.SuspendRunRequest{
 		ClientId: "client", OwnershipEpoch: 1, ClientOperationId: "suspend-1", RunId: "run-1",
-	}); err != nil {
+	}, protocolLimits()); err != nil {
 		t.Fatal(err)
 	}
 	if err := enginev1.ValidateResumeRunRequest(&enginev1.ResumeRunRequest{
 		ClientId: "client", OwnershipEpoch: 1, ClientOperationId: "resume-1", RunId: "run-1",
-	}); err != nil {
+	}, protocolLimits()); err != nil {
 		t.Fatal(err)
 	}
-	if err := enginev1.ValidateResumeRunRequest(&enginev1.ResumeRunRequest{}); err == nil {
+	if err := enginev1.ValidateResumeRunRequest(&enginev1.ResumeRunRequest{}, protocolLimits()); err == nil {
 		t.Fatal("unowned resume succeeded")
 	}
 	payload := []byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"run-1"}`)
@@ -214,7 +214,7 @@ func TestSuspendResumeAndSnapshotImportPreserveRunIdentity(t *testing.T) {
 	}
 	if err = enginev1.ValidateImportSnapshotRequest(context.Background(), &enginev1.ImportSnapshotRequest{
 		ClientId: "client", OwnershipEpoch: 1, ClientOperationId: "import-1", Snapshot: snapshot,
-	}, snapshotAuthority(t)); err != nil {
+	}, snapshotAuthority(t), protocolLimits()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = enginev1.NewSnapshotEnvelope(

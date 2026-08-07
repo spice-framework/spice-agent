@@ -202,11 +202,11 @@ func TestRunCreationAndCancellationAreBoundedIdempotentContracts(t *testing.T) {
 		ClientId: "client-1", OwnershipEpoch: 1,
 		ClientOperationId: "cancel-1", RunId: "run-1", Reason: "user requested",
 	}
-	if err := enginev1.ValidateCancelRunRequest(cancel); err != nil {
+	if err := enginev1.ValidateCancelRunRequest(cancel, protocolLimits()); err != nil {
 		t.Fatal(err)
 	}
 	cancel.ClientOperationId = ""
-	if err := enginev1.ValidateCancelRunRequest(cancel); err == nil {
+	if err := enginev1.ValidateCancelRunRequest(cancel, protocolLimits()); err == nil {
 		t.Fatal("cancellation without idempotency identity succeeded")
 	}
 }
@@ -311,7 +311,7 @@ func TestSnapshotDigestLifecycleAndImportSafety(t *testing.T) {
 		ClientId: "client-1", OwnershipEpoch: 1,
 		ClientOperationId: "import-1", Snapshot: snapshot,
 	}
-	if err = enginev1.ValidateImportSnapshotRequest(context.Background(), request, snapshotAuthority(t)); err != nil {
+	if err = enginev1.ValidateImportSnapshotRequest(context.Background(), request, snapshotAuthority(t), protocolLimits()); err != nil {
 		t.Fatal(err)
 	}
 	snapshot.Sha256[0] ^= 0xff
@@ -330,7 +330,7 @@ func TestSnapshotDigestLifecycleAndImportSafety(t *testing.T) {
 		t.Fatal(err)
 	}
 	request.Snapshot = snapshot
-	if err = enginev1.ValidateImportSnapshotRequest(context.Background(), request, snapshotAuthority(t)); err == nil {
+	if err = enginev1.ValidateImportSnapshotRequest(context.Background(), request, snapshotAuthority(t), protocolLimits()); err == nil {
 		t.Fatal("terminal snapshot import succeeded")
 	}
 }
@@ -394,7 +394,7 @@ func FuzzEngineEnvelope(f *testing.F) {
 			_ = enginev1.ValidateSnapshotEnvelope(&snapshot)
 			_ = enginev1.ValidateImportSnapshotRequest(context.Background(), &enginev1.ImportSnapshotRequest{
 				ClientId: "client", OwnershipEpoch: 1, ClientOperationId: "fuzz-import", Snapshot: &snapshot,
-			}, codec)
+			}, codec, protocolLimits())
 		}
 		var response enginev1.RespondInteractionRequest
 		if proto.Unmarshal(data, &response) == nil {

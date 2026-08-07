@@ -11,8 +11,17 @@ import (
 const (
 	// MaximumTextBytes bounds user-visible text crossing the client boundary.
 	MaximumTextBytes = 1 << 20
-	// MaximumSnapshotBytes bounds one opaque snapshot transfer.
-	MaximumSnapshotBytes = 16 << 20
+	// MaximumSnapshotPayloadBytes is the maximum safe kernel snapshot payload.
+	MaximumSnapshotPayloadBytes = 16 << 20
+	// MaximumSnapshotEnvelopeOverheadBytes is the exact deterministic Protobuf
+	// overhead for the current maximum-width engine/v1 signed envelope shape.
+	MaximumSnapshotEnvelopeOverheadBytes = 295
+	// MaximumSnapshotEnvelopeBytes bounds one complete opaque signed snapshot
+	// transfer, including its deterministic Protobuf envelope.
+	MaximumSnapshotEnvelopeBytes = MaximumSnapshotPayloadBytes + MaximumSnapshotEnvelopeOverheadBytes
+	// MaximumSnapshotBytes is retained as the public compatibility spelling for
+	// the complete opaque transfer bound.
+	MaximumSnapshotBytes = MaximumSnapshotEnvelopeBytes
 	// MaximumCapabilities bounds negotiated capability cardinality.
 	MaximumCapabilities = 1024
 	maximumTokenBytes   = 256

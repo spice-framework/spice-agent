@@ -34,6 +34,12 @@ primitives, bounded reconnect-safe mutation/stream gates, and an OS-backed
 snapshot/run authority; local IPC and protocol translation remain separate
 adapters.
 
+Daemon authority publication is explicitly two-phase. Prepared kernel runs can
+be registered behind an inert activation gate, allowing a durable authority
+transition to complete before any event, provider, tool, observer, or
+interaction becomes visible. Cancellation is latched until the host explicitly
+activates or aborts that gate.
+
 Tool contracts fail closed: each definition declares `read_only` or `mutating`
 effect, replay safety, and a canonical capability set. Tools return ordinary
 model-visible results separately from bounded, call-correlated infrastructure

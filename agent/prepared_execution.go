@@ -19,6 +19,12 @@ var (
 	ErrPreparedExecutionCommitted = errors.New("agent prepared execution is committed")
 	// ErrPreparedExecutionAborted rejects Commit after Abort or failed Commit.
 	ErrPreparedExecutionAborted = errors.New("agent prepared execution is aborted")
+	// ErrPreparedRunActivated rejects aborting or reactivating a committed run
+	// after its execution gate has been released.
+	ErrPreparedRunActivated = errors.New("agent prepared run is activated")
+	// ErrPreparedRunAborted rejects activation after the committed run was
+	// cancelled at its inert execution gate.
+	ErrPreparedRunAborted = errors.New("agent prepared run is aborted")
 )
 
 type preparedExecutionState uint8
@@ -45,6 +51,34 @@ type PreparedStart struct{ execution *preparedExecution }
 // tool-plan lease. An uncommitted value must close. The preparation context
 // never becomes the resumed run lifetime.
 type PreparedResume struct{ execution *preparedExecution }
+
+// PreparedRun is a registered run held at an inert execution gate. Registration
+// owns the run ID, event log, and tool-plan lease, but no provider, tool, stage,
+// or interaction can execute until Activate succeeds. The caller must finish a
+// prepared run with Activate, Abort, or Close.
+type PreparedRun struct {
+	mu       sync.Mutex
+	state    preparedRunState
+	run      *Run
+	decision chan struct{}
+	execute  preparedRunExecution
+}
+
+type preparedRunState uint8
+
+const (
+	preparedRunReady preparedRunState = iota
+	preparedRunActivated
+	preparedRunAborted
+)
+
+type preparedRunExecution struct {
+	engine       *Engine
+	definition   Definition
+	history      []message.Message
+	firstTurn    uint32
+	emitRunStart bool
+}
 
 type preparedExecution struct {
 	mu    sync.Mutex
@@ -241,7 +275,11 @@ func (prepared *PreparedStart) Commit(runRootCtx context.Context) (*Run, error) 
 	if prepared == nil || prepared.execution == nil {
 		return nil, errors.New("agent prepared start is nil")
 	}
-	return prepared.execution.commit(runRootCtx)
+	committed, err := prepared.execution.commitPaused(runRootCtx, true)
+	if err != nil {
+		return nil, err
+	}
+	return committed.run, nil
 }
 
 // Commit registers the prepared resumed run and starts it exactly once using
@@ -250,10 +288,32 @@ func (prepared *PreparedResume) Commit(runRootCtx context.Context) (*Run, error)
 	if prepared == nil || prepared.execution == nil {
 		return nil, errors.New("agent prepared resume is nil")
 	}
-	return prepared.execution.commit(runRootCtx)
+	committed, err := prepared.execution.commitPaused(runRootCtx, true)
+	if err != nil {
+		return nil, err
+	}
+	return committed.run, nil
 }
 
-func (prepared *preparedExecution) commit(runRootCtx context.Context) (*Run, error) {
+// CommitPaused registers the prepared new run under the caller-owned root but
+// holds all execution behind an explicit activation gate.
+func (prepared *PreparedStart) CommitPaused(runRootCtx context.Context) (*PreparedRun, error) {
+	if prepared == nil || prepared.execution == nil {
+		return nil, errors.New("agent prepared start is nil")
+	}
+	return prepared.execution.commitPaused(runRootCtx, false)
+}
+
+// CommitPaused registers the prepared snapshot run under the caller-owned root
+// but holds all execution behind an explicit activation gate.
+func (prepared *PreparedResume) CommitPaused(runRootCtx context.Context) (*PreparedRun, error) {
+	if prepared == nil || prepared.execution == nil {
+		return nil, errors.New("agent prepared resume is nil")
+	}
+	return prepared.execution.commitPaused(runRootCtx, false)
+}
+
+func (prepared *preparedExecution) commitPaused(runRootCtx context.Context, activateImmediately bool) (*PreparedRun, error) {
 	prepared.mu.Lock()
 	defer prepared.mu.Unlock()
 	switch prepared.state {
@@ -303,10 +363,124 @@ func (prepared *preparedExecution) commit(runRootCtx context.Context) (*Run, err
 	prepared.lease = nil
 	prepared.engine.mu.Unlock()
 
-	go prepared.engine.executeState(
-		runContext, run, prepared.definition, cloneHistory(prepared.history), prepared.firstTurn, prepared.emitRunStart,
+	committed := &PreparedRun{
+		state: preparedRunReady, run: run, decision: make(chan struct{}),
+		execute: preparedRunExecution{
+			engine: prepared.engine, definition: prepared.definition, history: cloneHistory(prepared.history),
+			firstTurn: prepared.firstTurn, emitRunStart: prepared.emitRunStart,
+		},
+	}
+	if activateImmediately {
+		committed.state = preparedRunActivated
+		close(committed.decision)
+	}
+	go committed.awaitDecision()
+	return committed, nil
+}
+
+// RunID returns the stable registered run identity.
+func (prepared *PreparedRun) RunID() string {
+	if prepared == nil || prepared.run == nil {
+		return ""
+	}
+	return prepared.run.ID()
+}
+
+// Activate releases the gate exactly once and returns the registered run.
+func (prepared *PreparedRun) Activate() (*Run, error) {
+	if prepared == nil || prepared.run == nil {
+		return nil, errors.New("agent prepared run is nil")
+	}
+	prepared.mu.Lock()
+	defer prepared.mu.Unlock()
+	switch prepared.state {
+	case preparedRunActivated:
+		return nil, ErrPreparedRunActivated
+	case preparedRunAborted:
+		return nil, ErrPreparedRunAborted
+	default:
+		prepared.state = preparedRunActivated
+		close(prepared.decision)
+		return prepared.run, nil
+	}
+}
+
+// Abort cancels an inert committed run and joins its bounded terminal
+// finalization. It never releases the execution gate into provider or tool work.
+func (prepared *PreparedRun) Abort(ctx context.Context) error {
+	if prepared == nil || prepared.run == nil {
+		return errors.New("agent prepared run is nil")
+	}
+	if ctx == nil {
+		return errors.New("agent prepared run abort context is nil")
+	}
+	prepared.mu.Lock()
+	switch prepared.state {
+	case preparedRunActivated:
+		prepared.mu.Unlock()
+		return ErrPreparedRunActivated
+	case preparedRunAborted:
+		prepared.mu.Unlock()
+		return prepared.wait(ctx)
+	default:
+		prepared.state = preparedRunAborted
+		prepared.run.Cancel()
+		close(prepared.decision)
+		prepared.mu.Unlock()
+		return prepared.wait(ctx)
+	}
+}
+
+// Close aborts an inert committed run using the engine's bounded finalization
+// timeout. It is idempotent after a completed abort.
+func (prepared *PreparedRun) Close() error {
+	if prepared == nil || prepared.run == nil {
+		return errors.New("agent prepared run is nil")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*prepared.execute.engine.finalizationTimeout)
+	defer cancel()
+	return prepared.Abort(ctx)
+}
+
+func (prepared *PreparedRun) awaitDecision() {
+	<-prepared.decision
+	prepared.mu.Lock()
+	state := prepared.state
+	prepared.mu.Unlock()
+	if state == preparedRunAborted {
+		prepared.finalizeAbort()
+		return
+	}
+	prepared.execute.engine.executeState(
+		prepared.run.ctx,
+		prepared.run,
+		prepared.execute.definition,
+		cloneHistory(prepared.execute.history),
+		prepared.execute.firstTurn,
+		prepared.execute.emitRunStart,
 	)
-	return run, nil
+}
+
+func (prepared *PreparedRun) finalizeAbort() {
+	prepared.run.beginFinalization()
+	releaseContext, cancel := context.WithTimeout(context.Background(), prepared.execute.engine.finalizationTimeout)
+	err := prepared.run.planLease.ReleaseContext(releaseContext)
+	cancel()
+	if err != nil {
+		err = fmt.Errorf("release tool plan %q from inert run: %w", prepared.run.ToolPlanID(), err)
+	}
+	prepared.run.complete(err)
+}
+
+func (prepared *PreparedRun) wait(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-prepared.run.done:
+		prepared.run.mu.Lock()
+		defer prepared.run.mu.Unlock()
+		return prepared.run.err
+	}
 }
 
 // Abort closes and releases an uncommitted new-run preparation exactly once.
