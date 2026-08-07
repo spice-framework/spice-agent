@@ -42,7 +42,7 @@ func TestRunReportsInvalidBootstrapOnlyOnStderr(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(stderr), "decode fixture bootstrap") {
+	if !strings.Contains(string(stderr), "plugin bootstrap must contain exactly one line") {
 		t.Fatalf("stderr = %q", stderr)
 	}
 	closedError, err := os.CreateTemp(t.TempDir(), "fixture-closed-error-*")

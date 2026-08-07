@@ -3,33 +3,13 @@ package pluginfixture
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"runtime"
 	"slices"
-	"strings"
 	"testing"
 
 	commonv1 "github.com/spice-framework/spice-agent/common/v1"
 	pluginv1 "github.com/spice-framework/spice-agent/plugin/v1"
 )
-
-func TestDecodeBootstrapRejectsMalformedInput(t *testing.T) {
-	t.Parallel()
-	secret := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{1}, pluginv1.HandshakeSecretBytes))
-	for name, input := range map[string]string{
-		"empty":    "",
-		"unknown":  `{"address":"value","secret":"` + secret + `","other":true}`,
-		"trailing": `{"address":"value","secret":"` + secret + `"} {}`,
-		"secret":   `{"address":"value","secret":"short"}`,
-		"address":  `{"address":"","secret":"` + secret + `"}`,
-		"large":    `{"address":"` + strings.Repeat("x", maximumBootstrapBytes) + `","secret":"` + secret + `"}`,
-	} {
-		if _, value, err := decodeBootstrap(strings.NewReader(input)); err == nil {
-			clear(value)
-			t.Errorf("invalid %s bootstrap succeeded", name)
-		}
-	}
-}
 
 func TestFixtureConstructorsRejectMissingOwnership(t *testing.T) {
 	t.Parallel()
@@ -86,17 +66,6 @@ func TestInitializeReturnsBoundedFailureAndAuthenticatedConflict(t *testing.T) {
 	if _, err = server.Shutdown(context.Background(), &pluginv1.ShutdownRequest{SessionId: response.GetSessionId()}); err == nil {
 		t.Fatal("shutdown before drain succeeded")
 	}
-}
-
-func FuzzBootstrap(fuzz *testing.F) {
-	secret := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{1}, pluginv1.HandshakeSecretBytes))
-	fuzz.Add([]byte(`{"address":"fixture","secret":"` + secret + `"}`))
-	fuzz.Add([]byte{})
-	fuzz.Add(bytes.Repeat([]byte{'x'}, maximumBootstrapBytes+1))
-	fuzz.Fuzz(func(t *testing.T, input []byte) {
-		_, value, _ := decodeBootstrap(bytes.NewReader(input))
-		clear(value)
-	})
 }
 
 func validFixtureInitializeRequest() *pluginv1.InitializeRequest {

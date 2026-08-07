@@ -19,6 +19,19 @@ Exact commits and command output are recorded only after the corresponding gate
 has run. A phase is not complete because code exists; every exit criterion in its
 document must be green on Windows and Linux where required.
 
+## Current Phase 5 boundary
+
+The initial tool-only protocol and independent Go/Python conformance processes
+are complete. The production host now also has its public private-stdin
+bootstrap, exact stdout readiness contract, immutable pinned executable
+configuration, held platform file-identity/digest lease, immediate recheck
+contract, and bounded non-reflecting stdout/stderr monitors. This is a security
+foundation only: candidate launch, authenticated initialization, remote tool
+translation, atomic generations, leases, crash recovery, Spice
+auto-configuration, and `spice dev` remain pending. Detailed evidence and the
+pathname-to-exec limitation are recorded in
+[`evidence/phase5-host-security-foundation.md`](evidence/phase5-host-security-foundation.md).
+
 ## Phase 2 preview boundary
 
 The immutable model/tool contracts, typed provider failures, dispatcher

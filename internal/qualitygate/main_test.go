@@ -152,11 +152,36 @@ func TestPluginFuzzContractRemainsInTheReleaseGate(t *testing.T) {
 	}
 	for _, target := range []fuzzTarget{
 		{"./plugin/v1", "FuzzPluginEnvelope"},
-		{"./internal/pluginfixture", "FuzzBootstrap"},
+		{"./plugin/v1", "FuzzBootstrap"},
 	} {
 		if seen[target] != 1 {
 			t.Fatalf("fuzz target %#v occurs %d times", target, seen[target])
 		}
+	}
+}
+
+func TestPluginHostDependencyDirectionIsEnforced(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeGateFile(t, root, "plugin/host/host.go", `package pluginhost
+
+import "github.com/spice-framework/spice-agent/daemon/localipc"
+
+var _ = localipc.ErrUnsafeEndpoint
+`)
+	if err := checkArchitecture(root); err == nil ||
+		!strings.Contains(err.Error(), "plugin host file plugin/host/host.go imports forbidden package") {
+		t.Fatalf("forbidden host dependency error = %v", err)
+	}
+
+	writeGateFile(t, root, "plugin/host/host.go", `package pluginhost
+
+import pluginv1 "github.com/spice-framework/spice-agent/plugin/v1"
+
+var _ = pluginv1.ProtocolMajor
+`)
+	if err := checkArchitecture(root); err != nil {
+		t.Fatalf("allowed host dependency failed: %v", err)
 	}
 }
 

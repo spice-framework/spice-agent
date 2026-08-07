@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"net"
 	"os"
@@ -32,10 +30,7 @@ import (
 func TestServePassesConformanceOverRealLocalIPC(t *testing.T) {
 	address := localAddress(t)
 	secret := bytes.Repeat([]byte{0x57}, pluginv1.HandshakeSecretBytes)
-	bootstrap, err := json.Marshal(map[string]string{
-		"address": address,
-		"secret":  base64.RawURLEncoding.EncodeToString(secret),
-	})
+	bootstrap, err := pluginv1.EncodeBootstrap(address, secret)
 	if err != nil {
 		t.Fatal(err)
 	}

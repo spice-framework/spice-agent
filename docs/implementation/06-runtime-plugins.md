@@ -41,6 +41,18 @@ and Protobuf dependencies and passes the same public harness over an absolute
 AF_UNIX socket on Windows, Linux, and macOS. This fixture-specific Windows
 choice does not change the production named-pipe transport.
 
+The first production-host security foundation is also implemented. Public
+bootstrap/readiness framing is shared by fixtures and production; immutable
+executable configuration has no interpreter arguments or ambient environment;
+and a held, platform-identified file is digest-verified before launch and must
+be identity/digest-rechecked immediately afterward. Bounded stdout readiness
+and stderr drains never reflect child-controlled content. The pathname-based
+`process.Launcher` cannot universally eliminate the verify-to-exec race, so the
+post-launch check detects it and activation fails closed. Process activation,
+local IPC, authenticated initialization, remote tool proxies, generations, and
+cleanup remain pending. Evidence is in
+[`evidence/phase5-host-security-foundation.md`](evidence/phase5-host-security-foundation.md).
+
 ## Runtime-plugin contracts
 
 - One host process and one local gRPC connection exist per plugin generation.
@@ -79,6 +91,7 @@ the active/failed generation; no partial generated tree is activated.
 
 1. Freeze `plugin/v1` with Buf lint/breaking checks. **Complete.**
 2. Implement manifest/digest verification and the fallback direct launcher.
+   **Digest/configuration foundation complete; launch and manifest validation pending.**
 3. Add generation manager, candidate handshake, atomic activation, leases,
    bounded stderr, restart policy, drain, and cleanup.
 4. Provide optional Spice auto-configuration that decorates/injects the dynamic

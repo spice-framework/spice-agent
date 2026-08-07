@@ -465,7 +465,7 @@ func fuzzTargets() []fuzzTarget {
 		{"./common/v1", "FuzzCommonEnvelope"},
 		{"./engine/v1", "FuzzEngineEnvelope"},
 		{"./plugin/v1", "FuzzPluginEnvelope"},
-		{"./internal/pluginfixture", "FuzzBootstrap"},
+		{"./plugin/v1", "FuzzBootstrap"},
 		{"./daemon/endpoint", "FuzzDecodeMetadata"},
 	}
 }
@@ -547,7 +547,8 @@ func checkArchitecture(root string) error {
 		if relativeErr != nil {
 			return relativeErr
 		}
-		first, _, _ := strings.Cut(filepath.ToSlash(relative), "/")
+		relative = filepath.ToSlash(relative)
+		first, _, _ := strings.Cut(relative, "/")
 		if slices.Contains([]string{"agent", "event", "interaction", "message", "model", "stage", "tool"}, first) {
 			for _, forbiddenImport := range []string{
 				`"google.golang.org/grpc`,
@@ -558,6 +559,23 @@ func checkArchitecture(root string) error {
 			} {
 				if bytes.Contains(content, []byte(forbiddenImport)) {
 					return fmt.Errorf("kernel file %s imports process-boundary package %s", relative, forbiddenImport)
+				}
+			}
+		}
+		if filepath.ToSlash(filepath.Dir(relative)) == "plugin/host" {
+			for _, forbiddenImport := range []string{
+				`"` + modulePath + `/agent`,
+				`"` + modulePath + `/client`,
+				`"` + modulePath + `/daemon`,
+				`"` + modulePath + `/engine/v1`,
+				`"` + modulePath + `/event`,
+				`"` + modulePath + `/interaction`,
+				`"` + modulePath + `/internal/`,
+				`"` + modulePath + `/message`,
+				`"` + modulePath + `/model`,
+			} {
+				if bytes.Contains(content, []byte(forbiddenImport)) {
+					return fmt.Errorf("plugin host file %s imports forbidden package %s", relative, forbiddenImport)
 				}
 			}
 		}
