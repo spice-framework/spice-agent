@@ -27,13 +27,20 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-const acceptanceTimeout = 30 * time.Second
+const (
+	acceptanceTimeout   = 30 * time.Second
+	fixtureBuildTimeout = 90 * time.Second
+)
 
 func TestIndependentGoFixturePassesPublicConformance(t *testing.T) {
 	root := repositoryRoot(t)
+	buildContext, cancelBuild := context.WithTimeout(context.Background(), fixtureBuildTimeout)
+	defer cancelBuild()
+	executable := buildFixture(t, buildContext, root)
+	cancelBuild()
+
 	ctx, cancel := context.WithTimeout(context.Background(), acceptanceTimeout)
 	defer cancel()
-	executable := buildFixture(t, ctx, root)
 	address := fixtureAddress(t)
 	secret := bytes.Repeat([]byte{0x73}, pluginv1.HandshakeSecretBytes)
 

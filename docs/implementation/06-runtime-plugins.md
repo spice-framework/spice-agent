@@ -48,10 +48,23 @@ and a held, platform-identified file is digest-verified before launch and must
 be identity/digest-rechecked immediately afterward. Bounded stdout readiness
 and stderr drains never reflect child-controlled content. The pathname-based
 `process.Launcher` cannot universally eliminate the verify-to-exec race, so the
-post-launch check detects it and activation fails closed. Process activation,
-local IPC, authenticated initialization, remote tool proxies, generations, and
-cleanup remain pending. Evidence is in
-[`evidence/phase5-host-security-foundation.md`](evidence/phase5-host-security-foundation.md).
+post-launch check detects it and activation fails closed.
+
+The host now also derives caller-owned current-user local endpoints without
+listening or discovery, launches one authenticated candidate with exact private
+bootstrap and stdout readiness, validates the negotiated manifest and approved
+capabilities, and translates one initialized session into bounded remote tool
+implementations. Every acquired resource remains caller-owned after a failed
+launch. Cleanup releases the endpoint and verification lease only after process
+containment is proved. Remote execution never retries and maps any possibly
+started mutating operation without a valid terminal result to an uncertain,
+non-retryable kernel failure. A complete immutable desired `Set` supplies the
+future atomic-activation input. Generations, run-scoped leases, crash recovery,
+graceful drain/shutdown, and static auto-configuration remain pending. Evidence
+is in
+[`evidence/phase5-host-security-foundation.md`](evidence/phase5-host-security-foundation.md)
+and
+[`evidence/phase5-candidate-and-remote-tools.md`](evidence/phase5-candidate-and-remote-tools.md).
 
 ## Runtime-plugin contracts
 
@@ -91,9 +104,12 @@ the active/failed generation; no partial generated tree is activated.
 
 1. Freeze `plugin/v1` with Buf lint/breaking checks. **Complete.**
 2. Implement manifest/digest verification and the fallback direct launcher.
-   **Digest/configuration foundation complete; launch and manifest validation pending.**
+   **Complete through authenticated candidate launch and manifest validation;
+   public fallback source composition remains in slice 4.**
 3. Add generation manager, candidate handshake, atomic activation, leases,
-   bounded stderr, restart policy, drain, and cleanup.
+   bounded stderr, restart policy, drain, and cleanup. **Candidate handshake,
+   bounded stderr, and rejection cleanup complete; activation, leases, restart,
+   drain, and graceful shutdown pending.**
 4. Provide optional Spice auto-configuration that decorates/injects the dynamic
    tool source through normal static DI.
 5. Ship Go and Python echo/filesystem-neutral fixture tools and conformance CLI.
@@ -129,6 +145,8 @@ unbounded queue. Evidence includes digests, generation/lease timelines, process
 logs, conformance versions, and failure-injection results.
 
 Status is **in progress**. The execution-outcome and kernel plan-lease
-prerequisites, initial runtime-tool protocol, reusable conformance harness, and
-independent Go/Python fixtures are implemented. Process/digest ownership,
-generation management, and the developer loop remain pending.
+prerequisites, initial runtime-tool protocol, reusable conformance harness,
+independent Go/Python fixtures, digest/process ownership, local candidate
+handshake, and remote execution translation are implemented. Atomic generation
+management, run leases, graceful lifecycle, static auto-configuration, and the
+developer loop remain pending.

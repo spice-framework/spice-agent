@@ -194,6 +194,21 @@ func (sink *stderrSink) snapshot() stderrSnapshot {
 	}
 }
 
+// clear destroys the bounded plugin-controlled prefix after process
+// containment. Counts are reset as well so a closed candidate retains no
+// child-output state.
+func (sink *stderrSink) clear() {
+	if sink == nil {
+		return
+	}
+	sink.mu.Lock()
+	defer sink.mu.Unlock()
+	clear(sink.captured)
+	sink.captured = nil
+	sink.total = 0
+	sink.truncated = false
+}
+
 func (sink *stderrSink) String() string { return sink.snapshot().String() }
 
 func (sink *stderrSink) GoString() string { return sink.snapshot().GoString() }

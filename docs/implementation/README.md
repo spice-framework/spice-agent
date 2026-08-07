@@ -22,15 +22,19 @@ document must be green on Windows and Linux where required.
 ## Current Phase 5 boundary
 
 The initial tool-only protocol and independent Go/Python conformance processes
-are complete. The production host now also has its public private-stdin
-bootstrap, exact stdout readiness contract, immutable pinned executable
-configuration, held platform file-identity/digest lease, immediate recheck
-contract, and bounded non-reflecting stdout/stderr monitors. This is a security
-foundation only: candidate launch, authenticated initialization, remote tool
-translation, atomic generations, leases, crash recovery, Spice
+are complete. The production host now has its public private-stdin bootstrap,
+exact stdout readiness contract, immutable pinned executable configuration,
+held platform file-identity/digest lease, immediate recheck contract, bounded
+non-reflecting stdout/stderr monitors, current-user local endpoint allocation,
+authenticated candidate launch, and fail-closed remote tool translation. A
+complete immutable desired plugin `Set` is also available for the activation
+boundary. This remains a pre-activation foundation: atomic generations,
+run-scoped leases, crash recovery, graceful drain/shutdown, Spice
 auto-configuration, and `spice dev` remain pending. Detailed evidence and the
 pathname-to-exec limitation are recorded in
-[`evidence/phase5-host-security-foundation.md`](evidence/phase5-host-security-foundation.md).
+[`evidence/phase5-host-security-foundation.md`](evidence/phase5-host-security-foundation.md)
+and
+[`evidence/phase5-candidate-and-remote-tools.md`](evidence/phase5-candidate-and-remote-tools.md).
 
 ## Phase 2 preview boundary
 
