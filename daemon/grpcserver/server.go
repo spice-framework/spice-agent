@@ -29,6 +29,13 @@ type ServerConfig struct {
 type runHostBoundary interface {
 	Describe(context.Context) (daemon.RunHostDescription, error)
 	Health(context.Context, daemon.Session) (client.Health, error)
+	Start(context.Context, daemon.Session, client.StartRequest) (client.StartResult, error)
+	Cancel(context.Context, daemon.Session, client.CancelRequest) (client.CancelResult, error)
+	Respond(context.Context, daemon.Session, client.RespondRequest) (client.RespondResult, error)
+	Suspend(context.Context, daemon.Session, client.RunMutation) (client.SuspendResult, error)
+	Resume(context.Context, daemon.Session, client.RunMutation) (client.ResumeResult, error)
+	Export(context.Context, daemon.Session, client.RunRef) (client.Snapshot, error)
+	Import(context.Context, daemon.Session, client.ImportRequest) (client.ImportResult, error)
 }
 
 type sessionStoreBoundary interface {

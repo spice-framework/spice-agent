@@ -183,8 +183,16 @@ bounded private registry stores exact daemon sessions and cloned validated
 negotiation contracts. Authenticated Initialize and Health now run over real
 gRPC: preflight precedes ownership allocation, reconnect is an exact epoch CAS,
 and Health rechecks both registry and SessionStore ownership before reaching the
-host. This slice has no OS listener, endpoint metadata file, lifecycle RPCs,
-stream bridge, discovery, or client adapter; those remain pending.
+host. Authenticated Start, Cancel, Respond, Suspend, Resume, Export, and Import
+now cross the same ownership boundary. Requests are checked against the hard
+server bound before lookup and against the exact negotiated connection limits
+before RunHost. Application failures are fixed typed statuses; cancellation and
+deadlines alone remain gRPC errors. Start deliberately supports one user text
+part until the standard-library client contract grows richer input types.
+Snapshot transfer requires minor 1 plus `snapshots` and
+`snapshot-authority-v1`; the adapter validates and serializes import structure
+but never verifies its HMAC. This slice has no OS listener, endpoint metadata
+file, stream bridge, discovery, or client adapter; those remain pending.
 
 The lifecycle-adapter prerequisite now separates snapshot-import structure
 from authority. `ValidateImportSnapshotRequestStructure` checks the complete
@@ -201,8 +209,8 @@ has an independent control lane, and external acceptance executes the actual
 injected terminal shell through explicit application start and stop. Its full
 gate passed in 158.4 seconds at 90.1% product coverage. The high-level daemon
 client adapter and real terminal process workflow remain pending.
-The remainder of slices 2 through 6 stays pending, including lifecycle RPC
-translation, event and interaction streams, OS transport, managed startup, the
+The remainder of slices 2 through 6 stays pending, including event and
+interaction streams, OS transport, managed startup, the
 daemon-to-TUI bridge, and real Windows/Linux reconnect acceptance. See
 [`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
 Foundation-specific evidence is in
@@ -229,6 +237,8 @@ Endpoint-authentication prerequisite evidence is in
 [`evidence/phase4-grpc-authentication.md`](evidence/phase4-grpc-authentication.md).
 Initialize/Health adapter evidence is in
 [`evidence/phase4-initialize-health.md`](evidence/phase4-initialize-health.md).
+Lifecycle unary adapter evidence is in
+[`evidence/phase4-lifecycle-unary.md`](evidence/phase4-lifecycle-unary.md).
 
 The baseline remains intentionally provisional. The pre-host repair closes the
 schema and kernel seams for interaction discovery/run identity, reconnect CAS,

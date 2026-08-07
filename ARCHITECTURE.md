@@ -153,7 +153,19 @@ performs pure preflight before fresh allocation or reconnect CAS, while `Health`
 rechecks the exact ownership epoch and reuses `RunHost.Health`. Application
 failures stay in typed response statuses; gRPC errors are reserved for
 authentication, transport, cancellation, and deadline failures. This adapter
-opens no listener and persists no endpoint metadata.
+now translates every lifecycle unary RPC through the standard-library client
+values into `RunHost`: Start, Cancel, Respond, Suspend, Resume, Export, and
+Import. Each request is validated first against the server hard bound and then
+the exact negotiated connection limit after registry and SessionStore ownership
+checks. The architecture-proof Start surface accepts exactly one user text part;
+richer provider-neutral wire messages fail explicitly until the public client
+contract supports them. Snapshot RPCs additionally require protocol minor 1 and
+both snapshot capabilities. Import performs only structural validation and
+deterministic opaque serialization here; RunHost remains the keyed authority.
+Safe typed stale, overload, uncertain, missing, conflict, and unavailable facts
+become application statuses with fixed messages, while arbitrary dependency
+text fails closed. This adapter opens no listener and persists no endpoint
+metadata.
 
 Every client epoch also owns a bounded commit and stream gate. Mutating work
 crosses an exclusive FIFO commit boundary; a reconnect intent takes priority,

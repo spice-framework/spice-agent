@@ -112,6 +112,17 @@ abandonment returned with a result remain committed uncertain outcomes.
   while uncertainty or post-tombstone cleanup failure wins over cancellation
   and is never automatically retried.
 
+All unary lifecycle handlers authenticate transport metadata, validate the
+request under the server hard limit, resolve the exact negotiated session and
+recheck SessionStore ownership, then revalidate under that connection's limits
+before constructing standard-library client values. Start accepts exactly one
+user text part in the architecture-proof contract; other valid wire message
+shapes receive `INVALID_ARGUMENT` rather than being silently flattened. Snapshot
+RPCs require minor 1 plus both `snapshots` and `snapshot-authority-v1`.
+Application failures use status-only responses with fixed safe messages and
+typed recovery details. Only request/daemon cancellation and deadline failures
+use gRPC error status.
+
 The daemon adapter must use the kernel's transactional preparation boundary for
 both `StartRun` and `ImportSnapshot`. A new run prepares the execution, uses its
 immutable run ID to acquire durable daemon authority, then commits with a

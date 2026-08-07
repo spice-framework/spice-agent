@@ -172,6 +172,34 @@ func TestEngineServiceFailsClosedWithoutAuthenticationMiddleware(t *testing.T) {
 	if health != nil || status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("direct unauthenticated health = %#v, %v", health, err)
 	}
+	start, err := service.StartRun(context.Background(), &enginev1.StartRunRequest{})
+	if start != nil || status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("direct unauthenticated start = %#v, %v", start, err)
+	}
+	cancel, err := service.CancelRun(context.Background(), &enginev1.CancelRunRequest{})
+	if cancel != nil || status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("direct unauthenticated cancel = %#v, %v", cancel, err)
+	}
+	respond, err := service.RespondInteraction(context.Background(), &enginev1.RespondInteractionRequest{})
+	if respond != nil || status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("direct unauthenticated respond = %#v, %v", respond, err)
+	}
+	suspend, err := service.SuspendRun(context.Background(), &enginev1.SuspendRunRequest{})
+	if suspend != nil || status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("direct unauthenticated suspend = %#v, %v", suspend, err)
+	}
+	resume, err := service.ResumeRun(context.Background(), &enginev1.ResumeRunRequest{})
+	if resume != nil || status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("direct unauthenticated resume = %#v, %v", resume, err)
+	}
+	exported, err := service.ExportSnapshot(context.Background(), &enginev1.ExportSnapshotRequest{})
+	if exported != nil || status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("direct unauthenticated export = %#v, %v", exported, err)
+	}
+	imported, err := service.ImportSnapshot(context.Background(), &enginev1.ImportSnapshotRequest{})
+	if imported != nil || status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("direct unauthenticated import = %#v, %v", imported, err)
+	}
 }
 
 func TestNewServerRejectsInvalidBoundaries(t *testing.T) {
@@ -316,6 +344,34 @@ func (host *grpcFixtureHost) Health(ctx context.Context, session daemon.Session)
 	}
 	host.healthCalls.Add(1)
 	return host.health, host.healthErr
+}
+
+func (*grpcFixtureHost) Start(context.Context, daemon.Session, client.StartRequest) (client.StartResult, error) {
+	return client.StartResult{}, daemon.ErrRunHostUnavailable
+}
+
+func (*grpcFixtureHost) Cancel(context.Context, daemon.Session, client.CancelRequest) (client.CancelResult, error) {
+	return client.CancelResult{}, daemon.ErrRunHostUnavailable
+}
+
+func (*grpcFixtureHost) Respond(context.Context, daemon.Session, client.RespondRequest) (client.RespondResult, error) {
+	return client.RespondResult{}, daemon.ErrRunHostUnavailable
+}
+
+func (*grpcFixtureHost) Suspend(context.Context, daemon.Session, client.RunMutation) (client.SuspendResult, error) {
+	return client.SuspendResult{}, daemon.ErrRunHostUnavailable
+}
+
+func (*grpcFixtureHost) Resume(context.Context, daemon.Session, client.RunMutation) (client.ResumeResult, error) {
+	return client.ResumeResult{}, daemon.ErrRunHostUnavailable
+}
+
+func (*grpcFixtureHost) Export(context.Context, daemon.Session, client.RunRef) (client.Snapshot, error) {
+	return client.Snapshot{}, daemon.ErrRunHostUnavailable
+}
+
+func (*grpcFixtureHost) Import(context.Context, daemon.Session, client.ImportRequest) (client.ImportResult, error) {
+	return client.ImportResult{}, daemon.ErrRunHostUnavailable
 }
 
 func grpcInitializeRequest(limits client.Limits) *enginev1.InitializeRequest {

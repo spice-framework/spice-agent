@@ -164,7 +164,8 @@ malformed or legacy detail fields degrade to stable public sentinels.
 The kernel's service-lifetime seen-run identity tombstones remain unbounded even
 when RunHost evicts a terminal envelope. No gRPC/Protobuf adapter, IPC listener,
 stream bridge, endpoint authentication, discovery, or managed startup is
-claimed. Focused evidence and remaining exclusions are recorded in
+part of the transport-independent RunHost itself. Focused evidence and
+remaining exclusions are recorded in
 [`evidence/phase4-run-host.md`](evidence/phase4-run-host.md).
 `RunHost.Describe` now supplies the initialization boundary with one immutable,
 validated, sessionless snapshot of the generated definition catalog and daemon
@@ -181,12 +182,18 @@ mandatory middleware installation, global gRPC message bounds, a bounded
 private negotiated-session registry, and authenticated `Initialize` and
 `Health` RPC translation. Fresh allocation occurs only after pure negotiation;
 reconnect uses the daemon's epoch CAS, old owners receive typed stale facts, and
-unknown identities reveal no invented epoch. No OS endpoint, metadata-file
-permission handling, lifecycle RPCs, streams, or client adapter is claimed.
+unknown identities reveal no invented epoch. The same authenticated service now
+implements all seven lifecycle unary RPCs through typed client values and
+`RunHost`, with exact negotiated-limit revalidation, fixed safe error statuses,
+single-text Start input, snapshot capability gates, and structural-only import
+translation. No OS endpoint, metadata-file permission handling, streams, or
+client adapter is claimed.
 Evidence is in
 [`evidence/phase4-grpc-authentication.md`](evidence/phase4-grpc-authentication.md)
 and
 [`evidence/phase4-initialize-health.md`](evidence/phase4-initialize-health.md).
+Lifecycle unary evidence is in
+[`evidence/phase4-lifecycle-unary.md`](evidence/phase4-lifecycle-unary.md).
 The snapshot-import contract now also exposes a complete unkeyed structural
 validator for the transport boundary. It accounts for compatible unknown
 Protobuf fields in the negotiated size and deliberately accepts an untrusted
