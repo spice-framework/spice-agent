@@ -12,7 +12,7 @@ import (
 )
 
 func TestCurrentUserUnixScopeUsesVerifiedXDGDirectory(t *testing.T) {
-	root := filepath.Join(realUnixTestDirectory(t, t.TempDir()), "runtime")
+	root := filepath.Join(shortUnixTestDirectory(t), "runtime")
 	if err := os.Mkdir(root, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestCurrentUserUnixScopeFallsBackWhenXDGSocketPathIsTooLong(t *testing.T) {
 }
 
 func TestCurrentUserUnixScopeAcceptsMaximumSocketPath(t *testing.T) {
-	parent := realUnixTestDirectory(t, t.TempDir())
+	parent := shortUnixTestDirectory(t)
 	suffixLength := 100 - len(parent) - len(string(filepath.Separator)+"spice-agent"+string(filepath.Separator)+unixSocketName) - 1
 	if suffixLength < 1 {
 		t.Skip("temporary test path is too long for the boundary fixture")
@@ -138,7 +138,7 @@ func TestCurrentUserUnixScopeRejectsInvalidIdentityAndSymlinkXDG(t *testing.T) {
 	if _, err := currentUserUnixScope("", "/tmp", -1); err == nil {
 		t.Fatal("negative user ID succeeded")
 	}
-	root := realUnixTestDirectory(t, t.TempDir())
+	root := shortUnixTestDirectory(t)
 	target := filepath.Join(root, "target")
 	if err := os.Mkdir(target, 0o700); err != nil {
 		t.Fatal(err)
@@ -161,7 +161,7 @@ func platformTransportError() string    { return "Unix socket" }
 
 func shortUnixTestDirectory(t *testing.T) string {
 	t.Helper()
-	directory, err := os.MkdirTemp("", "sa-")
+	directory, err := os.MkdirTemp(defaultStickyTemp(), "sa-")
 	if err != nil {
 		t.Fatal(err)
 	}

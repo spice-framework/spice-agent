@@ -31,8 +31,8 @@ func TestVerifiedExecutableDetectsInPlaceMutation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = lease.Close() }()
-	if err := os.WriteFile(path, []byte("mutated"), 0o700); err != nil {
-		t.Fatal(err)
+	if writeErr := os.WriteFile(path, []byte("mutated"), 0o700); writeErr != nil {
+		t.Fatal(writeErr)
 	}
 	err = lease.Recheck(context.Background())
 	if err == nil {

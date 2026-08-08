@@ -214,11 +214,16 @@ func localAddress(t *testing.T) string {
 	if _, err := rand.Read(random); err != nil {
 		t.Fatal(err)
 	}
-	name := "spice-agent-plugin-fixture-" + hex.EncodeToString(random)
+	randomName := hex.EncodeToString(random)
 	if runtime.GOOS == "windows" {
-		return `\\.\pipe\` + name
+		return `\\.\pipe\spice-agent-plugin-` + randomName
 	}
-	directory, err := os.MkdirTemp("", "spice-pf-")
+	name := "spf-" + randomName
+	tempRoot := ""
+	if runtime.GOOS == "darwin" {
+		tempRoot = "/private/tmp"
+	}
+	directory, err := os.MkdirTemp(tempRoot, "spf-")
 	if err != nil {
 		t.Fatal(err)
 	}

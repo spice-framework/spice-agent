@@ -8,16 +8,16 @@ import (
 	"testing"
 )
 
-func currentStoreDirectory(t testing.TB) string {
-	t.Helper()
-	root, err := os.MkdirTemp("", "spice-agent-localclient-store-")
+func currentStoreDirectory(tb testing.TB) string {
+	tb.Helper()
+	root, err := os.MkdirTemp(shortLocalClientTempRoot(), "sa-store-")
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
-	t.Cleanup(func() { _ = os.RemoveAll(root) })
+	tb.Cleanup(func() { _ = os.RemoveAll(root) })
 	realRoot, err := filepath.EvalSymlinks(root)
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	return filepath.Join(realRoot, "endpoint")
 }
