@@ -85,6 +85,56 @@ func TestReconnectSerializesFenceRPCAndInstallForOneClient(t *testing.T) {
 	}
 }
 
+func TestStreamRPCJoinWaitsForSessionOwnershipRelease(t *testing.T) {
+	connection := reconnectConnection(t, "client-stream-join", 1)
+	connector := reconnectConnector(t, &unaryEngineClient{})
+	prior := unaryTestSession(t, connection, &unaryEngineClient{})
+	prior.owner = connector
+	connector.sessions[connection.ClientID()] = prior
+	lifetime, _ := newStreamLifetime(prior)
+	prior.streams[lifetime] = struct{}{}
+
+	streams := prior.closeAndCaptureStreams()
+	if len(streams) != 1 || streams[0] != lifetime {
+		t.Fatalf("captured streams = %#v, want exact prior lifetime", streams)
+	}
+	lifetime.close()
+
+	connector.mu.Lock()
+	locked := true
+	defer func() {
+		if locked {
+			connector.mu.Unlock()
+		}
+	}()
+	finished := make(chan struct{})
+	go func() {
+		lifetime.finishRPC()
+		close(finished)
+	}()
+	select {
+	case <-lifetime.rpcDone:
+		t.Fatal("stream RPC join was published before session ownership release completed")
+	case <-time.After(100 * time.Millisecond):
+	}
+	connector.mu.Unlock()
+	locked = false
+	select {
+	case <-finished:
+	case <-time.After(time.Second):
+		t.Fatal("stream RPC cleanup did not complete after ownership release was unblocked")
+	}
+	if err := lifetime.waitFor(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	connector.mu.Lock()
+	installed := connector.sessions[connection.ClientID()]
+	connector.mu.Unlock()
+	if installed != nil {
+		t.Fatalf("fenced session remains installed after stream join: %#v", installed)
+	}
+}
+
 func TestCancelledReconnectWaiterDoesNotAffectOwner(t *testing.T) {
 	t.Parallel()
 	connection := reconnectConnection(t, "client-cancel", 1)
