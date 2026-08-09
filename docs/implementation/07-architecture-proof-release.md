@@ -120,3 +120,9 @@ foundation and distribution release paths, exact tagged dependency graph,
 installed-platform proof, and decisive live workflow remain pending. Component
 tags may be created only in the dependency order above; no distribution tag may
 be created from partial phase evidence.
+
+The kernel-local portion of slice 6 now has a reproducible offline command and
+recorded comparison table in
+[`phase7-kernel-runtime-baseline.md`](evidence/phase7-kernel-runtime-baseline.md).
+Installed daemon startup, connection, plugin RPC, TUI, generation, and build
+measurements remain required; the core baseline does not close slice 6 alone.

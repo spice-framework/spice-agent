@@ -6,6 +6,14 @@ loop, `make check` adds formatting, module/vendor, Protobuf, architecture, vet,
 and shuffled tests, and `make verify` adds lint/NilAway, security, race, fuzz,
 coverage, and vendor-only build proof.
 
+`make benchmark` is the bounded offline runtime comparison command. It executes
+the four `BenchmarkKernel*` paths for 500 iterations and five samples on one
+logical CPU with allocation reporting. The gate fails when a benchmark or
+sample is missing; machine-specific time and allocation results are compared
+under the regression policy in
+[`phase7-kernel-runtime-baseline.md`](implementation/evidence/phase7-kernel-runtime-baseline.md),
+not enforced as noisy absolute thresholds on unrelated hosts.
+
 Hosted CI keeps the cross-platform proof and the expensive repository-quality
 mirror distinct. The reusable verifier remains pinned and owns Linux, macOS,
 Windows, and vendor/offline jobs. One Ubuntu quality job bootstraps the pinned

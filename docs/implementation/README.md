@@ -46,6 +46,13 @@ validated, optional execution state/retry facts remain typed, and exactly-one
 ledger tests prove no started call is left ambiguously closed. The daemon keeps
 the legacy terminal shape using a fixed safe failure problem.
 
+Core runtime comparison is now repository-owned through `make benchmark`:
+engine construction, a text run, one compiled tool round, and cooperative
+cancellation run offline for five bounded samples with allocation reporting.
+The initial Windows numbers and material-regression policy are recorded in
+[`phase7-kernel-runtime-baseline.md`](evidence/phase7-kernel-runtime-baseline.md);
+installed daemon/client/plugin/TUI budgets remain separate Phase 6 evidence.
+
 ## Current Phase 5 boundary
 
 The initial tool-only protocol and independent Go/Python conformance processes

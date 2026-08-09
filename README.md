@@ -16,6 +16,7 @@ make tools-bootstrap # explicit fresh-cache dependency download
 make proto           # regenerate committed Protobuf Go with local tools
 make fast            # affected feedback
 make check           # broad edit loop, including protocol compatibility
+make benchmark       # bounded offline kernel runtime baseline
 make verify          # commit gate
 ```
 

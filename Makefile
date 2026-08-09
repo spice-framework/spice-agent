@@ -1,6 +1,6 @@
 PYTHON_FIXTURE_DIR := testdata/runtimeplugin/python
 
-.PHONY: tools-bootstrap proto fast check coverage verify verify-python verify-release
+.PHONY: tools-bootstrap proto fast check coverage benchmark verify verify-python verify-release
 
 tools-bootstrap:
 	go run ./internal/qualitygate -mode=tools-bootstrap
@@ -16,6 +16,9 @@ check:
 
 coverage:
 	go run ./internal/qualitygate -mode=coverage
+
+benchmark:
+	go run ./internal/qualitygate -mode=benchmark
 
 verify:
 	go run ./internal/qualitygate -mode=verify

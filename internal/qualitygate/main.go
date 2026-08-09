@@ -36,7 +36,7 @@ func main() {
 }
 
 func execute() int {
-	mode := flag.String("mode", "verify", "verification mode: tools-bootstrap, proto, fast, check, coverage, or verify")
+	mode := flag.String("mode", "verify", "verification mode: tools-bootstrap, proto, fast, check, coverage, benchmark, or verify")
 	flag.Parse()
 	ctx, cancel := context.WithTimeout(context.Background(), gateTimeout(*mode))
 	defer cancel()
@@ -101,6 +101,11 @@ func run(ctx context.Context, root, mode string) error {
 			return coverage(ctx, root, productEnvironment)
 		}}}
 	}
+	if mode == "benchmark" {
+		steps = []step{identity, diffHygiene, {"kernel runtime benchmarks", func() error {
+			return kernelRuntimeBenchmarks(ctx, root, productEnvironment)
+		}}}
+	}
 	if mode == "check" || mode == "verify" {
 		steps = []step{
 			identity,
@@ -133,7 +138,7 @@ func run(ctx context.Context, root, mode string) error {
 			step{"offline vendor", func() error { return offline(ctx, root) }},
 		)
 	}
-	if mode != "fast" && mode != "check" && mode != "coverage" && mode != "verify" {
+	if mode != "fast" && mode != "check" && mode != "coverage" && mode != "benchmark" && mode != "verify" {
 		return fmt.Errorf("unknown mode %q", mode)
 	}
 	for _, current := range steps {
@@ -149,6 +154,65 @@ func run(ctx context.Context, root, mode string) error {
 }
 
 func networkAllowed(mode string) bool { return mode == "tools-bootstrap" }
+
+func kernelRuntimeBenchmarkArguments() []string {
+	return []string{
+		"test", "-run=^$", "-bench=^BenchmarkKernel", "-benchmem",
+		"-benchtime=500x", "-count=5", "-cpu=1", "./agent",
+	}
+}
+
+func kernelRuntimeBenchmarks(
+	ctx context.Context,
+	root string,
+	environment map[string]string,
+) error {
+	output, err := capture(ctx, root, environment, "go", kernelRuntimeBenchmarkArguments()...)
+	if err != nil {
+		return err
+	}
+	if err = validateKernelRuntimeBenchmarkOutput(output); err != nil {
+		return err
+	}
+	fmt.Print(output)
+	return nil
+}
+
+func validateKernelRuntimeBenchmarkOutput(output string) error {
+	required := [...]string{
+		"BenchmarkKernelEngineConstruction",
+		"BenchmarkKernelTextRun",
+		"BenchmarkKernelToolRound",
+		"BenchmarkKernelCancellation",
+	}
+	counts := make(map[string]int, len(required))
+	for line := range strings.Lines(output) {
+		line = strings.TrimSpace(line)
+		for _, name := range required {
+			if benchmarkOutputLineMatches(line, name) {
+				counts[name]++
+			}
+		}
+	}
+	for _, name := range required {
+		if counts[name] != 5 {
+			return fmt.Errorf("kernel runtime benchmark %s produced %d samples; require 5", name, counts[name])
+		}
+	}
+	return nil
+}
+
+func benchmarkOutputLineMatches(line, name string) bool {
+	if !strings.HasPrefix(line, name) || len(line) == len(name) {
+		return false
+	}
+	switch line[len(name)] {
+	case '-', ' ', '\t':
+		return true
+	default:
+		return false
+	}
+}
 
 type bootstrapRunner func(context.Context, string, ...string) error
 

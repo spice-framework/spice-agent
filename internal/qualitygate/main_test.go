@@ -16,7 +16,7 @@ func TestNetworkIsReservedForExplicitBootstrap(t *testing.T) {
 	if !networkAllowed("tools-bootstrap") {
 		t.Fatal("tools-bootstrap does not allow dependency download")
 	}
-	for _, mode := range []string{"fast", "check", "coverage", "verify"} {
+	for _, mode := range []string{"fast", "check", "coverage", "benchmark", "verify"} {
 		if networkAllowed(mode) {
 			t.Fatalf("ordinary gate %q allows network access", mode)
 		}
@@ -28,9 +28,37 @@ func TestVerificationTimeoutIsModeAware(t *testing.T) {
 	if timeout := gateTimeout("verify"); timeout != 30*time.Minute {
 		t.Fatalf("verify timeout = %s", timeout)
 	}
-	for _, mode := range []string{"tools-bootstrap", "proto", "fast", "check", "coverage", "unknown"} {
+	for _, mode := range []string{"tools-bootstrap", "proto", "fast", "check", "coverage", "benchmark", "unknown"} {
 		if timeout := gateTimeout(mode); timeout != 15*time.Minute {
 			t.Fatalf("%s timeout = %s", mode, timeout)
+		}
+	}
+}
+
+func TestKernelRuntimeBenchmarkContractIsBoundedAndFailsClosed(t *testing.T) {
+	t.Parallel()
+	wantArguments := []string{
+		"test", "-run=^$", "-bench=^BenchmarkKernel", "-benchmem",
+		"-benchtime=500x", "-count=5", "-cpu=1", "./agent",
+	}
+	if actual := kernelRuntimeBenchmarkArguments(); !slices.Equal(actual, wantArguments) {
+		t.Fatalf("kernel benchmark arguments = %q", actual)
+	}
+	valid := strings.Repeat(`BenchmarkKernelEngineConstruction 500 1 ns/op 1 B/op 1 allocs/op
+BenchmarkKernelTextRun 500 1 ns/op 1 B/op 1 allocs/op
+BenchmarkKernelToolRound 500 1 ns/op 1 B/op 1 allocs/op
+BenchmarkKernelCancellation 500 1 ns/op 1 B/op 1 allocs/op
+`, 5)
+	if err := validateKernelRuntimeBenchmarkOutput(valid); err != nil {
+		t.Fatal(err)
+	}
+	for _, missing := range []string{
+		"BenchmarkKernelEngineConstruction", "BenchmarkKernelTextRun",
+		"BenchmarkKernelToolRound", "BenchmarkKernelCancellation",
+	} {
+		invalid := strings.Replace(valid, missing, "BenchmarkOmitted", 1)
+		if err := validateKernelRuntimeBenchmarkOutput(invalid); err == nil || !strings.Contains(err.Error(), "require 5") {
+			t.Fatalf("missing benchmark sample %q = %v", missing, err)
 		}
 	}
 }

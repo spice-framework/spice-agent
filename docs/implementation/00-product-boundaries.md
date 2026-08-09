@@ -88,6 +88,14 @@ startup below 250 ms, warm local client connection below 75 ms, local event
 delivery p95 below 10 ms, and cooperative cancellation propagation p95 below
 50 ms. Model latency is measured separately.
 
+Core now owns a bounded single-CPU `make benchmark` command for engine
+construction, text execution, one compiled tool round, and cooperative
+cancellation. Its first Windows baseline and material-regression policy are
+recorded in
+[`phase7-kernel-runtime-baseline.md`](evidence/phase7-kernel-runtime-baseline.md).
+These kernel measurements do not replace installed daemon, client, plugin, or
+TUI latency evidence.
+
 ## Evidence and status
 
 Status is **in progress**. Repository creation and the hardened kernel are
