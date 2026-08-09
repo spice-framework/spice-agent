@@ -2,10 +2,17 @@
 
 ## Objective and prerequisites
 
-Publish coordinated `v0.1.0-preview.1` artifacts only after phases 0 through 5
-prove the complete Spice-native architecture. Existing Spice core/toolchain
-preview tags remain immutable inputs; every agent repository records exact
-compatible sibling tags and protocol versions.
+Publish coordinated `v0.1.0-preview.1` Agent artifacts only after phases 0
+through 5 prove the complete Spice-native architecture. The release graph must
+first replace every foundation and sibling pseudo-version with an immutable
+preview tag. Every repository records the exact compatible tags, commits,
+module graph, and protocol versions used to build it.
+
+Component module tags are dependency inputs, not proof that this phase is
+complete. A component may be tagged after its exact candidate passes local and
+hosted gates plus the protected keyless module-release path. Phase 6 remains
+incomplete until the final distribution is independently rebuilt, attested,
+installed, and exercised through the decisive workflow.
 
 ## Decisive workflow
 
@@ -40,15 +47,26 @@ notes.
 
 ## Implementation slices
 
-1. Freeze the coordinated compatibility matrix and release candidate commits.
-2. Execute clean-clone, isolated tools-module, offline vendor, generation,
+1. Publish a keyless Spice foundation preview that replaces the two historical
+   post-preview pseudo-versions used by the Agent repositories. Repin every
+   Agent module to that exact foundation tag.
+2. Tag `spice-agent` and `spice-agent-tui` only after their exact candidate
+   commits pass local, hosted, and protected keyless release verification.
+3. Repin the provider and coding-tools modules to the released Agent core,
+   verify them independently, and publish their component tags.
+4. Repin the distribution to all four released sibling modules, regenerate
+   vendor and Spice-owned output, and freeze the compatibility matrix.
+5. Execute clean-clone, isolated tools-module, offline vendor, generation,
    cross-repository, protocol, terminal, and live opt-in acceptance.
-3. Baseline startup, connection, event, cancellation, generation, and build
+6. Baseline startup, connection, event, cancellation, generation, and build
    benchmarks; investigate any budget miss before release.
-4. Build archives twice in independent paths and compare normalized hashes.
-5. Generate/verify SBOM, signatures, provenance, and checksum bundles.
-6. Install each archive into a clean profile and run the decisive workflow.
-7. Create immutable preview tags only after evidence is linked in the ledger.
+7. Build archives twice in independent paths and compare normalized hashes.
+8. Generate and independently verify SBOM, keyless provenance, and checksum
+   bundles.
+9. Install each archive into a clean profile and run the decisive workflow.
+10. Create the immutable distribution tag only after all evidence is linked in
+    the ledger. Publishing that final tag does not retroactively excuse a
+    failed component or foundation release.
 
 ## Exclusions and support statement
 
@@ -81,4 +99,8 @@ source ownership hashes, benchmark tables, supported OS/architecture matrix,
 protocol compatibility output, terminal transcript hashes, security scans, SBOM
 and signature verification, and known limitations.
 
-Status is **planned**. No preview tag may be created from partial phase evidence.
+Status is **in progress**. Keyless component release callers exist, but the
+foundation and distribution release paths, exact tagged dependency graph,
+installed-platform proof, and decisive live workflow remain pending. Component
+tags may be created only in the dependency order above; no distribution tag may
+be created from partial phase evidence.
