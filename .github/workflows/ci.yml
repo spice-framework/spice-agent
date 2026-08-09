@@ -8,9 +8,8 @@ jobs:
     uses: spice-framework/.github/.github/workflows/go-verify.yml@0534fe1247f892b287f624b7abb6f2347765ab22
     with: {go-version: 1.26.5}
   quality:
-    strategy: {matrix: {os: [ubuntu-latest, windows-latest]}}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with: {persist-credentials: false}

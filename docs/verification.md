@@ -6,6 +6,16 @@ loop, `make check` adds formatting, module/vendor, Protobuf, architecture, vet,
 and shuffled tests, and `make verify` adds lint/NilAway, security, race, fuzz,
 coverage, and vendor-only build proof.
 
+Hosted CI keeps the cross-platform proof and the expensive repository-quality
+mirror distinct. The reusable verifier remains pinned and owns Linux, macOS,
+Windows, and vendor/offline jobs. One Ubuntu quality job bootstraps the pinned
+tools and runs the full repository verifier; it is not duplicated on Windows.
+The quality job has a bounded 40-minute cold-runner budget, while `verify`
+receives a 30-minute internal deadline. Every other quality-gate mode retains
+the 15-minute bound used by the local feedback loop. Repository identity fails
+closed if the reusable pin, platform proof, single-mirror topology, ordering,
+timeouts, or required aggregation drifts.
+
 A fresh machine runs `make tools-bootstrap` once. This is the sole
 network-authorized quality-gate mode. It copies each `go.mod`/`go.sum` pair to a
 temporary modfile, downloads the exact graph from the public Go proxy with

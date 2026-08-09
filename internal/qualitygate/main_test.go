@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNetworkIsReservedForExplicitBootstrap(t *testing.T) {
@@ -22,24 +23,119 @@ func TestNetworkIsReservedForExplicitBootstrap(t *testing.T) {
 	}
 }
 
+func TestVerificationTimeoutIsModeAware(t *testing.T) {
+	t.Parallel()
+	if timeout := gateTimeout("verify"); timeout != 30*time.Minute {
+		t.Fatalf("verify timeout = %s", timeout)
+	}
+	for _, mode := range []string{"tools-bootstrap", "proto", "fast", "check", "coverage", "unknown"} {
+		if timeout := gateTimeout(mode); timeout != 15*time.Minute {
+			t.Fatalf("%s timeout = %s", mode, timeout)
+		}
+	}
+}
+
 func TestRepositoryPortabilityRequiresLFAndExplicitToolBootstrap(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeGateFile(t, root, ".gitattributes", "* text=auto eol=lf\n*.pb -text\n*.png -text\n")
-	writeGateFile(t, root, ".github/workflows/ci.yml", `steps:
-  - run: go run ./internal/qualitygate -mode=tools-bootstrap
-  - run: go run ./internal/qualitygate -mode=verify
-`)
+	writeGateFile(t, root, ".github/workflows/ci.yml", validCIWorkflow())
 	if err := checkRepositoryPortability(root); err != nil {
 		t.Fatal(err)
 	}
 
-	writeGateFile(t, root, ".github/workflows/ci.yml", `steps:
-  - run: go run ./internal/qualitygate -mode=verify
-`)
+	writeGateFile(
+		t,
+		root,
+		".github/workflows/ci.yml",
+		strings.Replace(validCIWorkflow(), "      - run: go run ./internal/qualitygate -mode=tools-bootstrap\n", "", 1),
+	)
 	if err := checkRepositoryPortability(root); err == nil || !strings.Contains(err.Error(), "bootstrap") {
 		t.Fatalf("missing bootstrap error = %v", err)
 	}
+}
+
+func TestCIWorkflowPreservesUniqueGatesAndSingleQualityMirror(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		workflow string
+		wantErr  string
+	}{
+		{name: "valid", workflow: validCIWorkflow()},
+		{
+			name:     "wrong reusable pin",
+			workflow: strings.Replace(validCIWorkflow(), verifyWorkflowCommit, strings.Repeat("0", 40), 1),
+			wantErr:  "go-verify.yml@",
+		},
+		{
+			name:     "duplicate windows quality",
+			workflow: strings.Replace(validCIWorkflow(), "    runs-on: ubuntu-latest\n", "    strategy: {matrix: {os: [ubuntu-latest, windows-latest]}}\n    runs-on: ${{ matrix.os }}\n", 1),
+			wantErr:  "runs-on: ubuntu-latest",
+		},
+		{
+			name:     "short cold runner budget",
+			workflow: strings.Replace(validCIWorkflow(), "    timeout-minutes: 40\n", "    timeout-minutes: 20\n", 1),
+			wantErr:  "timeout-minutes: 40",
+		},
+		{
+			name:     "missing reusable verification",
+			workflow: strings.Replace(validCIWorkflow(), "  verify:\n", "  omitted:\n", 1),
+			wantErr:  "jobs must be",
+		},
+		{
+			name:     "missing required aggregation",
+			workflow: strings.Replace(validCIWorkflow(), "    needs: [verify, quality]\n", "    needs: [quality]\n", 1),
+			wantErr:  "needs: [verify, quality]",
+		},
+		{
+			name:     "duplicate full verifier",
+			workflow: strings.Replace(validCIWorkflow(), "      - run: go run ./internal/qualitygate -mode=verify\n", "      - run: go run ./internal/qualitygate -mode=verify\n      - run: go run ./internal/qualitygate -mode=verify\n", 1),
+			wantErr:  "exactly once",
+		},
+		{
+			name:     "extra job",
+			workflow: validCIWorkflow() + "  extra:\n    runs-on: ubuntu-latest\n",
+			wantErr:  "jobs must be",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			err := checkCIWorkflow(test.workflow)
+			if test.wantErr == "" && err != nil {
+				t.Fatal(err)
+			}
+			if test.wantErr != "" && (err == nil || !strings.Contains(err.Error(), test.wantErr)) {
+				t.Fatalf("checkCIWorkflow() error = %v, want containing %q", err, test.wantErr)
+			}
+		})
+	}
+}
+
+func validCIWorkflow() string {
+	return `name: CI
+on:
+  push: {branches: [main]}
+  pull_request: {branches: [main]}
+permissions: {contents: read}
+jobs:
+  verify:
+    uses: spice-framework/.github/.github/workflows/go-verify.yml@` + verifyWorkflowCommit + `
+    with: {go-version: 1.26.5}
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - run: go run ./internal/qualitygate -mode=tools-bootstrap
+      - run: go run ./internal/qualitygate -mode=verify
+  required:
+    if: always()
+    needs: [verify, quality]
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.verify.result }}" = success && test "${{ needs.quality.result }}" = success
+`
 }
 
 func TestReleaseWorkflowRequiresExactKeylessBoundary(t *testing.T) {

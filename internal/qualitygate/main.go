@@ -26,6 +26,9 @@ const (
 	modulePath            = "github.com/spice-framework/spice-agent"
 	minimumCoverage       = 85.0
 	releaseWorkflowCommit = "07f898b85e7d1c409b91bf280e47d62921e786b6"
+	verifyWorkflowCommit  = "0534fe1247f892b287f624b7abb6f2347765ab22"
+	standardGateTimeout   = 15 * time.Minute
+	verifyGateTimeout     = 30 * time.Minute
 )
 
 func main() {
@@ -35,7 +38,7 @@ func main() {
 func execute() int {
 	mode := flag.String("mode", "verify", "verification mode: tools-bootstrap, proto, fast, check, coverage, or verify")
 	flag.Parse()
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), gateTimeout(*mode))
 	defer cancel()
 	root, err := repositoryRoot()
 	if err == nil {
@@ -46,6 +49,13 @@ func execute() int {
 		return 1
 	}
 	return 0
+}
+
+func gateTimeout(mode string) time.Duration {
+	if mode == "verify" {
+		return verifyGateTimeout
+	}
+	return standardGateTimeout
 }
 
 type step struct {
@@ -372,11 +382,55 @@ func checkRepositoryPortability(root string) error {
 	if err != nil {
 		return fmt.Errorf("read CI workflow: %w", err)
 	}
-	text := strings.ReplaceAll(string(workflow), "\r\n", "\n")
+	return checkCIWorkflow(string(workflow))
+}
+
+func checkCIWorkflow(workflow string) error {
+	text := strings.ReplaceAll(workflow, "\r\n", "\n")
+	required := []string{
+		"uses: spice-framework/.github/.github/workflows/go-verify.yml@" + verifyWorkflowCommit,
+		"with: {go-version: 1.26.5}",
+		"  quality:\n    runs-on: ubuntu-latest\n    timeout-minutes: 40\n",
+		"    needs: [verify, quality]",
+		`test "${{ needs.verify.result }}" = success && test "${{ needs.quality.result }}" = success`,
+	}
+	for _, contract := range required {
+		if strings.Count(text, contract) != 1 {
+			return fmt.Errorf("CI workflow must contain exactly one %q", contract)
+		}
+	}
+	for _, forbidden := range []string{"strategy:", "matrix:", "windows-latest", "fail-fast:"} {
+		if strings.Contains(text, forbidden) {
+			return fmt.Errorf("CI full-quality job contains forbidden %q", forbidden)
+		}
+	}
 	bootstrap := strings.Index(text, "go run ./internal/qualitygate -mode=tools-bootstrap")
 	verify := strings.Index(text, "go run ./internal/qualitygate -mode=verify")
-	if bootstrap < 0 || verify <= bootstrap {
-		return errors.New("CI quality jobs must bootstrap pinned tools before offline verification")
+	if bootstrap < 0 || verify <= bootstrap ||
+		strings.Count(text, "go run ./internal/qualitygate -mode=tools-bootstrap") != 1 ||
+		strings.Count(text, "go run ./internal/qualitygate -mode=verify") != 1 {
+		return errors.New("CI full-quality job must bootstrap pinned tools exactly once before offline verification")
+	}
+	lines := strings.Split(text, "\n")
+	jobs := make([]string, 0, 3)
+	inJobs := false
+	for _, line := range lines {
+		if line == "jobs:" {
+			inJobs = true
+			continue
+		}
+		if !inJobs {
+			continue
+		}
+		if line != "" && !strings.HasPrefix(line, " ") {
+			break
+		}
+		if strings.HasPrefix(line, "  ") && !strings.HasPrefix(line, "    ") && strings.HasSuffix(line, ":") {
+			jobs = append(jobs, strings.TrimSuffix(strings.TrimSpace(line), ":"))
+		}
+	}
+	if !slices.Equal(jobs, []string{"verify", "quality", "required"}) {
+		return fmt.Errorf("CI workflow jobs must be verify, quality, and required, got %q", jobs)
 	}
 	return nil
 }
