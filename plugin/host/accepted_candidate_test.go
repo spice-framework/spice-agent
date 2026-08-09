@@ -81,6 +81,7 @@ func TestAcceptedCandidateBuildsToolsAndClosesGracefully(t *testing.T) {
 }
 
 func TestAcceptedCandidateDrainsLocalAdmissionBeforeRPC(t *testing.T) {
+	const lifecycleBudget = 500 * time.Millisecond
 	owned := newLifecycleProcess()
 	drainCalled := make(chan struct{})
 	executeEntered := make(chan struct{})
@@ -101,7 +102,8 @@ func TestAcceptedCandidateDrainsLocalAdmissionBeforeRPC(t *testing.T) {
 				},
 			}, nil
 		},
-		drain: func(context.Context, *pluginv1.DrainRequest) (*pluginv1.DrainResponse, error) {
+		drain: func(ctx context.Context, _ *pluginv1.DrainRequest) (*pluginv1.DrainResponse, error) {
+			assertLifecycleDeadline(t, ctx, lifecycleBudget)
 			close(drainCalled)
 			return &pluginv1.DrainResponse{Status: commonv1.OKStatus()}, nil
 		},
@@ -111,6 +113,11 @@ func TestAcceptedCandidateDrainsLocalAdmissionBeforeRPC(t *testing.T) {
 		},
 	}
 	accepted, _, _ := newLifecycleAccepted(t, client, owned)
+	// This test deliberately pauses an admitted call while close waits for it.
+	// Give scheduler delays room without weakening the bounded lifecycle under
+	// test; the ordering assertions below remain channel-driven.
+	accepted.candidate.executable.drainTimeout = lifecycleBudget
+	accepted.candidate.executable.shutdownTimeout = lifecycleBudget
 	call, err := tool.NewCall("call-1", "remote.read", []byte(`{}`))
 	if err != nil {
 		t.Fatal(err)
