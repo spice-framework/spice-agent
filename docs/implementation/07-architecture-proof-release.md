@@ -4,7 +4,7 @@
 
 Publish the coordinated architecture proof only after phases 0 through 5 prove
 the complete Spice-native architecture. The Agent core recovery is
-`v0.1.0-preview.3`; TUI, provider, coding tools, and the distribution retain
+`v0.1.0-preview.4`; TUI, provider, coding tools, and the distribution retain
 their independently versioned `v0.1.0-preview.1` release identities. The
 release graph must first replace every foundation and sibling pseudo-version
 with an immutable preview tag. Every repository records the exact compatible
@@ -16,11 +16,13 @@ hosted gates plus the protected keyless module-release path. Phase 6 remains
 incomplete until the final distribution is independently rebuilt, attested,
 installed, and exercised through the decisive workflow.
 
-The immutable `v0.1.0-preview.1` and `v0.1.0-preview.2` Spice Agent tags are
-failed release history, not published components. Preview.1 failed before
-rendering; preview.2 passed candidate verification and rendering but failed
-independent verifier cleanup before attestation or publication. The exact tags,
-commits, failures, and artifact boundaries are recorded in
+The immutable `v0.1.0-preview.1`, `v0.1.0-preview.2`, and
+`v0.1.0-preview.3` Spice Agent tags are failed release history, not published
+components. Preview.1 failed before rendering; preview.2 failed during
+independent-verifier cleanup; preview.3 passed candidate verification and
+rendering but exposed disagreement between the separately reviewed release
+policies before any verified handoff or release authority. The exact tags,
+commits, failures, policy checks, and artifact boundaries are recorded in
 [`evidence/phase6-release-history.md`](evidence/phase6-release-history.md).
 Recovery advances the release identity; it never moves, deletes, or retries the
 failed tag as a different candidate.

@@ -3,5 +3,5 @@
   "profile": "go-module-v1",
   "repository": "spice-agent",
   "module": "github.com/spice-framework/spice-agent",
-  "version": "v0.1.0-preview.3"
+  "version": "v0.1.0-preview.4"
 }
