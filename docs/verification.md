@@ -23,3 +23,11 @@ Generated `*.pb.go` and canonical Spice output remain compilation, test, race,
 security, and offline-build inputs. They are excluded only from handwritten
 formatting and coverage-denominator checks because their source schemas and
 deterministic freshness are separately enforced.
+
+Repository identity also validates `.github/workflows/release.yml` as a
+single-job, secret-free caller of the organization keyless Go-module release
+workflow at its exact audited commit. The caller must deny permissions at the
+workflow level and may grant only `contents`, `id-token`, `attestations`, and
+`artifact-metadata` writes to the reusable release job. Extra permissions,
+local steps, additional jobs, legacy workflows, module drift, and either named
+or inherited secrets fail every verification mode before product tests run.
