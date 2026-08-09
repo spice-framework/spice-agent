@@ -328,11 +328,12 @@ type Run struct {
 	engine *Engine
 	// The run owns this derived context and cancels it during finalization.
 	//nolint:containedctx // required to link concurrent interaction lifecycles to run cancellation
-	ctx      context.Context
-	emitter  *runEmitter
-	finalize sync.Once
-	mu       sync.Mutex
-	err      error
+	ctx       context.Context
+	emitter   *runEmitter
+	requester interaction.Requester
+	finalize  sync.Once
+	mu        sync.Mutex
+	err       error
 
 	stateMu            sync.Mutex
 	definition         Definition
@@ -1060,7 +1061,7 @@ func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, 
 		}
 		dispatchScope, scopeErr := stage.NewToolDispatchScope(
 			emitter.run.id, turn, emitter.run.planIdentity.ToolPlanID(), emitter.run.planIdentity.Fingerprint(),
-			emitter.run.planIdentity.WorkspaceFingerprint(), interactionAuthority,
+			emitter.run.planIdentity.WorkspaceFingerprint(), interactionAuthority, emitter.run.requester,
 		)
 		if scopeErr != nil {
 			return errors.Join(scopeErr, emitter.toolFailure(ctx, call, scopeErr))
@@ -1351,6 +1352,18 @@ type runEmitter struct {
 	run    *Run
 	mu     sync.Mutex
 	next   uint64
+}
+
+type runInteractionRequester struct{ run *Run }
+
+func (requester *runInteractionRequester) Request(
+	ctx context.Context,
+	request interaction.Request,
+) (interaction.Response, error) {
+	if requester == nil || requester.run == nil {
+		return interaction.Response{}, errors.New("agent run interaction requester is nil")
+	}
+	return requester.run.Interact(ctx, request)
 }
 
 func (emitter *runEmitter) emit(ctx context.Context, kind event.Kind, payload any) error {

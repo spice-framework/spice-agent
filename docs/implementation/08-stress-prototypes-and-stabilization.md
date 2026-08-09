@@ -15,6 +15,10 @@ Build an optional `stage.ToolDispatchGuard` that observes and can deny every
 compiled and runtime tool execution through RFC 0009. The generic immutable
 scope, exact-plan binding, generated collection injection, and terminal guard
 ordering are implemented in core; no external policy is installed by default.
+The scope now also exposes the run-owned lifecycle requester required for a
+policy prompt without exposing mutable broker scope. Its private pointer
+capability, engine binding, terminal ordering, cancellation join, and snapshot
+refusal are core invariants rather than behavior each policy reimplements.
 The prototype must prove there is no bypass around canonical dispatch,
 including retries, interactions, and plugin generations. Capability metadata
 informs policy but does not become enforcement by itself.

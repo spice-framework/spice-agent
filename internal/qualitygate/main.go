@@ -811,9 +811,15 @@ func checkToolDispatchBoundary(root string) error {
 	}{
 		{name: "agent/agent.go", fragments: []string{
 			"stage.NewToolDispatchScope(",
+			"emitter.run.requester",
+			"type runInteractionRequester struct",
+			"return requester.run.Interact(ctx, request)",
 			"NewToolStartedOccurrence(",
 			"occurrence.Encode()",
 			"dispatcher.Dispatch(ctx, scope, call, reporter)",
+		}},
+		{name: "agent/prepared_execution.go", fragments: []string{
+			"run.requester = &runInteractionRequester{run: run}",
 		}},
 		{name: "agent/tool_started.go", fragments: []string{
 			"ToolStartedOccurrenceVersion = \"spice.agent.tool-started/v1alpha1\"",
@@ -832,6 +838,9 @@ func checkToolDispatchBoundary(root string) error {
 		}},
 		{name: "stage/dispatch_guard.go", fragments: []string{
 			"type ToolDispatchScope struct",
+			"interactionRequester *toolInteractionCapability",
+			"func (scope ToolDispatchScope) RequestInteraction(",
+			"scope.interactionRequester == other.interactionRequester",
 			"type ToolDispatchGuard interface",
 			"tool dispatch continuation is closed or was already invoked",
 		}},

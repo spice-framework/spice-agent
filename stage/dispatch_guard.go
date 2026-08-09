@@ -25,7 +25,10 @@ type ToolDispatchScope struct {
 	planFingerprint      string
 	workspaceFingerprint string
 	interactionAuthority interaction.Scope
+	interactionRequester *toolInteractionCapability
 }
+
+type toolInteractionCapability struct{ requester interaction.Requester }
 
 // NewToolDispatchScope constructs the immutable facts visible to terminal
 // guards. An empty workspace fingerprint is allowed only for deliberately
@@ -37,11 +40,16 @@ func NewToolDispatchScope(
 	planFingerprint string,
 	workspaceFingerprint string,
 	interactionAuthority interaction.Scope,
+	interactionRequester interaction.Requester,
 ) (ToolDispatchScope, error) {
 	result := ToolDispatchScope{
 		runID: runID, turn: turn, toolPlanID: toolPlanID, planFingerprint: planFingerprint,
 		workspaceFingerprint: workspaceFingerprint,
 		interactionAuthority: interactionAuthority,
+		interactionRequester: &toolInteractionCapability{requester: interactionRequester},
+	}
+	if interactionRequester == nil {
+		return ToolDispatchScope{}, errors.New("tool dispatch interaction requester is required")
 	}
 	if err := result.Validate(); err != nil {
 		return ToolDispatchScope{}, err
@@ -72,6 +80,9 @@ func (scope ToolDispatchScope) Validate() error {
 	if scope.interactionAuthority.RunID() != scope.runID {
 		return errors.New("tool dispatch interaction authority does not own the run")
 	}
+	if scope.interactionRequester == nil || scope.interactionRequester.requester == nil {
+		return errors.New("tool dispatch interaction requester is required")
+	}
 	return nil
 }
 
@@ -82,6 +93,40 @@ func (scope ToolDispatchScope) PlanFingerprint() string      { return scope.plan
 func (scope ToolDispatchScope) WorkspaceFingerprint() string { return scope.workspaceFingerprint }
 func (scope ToolDispatchScope) InteractionAuthority() interaction.Scope {
 	return scope.interactionAuthority
+}
+
+// RequestInteraction invokes the run-owned interaction lifecycle without
+// exposing broker Scope authority to a guard.
+func (scope ToolDispatchScope) RequestInteraction(
+	ctx context.Context,
+	request interaction.Request,
+) (interaction.Response, error) {
+	if ctx == nil {
+		return interaction.Response{}, errors.New("tool dispatch interaction context must not be nil")
+	}
+	if err := scope.Validate(); err != nil {
+		return interaction.Response{}, err
+	}
+	if err := request.Validate(); err != nil {
+		return interaction.Response{}, err
+	}
+	if err := ctx.Err(); err != nil {
+		return interaction.Response{}, err
+	}
+	response, err := safeRequestInteraction(ctx, scope.interactionRequester.requester, request.Clone())
+	if err != nil {
+		return interaction.Response{}, err
+	}
+	if err = ctx.Err(); err != nil {
+		return interaction.Response{}, err
+	}
+	if err = response.Validate(); err != nil {
+		return interaction.Response{}, errors.New("tool dispatch interaction response is invalid")
+	}
+	if response.ID() != request.ID() {
+		return interaction.Response{}, errors.New("tool dispatch interaction response does not match the request")
+	}
+	return response.Clone(), nil
 }
 
 func validateDispatchFingerprint(label, value string, allowEmpty bool) error {
@@ -104,7 +149,22 @@ func validateDispatchFingerprint(label, value string, allowEmpty bool) error {
 func (scope ToolDispatchScope) equal(other ToolDispatchScope) bool {
 	return scope.runID == other.runID && scope.turn == other.turn && scope.toolPlanID == other.toolPlanID &&
 		scope.planFingerprint == other.planFingerprint && scope.workspaceFingerprint == other.workspaceFingerprint &&
-		scope.interactionAuthority.RunID() == other.interactionAuthority.RunID()
+		scope.interactionAuthority.RunID() == other.interactionAuthority.RunID() &&
+		scope.interactionRequester == other.interactionRequester
+}
+
+func safeRequestInteraction(
+	ctx context.Context,
+	requester interaction.Requester,
+	request interaction.Request,
+) (response interaction.Response, err error) {
+	defer func() {
+		if recover() != nil {
+			response = interaction.Response{}
+			err = errors.New("tool dispatch interaction requester panicked")
+		}
+	}()
+	return requester.Request(ctx, request)
 }
 
 // ToolDispatchNext is a single-use continuation bound to the immutable context,

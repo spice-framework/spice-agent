@@ -22,8 +22,11 @@ terminal guard seam in RFC 0009. Definitions
 declare exact filesystem read/write, process, network, secret, and environment
 capabilities. A permission guard can inspect definition, call, exact leased
 plan, workspace, run, turn, and interaction facts and deny before execution.
-Tools cannot
-publish an alternate executable route or event directly.
+When policy needs user input, it can invoke only the private run-bound requester
+on `ToolDispatchScope`; it cannot provide or forge broker scope authority. The
+request uses the normal interaction lifecycle and blocks tool completion until
+one interaction terminal is committed. Tools cannot publish an alternate
+executable route or event directly.
 
 Each run uses one immutable leased definition snapshot. The guard rejects tool
 names outside that snapshot even if a mutable or malicious delegate later
@@ -60,7 +63,8 @@ field set. Unknown headers/provider payloads are dropped, not forwarded.
 Interaction events carry only identity, kind, and lifecycle status. Prompt text,
 schemas, approvals, secrets, and user-entered response JSON never enter the
 event log or replay stream; the validated response is returned directly to the
-requesting stage.
+requesting stage. Interaction-requester panics become one fixed diagnostic and
+never format the recovered value.
 
 ## Local daemon and plugins
 

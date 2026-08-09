@@ -29,8 +29,11 @@ Each dispatch carries immutable run, turn, exact `PlanID`, combined plan,
 workspace, and interaction authority facts. Workspace identity is now part of
 `PlanIdentity` and the deliberately incompatible v1alpha3 snapshot contract,
 so cross-workspace resume fails before leasing dynamic resources. The optional
-external permission policy and its user interaction remain the next isolated
-stress prototype.
+external permission policy remains the next isolated stress prototype. Core now
+provides its required run-owned interaction lifecycle seam: guards can request
+UI-neutral input through an unforgeable requester bound to `Run.Interact`, while
+the engine retains exactly-once interaction events, snapshot safety,
+cancellation joining, and tool/run terminal ordering.
 
 The kernel now durably records each `ToolStarted` occurrence with typed,
 bounded, secret-free definition and exact plan/workspace facts. Corrupt,

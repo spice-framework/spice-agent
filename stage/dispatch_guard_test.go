@@ -140,6 +140,33 @@ func TestToolDispatchPipelineBindsEngineScopeAcrossTrustedDecorators(t *testing.
 		})
 	}
 
+	t.Run("substitution rejected/interaction requester capability", func(t *testing.T) {
+		requester := testRequesterFunc(func(context.Context, interaction.Request) (interaction.Response, error) {
+			return interaction.Response{}, errors.New("not called")
+		})
+		original := testToolDispatchScopeWithRequester(t, "generation:test", requester)
+		forged := mustDispatchScopeWithRequester(
+			t, original.RunID(), original.Turn(), original.ToolPlanID(), original.PlanFingerprint(),
+			original.WorkspaceFingerprint(), original.InteractionAuthority(), requester,
+		)
+		decorator := decoratorFunc(func(next stage.ToolDispatcher) stage.ToolDispatcher {
+			return dispatchAdapter{next: next, dispatch: func(ctx context.Context, _ stage.ToolDispatchScope, call tool.Call, reporter tool.Reporter) (tool.Result, error) {
+				return next.Dispatch(ctx, forged, call, reporter)
+			}}
+		})
+		pipeline, err := stage.ApplyToolDispatchPipeline(base, []stage.ToolDispatchGuard{guard}, []stage.ToolDispatchDecorator{decorator})
+		if err != nil {
+			t.Fatal(err)
+		}
+		call, _ := tool.NewCall("call-substitute-requester", "read", json.RawMessage(`{}`))
+		if _, err = pipeline.Dispatch(t.Context(), original, call, nil); err == nil || !strings.Contains(err.Error(), "substituted") {
+			t.Fatalf("substituted requester = %v", err)
+		}
+		if guardCalls.Load() != 0 || implementation.calls.Load() != 0 {
+			t.Fatalf("requester substitution reached guard/tool = %d/%d", guardCalls.Load(), implementation.calls.Load())
+		}
+	})
+
 	t.Run("same-scope retry allowed", func(t *testing.T) {
 		decorator := decoratorFunc(func(next stage.ToolDispatcher) stage.ToolDispatcher {
 			return dispatchAdapter{next: next, dispatch: func(ctx context.Context, scope stage.ToolDispatchScope, call tool.Call, reporter tool.Reporter) (tool.Result, error) {
@@ -170,8 +197,26 @@ func mustDispatchScope(
 	authority interaction.Scope,
 ) stage.ToolDispatchScope {
 	t.Helper()
+	return mustDispatchScopeWithRequester(
+		t, runID, turn, planID, planFingerprint, workspaceFingerprint, authority,
+		interaction.UnavailableRequester{},
+	)
+}
+
+func mustDispatchScopeWithRequester(
+	t *testing.T,
+	runID string,
+	turn uint32,
+	planID stage.PlanID,
+	planFingerprint string,
+	workspaceFingerprint string,
+	authority interaction.Scope,
+	requester interaction.Requester,
+) stage.ToolDispatchScope {
+	t.Helper()
 	scope, err := stage.NewToolDispatchScope(
 		runID, turn, planID, planFingerprint, workspaceFingerprint, authority,
+		requester,
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -66,7 +66,10 @@ interaction authority through `stage.ToolDispatchScope`. Ordered
 `ToolDispatchGuard` beans form the terminal policy seam immediately above the
 merged compiled/runtime dispatcher. Spice Agent ships no permission policy by
 default; trusted decorators remain outside that seam with their existing
-ordering and trust contract.
+ordering and trust contract. A guard that needs user input calls the scope's
+run-owned interaction requester, which delegates to `Run.Interact` without
+exposing forgeable broker scope. The normal exactly-once interaction lifecycle,
+snapshot refusal, cancellation join, and terminal ordering still apply.
 
 Before that seam is entered, the kernel commits a strict typed `ToolStarted`
 occurrence containing only call identity, declared definition security facts,

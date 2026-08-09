@@ -488,9 +488,15 @@ func TestToolDispatchBoundaryFailsClosed(t *testing.T) {
 	for name, content := range map[string]string{
 		"agent/agent.go": `package agent
 // stage.NewToolDispatchScope(
+// emitter.run.requester
+// type runInteractionRequester struct
+// return requester.run.Interact(ctx, request)
 // NewToolStartedOccurrence(
 // occurrence.Encode()
 // dispatcher.Dispatch(ctx, scope, call, reporter)
+`,
+		"agent/prepared_execution.go": `package agent
+// run.requester = &runInteractionRequester{run: run}
 `,
 		"agent/tool_started.go": `package agent
 // ToolStartedOccurrenceVersion = "spice.agent.tool-started/v1alpha1"
@@ -509,6 +515,9 @@ func TestToolDispatchBoundaryFailsClosed(t *testing.T) {
 `,
 		"stage/dispatch_guard.go": `package stage
 // type ToolDispatchScope struct
+// interactionRequester *toolInteractionCapability
+// func (scope ToolDispatchScope) RequestInteraction(
+// scope.interactionRequester == other.interactionRequester
 // type ToolDispatchGuard interface
 // tool dispatch continuation is closed or was already invoked
 `,
@@ -521,6 +530,13 @@ func TestToolDispatchBoundaryFailsClosed(t *testing.T) {
 	if err := checkToolDispatchBoundary(root); err != nil {
 		t.Fatal(err)
 	}
+	writeGateFile(t, root, "agent/prepared_execution.go", "package agent\n")
+	if err := checkToolDispatchBoundary(root); err == nil || !strings.Contains(err.Error(), "runInteractionRequester") {
+		t.Fatalf("missing run-owned interaction requester = %v", err)
+	}
+	writeGateFile(t, root, "agent/prepared_execution.go", `package agent
+// run.requester = &runInteractionRequester{run: run}
+`)
 	writeGateFile(t, root, "plugin/host/host.go", "package pluginhost\n// stage.SnapshotToolDispatcher(config.Compiled)\n")
 	if err := checkToolDispatchBoundary(root); err == nil || !strings.Contains(err.Error(), "ApplyToolDispatchPipeline") {
 		t.Fatalf("missing host pipeline = %v", err)

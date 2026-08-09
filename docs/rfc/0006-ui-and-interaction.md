@@ -16,6 +16,13 @@ user-entered response JSON are returned through
 the direct broker call and never enter event/replay payloads. Prompt rendering,
 terminal state, shortcuts, and client routing remain outside the kernel.
 
+Terminal tool guards do not receive the broker or construct its scope. Their
+`ToolDispatchScope` holds a private run-bound `interaction.Requester` capability
+whose `Request` method accepts only context and request. The engine adapts it to
+`Run.Interact`, preserving the same validation, event ownership, cancellation,
+snapshot-safety, and finalization join as any other in-run interaction. A copied
+or reconstructed public scope cannot reproduce this pointer capability.
+
 The process protocol carries pending prompts on a separate stream. Its first
 frame is always one atomic complete snapshot of pending state, even after
 reconnect; revision-contiguous opened/closed deltas follow. A client never has

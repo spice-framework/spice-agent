@@ -72,7 +72,7 @@ func (proof *Proof) DispatchProof(ctx context.Context) (uint32, error) {
 	}
 	scope, err := stage.NewToolDispatchScope(
 		"composition-proof", 1, stage.PlanID("composition:static"),
-		"sha256:"+strings.Repeat("0", 64), "", authority,
+		"sha256:"+strings.Repeat("0", 64), "", authority, interaction.UnavailableRequester{},
 	)
 	if err != nil {
 		return 0, err

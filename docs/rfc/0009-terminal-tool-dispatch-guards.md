@@ -33,10 +33,25 @@ but cannot substitute a run, turn, plan, workspace, or interaction authority or
 drop the binding. Re-entering the composed dispatcher with an already-bound
 context fails before guard or tool execution.
 
+Guards request approval or other UI-neutral input only through
+`ToolDispatchScope.RequestInteraction`. The scope contains a private pointer
+capability for one run-owned `interaction.Requester`; the requester accepts a
+request and context but no caller-supplied `interaction.Scope`. The engine binds
+that capability to `Run.Interact` when it constructs the run. Capability pointer
+identity participates in scope equality, so even a scope reconstructed from the
+same public facts and requester cannot substitute the engine-owned scope.
+Requester cancellation, validation, correlation, and panic containment fail
+closed without exposing recovered values.
+
 The engine constructs the scope and remains the only lifecycle-event owner.
 Guards cannot emit `ToolStarted`, tool terminal, turn terminal, or run terminal
 events. Denial, panic, cancellation, or malformed guard output returns through
 ordinary dispatch failure and the engine finalizes each started lifecycle once.
+An interaction requested by a guard uses the normal run lifecycle. Its
+`InteractionStarted` and exactly one interaction terminal occur after
+`ToolStarted` and before the tool terminal. A pending interaction makes the run
+unsafe to snapshot; run cancellation cancels and joins the interaction before
+the run terminal.
 Before guard entry, the engine commits the strict agent-owned typed
 `ToolStarted` occurrence from RFC 0002. It contains the same exact plan and
 workspace authority plus bounded definition security facts, never executable
@@ -65,4 +80,6 @@ DI. Process-launch policy remains a separate future seam.
 Tests cover generated collection injection, compiled and runtime routes,
 ordering, exact plan binding, workspace-bound resume, cancellation, denial,
 panic secrecy, re-entry, retained and double continuation use, forged results,
-concurrency, deterministic snapshot round trips, and engine-owned terminals.
+concurrency, requester delegation/substitution, interaction terminal ordering,
+pending-interaction snapshot refusal, cancellation join, deterministic snapshot
+round trips, and engine-owned terminals.

@@ -337,6 +337,7 @@ func (prepared *preparedExecution) commitPaused(runRootCtx context.Context, acti
 		engine: prepared.engine, runID: prepared.runID, token: prepared.identityToken,
 	}
 	run.emitter = &runEmitter{engine: prepared.engine, run: run, next: prepared.lastSequence + 1}
+	run.requester = &runInteractionRequester{run: run}
 
 	prepared.engine.mu.Lock()
 	if prepared.engine.closed {

@@ -31,6 +31,7 @@ func testToolDispatchScopeForPlan(t *testing.T, planID stage.PlanID) stage.ToolD
 	}
 	scope, err := stage.NewToolDispatchScope(
 		"run-test", 1, planID, "sha256:"+strings.Repeat("0", 64), "", authority,
+		interaction.UnavailableRequester{},
 	)
 	if err != nil {
 		t.Fatal(err)
