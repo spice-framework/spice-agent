@@ -654,7 +654,7 @@ func security(ctx context.Context, root string) error {
 
 func fuzz(ctx context.Context, root string, environment map[string]string) error {
 	for _, target := range fuzzTargets() {
-		if err := command(ctx, root, environment, "go", "test", "-run=^$", "-fuzz=^"+target.name+"$", "-fuzztime=1s", target.pkg); err != nil {
+		if err := command(ctx, root, environment, "go", fuzzArguments(target)...); err != nil {
 			return err
 		}
 	}
@@ -662,6 +662,10 @@ func fuzz(ctx context.Context, root string, environment map[string]string) error
 }
 
 type fuzzTarget struct{ pkg, name string }
+
+func fuzzArguments(target fuzzTarget) []string {
+	return []string{"test", "-run=^$", "-fuzz=^" + target.name + "$", "-fuzztime=100x", target.pkg}
+}
 
 func fuzzTargets() []fuzzTarget {
 	return []fuzzTarget{

@@ -404,6 +404,39 @@ func TestPluginFuzzContractRemainsInTheReleaseGate(t *testing.T) {
 	}
 }
 
+func TestFuzzSmokeUsesDeterministicExecutionBudgetForEveryTarget(t *testing.T) {
+	t.Parallel()
+	expected := []fuzzTarget{
+		{"./message", "FuzzNewID"},
+		{"./tool", "FuzzToolCall"},
+		{"./process", "FuzzSpecValidation"},
+		{"./process", "FuzzExitedOutcome"},
+		{"./process", "FuzzLookupValidation"},
+		{"./agent", "FuzzParseSnapshot"},
+		{"./annotation/agent", "FuzzToolHandler"},
+		{"./common/v1", "FuzzCommonEnvelope"},
+		{"./engine/v1", "FuzzEngineEnvelope"},
+		{"./plugin/v1", "FuzzPluginEnvelope"},
+		{"./plugin/v1", "FuzzBootstrap"},
+		{"./daemon/endpoint", "FuzzDecodeMetadata"},
+	}
+	if actual := fuzzTargets(); !slices.Equal(actual, expected) {
+		t.Fatalf("fuzz targets = %#v", actual)
+	}
+	for _, target := range expected {
+		want := []string{"test", "-run=^$", "-fuzz=^" + target.name + "$", "-fuzztime=100x", target.pkg}
+		arguments := fuzzArguments(target)
+		if !slices.Equal(arguments, want) {
+			t.Fatalf("fuzz arguments for %#v = %q", target, arguments)
+		}
+		for _, argument := range arguments {
+			if strings.HasPrefix(argument, "-fuzztime=") && argument != "-fuzztime=100x" {
+				t.Fatalf("fuzz target %#v uses nondeterministic budget %q", target, argument)
+			}
+		}
+	}
+}
+
 func TestPluginHostDependencyDirectionIsEnforced(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

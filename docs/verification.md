@@ -16,6 +16,12 @@ the 15-minute bound used by the local feedback loop. Repository identity fails
 closed if the reusable pin, platform proof, single-mirror topology, ordering,
 timeouts, or required aggregation drifts.
 
+Fuzz smoke is deterministic across runner speeds: every registered target uses
+Go's exact `-fuzztime=100x` execution budget instead of a wall-clock cutoff.
+The quality gate locks the complete target list and rejects duration-based fuzz
+arguments, preventing corpus discovery or minimization near a time boundary
+from turning a successful smoke run into a deadline failure.
+
 A fresh machine runs `make tools-bootstrap` once. This is the sole
 network-authorized quality-gate mode. It copies each `go.mod`/`go.sum` pair to a
 temporary modfile, downloads the exact graph from the public Go proxy with
