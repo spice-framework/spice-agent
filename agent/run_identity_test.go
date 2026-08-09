@@ -2,7 +2,9 @@ package agent_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
+	"io"
 	"strings"
 	"sync"
 	"testing"
@@ -24,6 +26,51 @@ func (source *sequenceIdentitySource) Next(string) (string, error) {
 	value := source.values[0]
 	source.values = source.values[1:]
 	return value, nil
+}
+
+type gatedIdentityStream struct {
+	release   <-chan struct{}
+	completed model.StreamEvent
+	delivered bool
+}
+
+func (stream *gatedIdentityStream) Recv(ctx context.Context) (model.StreamEvent, error) {
+	if stream.delivered {
+		return model.StreamEvent{}, io.EOF
+	}
+	select {
+	case <-ctx.Done():
+		return model.StreamEvent{}, ctx.Err()
+	case <-stream.release:
+		stream.delivered = true
+		return stream.completed, nil
+	}
+}
+
+func (*gatedIdentityStream) Close() error { return nil }
+
+type terminalThenGatedProvider struct {
+	mu        sync.Mutex
+	completed model.StreamEvent
+	release   <-chan struct{}
+	calls     int
+}
+
+func (provider *terminalThenGatedProvider) Stream(
+	context.Context,
+	model.Request,
+) (model.Stream, error) {
+	provider.mu.Lock()
+	defer provider.mu.Unlock()
+	provider.calls++
+	switch provider.calls {
+	case 1:
+		return &scriptedStream{events: []model.StreamEvent{provider.completed}}, nil
+	case 2:
+		return &gatedIdentityStream{release: provider.release, completed: provider.completed}, nil
+	default:
+		return nil, errors.New("unexpected identity provider call")
+	}
 }
 
 func identityEngine(
@@ -134,7 +181,8 @@ func TestRunIdentityByteCapacityUsesFixedChargePlusID(t *testing.T) {
 
 func TestRunIdentityTerminalRetirementIsExactTokenFencedAndIdempotent(t *testing.T) {
 	completedEvent, _ := model.Completed(model.NewUsage(1, 1))
-	provider := &scriptedProvider{scripts: [][]model.StreamEvent{{completedEvent}, {completedEvent}}}
+	releaseSecond := make(chan struct{})
+	provider := &terminalThenGatedProvider{completed: completedEvent, release: releaseSecond}
 	limits, _ := agent.NewRunIdentityLimits(1, 1<<20)
 	engine := identityEngine(t, provider, fixedIDSource{value: "same-run"}, limits)
 	definition, _ := agent.NewDefinition("identity", "model", 1)
@@ -178,6 +226,7 @@ func TestRunIdentityTerminalRetirementIsExactTokenFencedAndIdempotent(t *testing
 	if _, err = engine.Start(t.Context(), definition, input); err == nil {
 		t.Fatal("old retirement removed the active generation")
 	}
+	close(releaseSecond)
 	if err = second.Wait(t.Context()); err != nil {
 		t.Fatal(err)
 	}
