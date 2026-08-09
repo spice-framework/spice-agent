@@ -11,7 +11,7 @@ Repository roadmaps link here and must not duplicate status.
 | 3 — provider and coding tools | In progress | generated cross-repository continuation and opt-in live acceptance |
 | 4 — daemon and TUI | In progress | generated daemon/TUI distribution targets and managed local composition proven; installed Windows/Linux terminal interaction pending |
 | 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, bounded recovery/health, generated distribution activation, real-process cancellation, and real `spice dev` last-known-good proof complete; simultaneous installed daemon/TUI fault-reconnect proof pending |
-| 6 — architecture proof | In progress | dependency-ordered keyless module releases, then independently attested `v0.1.0-preview.2` distribution; [preview.1 pre-artifact history](evidence/phase6-release-history.md) |
+| 6 — architecture proof | In progress | dependency-ordered keyless module releases, then independently attested preview distribution; [Agent preview.1/preview.2 failure history](evidence/phase6-release-history.md) |
 | 7 — stress prototypes | Planned | permission, SQLite, alternate UI, two-worker experiments |
 | 8 — stabilization | Planned | external authors and frozen compatibility policy |
 
