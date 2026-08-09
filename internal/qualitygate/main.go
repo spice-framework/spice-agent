@@ -22,9 +22,10 @@ import (
 )
 
 const (
-	requiredGoVersion = "go1.26.5"
-	modulePath        = "github.com/spice-framework/spice-agent"
-	minimumCoverage   = 85.0
+	requiredGoVersion     = "go1.26.5"
+	modulePath            = "github.com/spice-framework/spice-agent"
+	minimumCoverage       = 85.0
+	releaseWorkflowCommit = "26de6f4b78a64eedb21e15a2ffe8aa3fd579ef16"
 )
 
 func main() {
@@ -240,7 +241,38 @@ func checkIdentity(root string) error {
 	if strings.Contains(text, "\nreplace ") || strings.Contains(text, "\nreplace (") {
 		return errors.New("committed go.mod must not contain replace directives")
 	}
-	return checkRepositoryPortability(root)
+	if err := checkRepositoryPortability(root); err != nil {
+		return err
+	}
+	return checkReleaseWorkflow(root)
+}
+
+func checkReleaseWorkflow(root string) error {
+	content, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "release.yml")) // #nosec G304 -- repository-owned path.
+	if err != nil {
+		return fmt.Errorf("read release workflow: %w", err)
+	}
+	text := strings.ReplaceAll(string(content), "\r\n", "\n")
+	for _, required := range []string{
+		"permissions: {}",
+		"contents: write",
+		"id-token: write",
+		"attestations: write",
+		"artifact-metadata: write",
+		"uses: spice-framework/.github/.github/workflows/go-module-release.yml@" + releaseWorkflowCommit,
+		"module: " + modulePath,
+		"workflow_commit: " + releaseWorkflowCommit,
+	} {
+		if strings.Count(text, required) != 1 {
+			return fmt.Errorf("release workflow must contain exactly one %q", required)
+		}
+	}
+	for _, forbidden := range []string{"library-release.yml", "secrets:", "secrets: inherit", "SPICE_LIBRARY_RELEASE_SIGNING_KEY"} {
+		if strings.Contains(text, forbidden) {
+			return fmt.Errorf("release workflow contains forbidden %q", forbidden)
+		}
+	}
+	return nil
 }
 
 func checkRepositoryPortability(root string) error {

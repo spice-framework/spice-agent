@@ -42,6 +42,31 @@ func TestRepositoryPortabilityRequiresLFAndExplicitToolBootstrap(t *testing.T) {
 	}
 }
 
+func TestReleaseWorkflowRequiresExactKeylessBoundary(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeGateFile(t, root, ".github/workflows/release.yml", `permissions: {}
+jobs:
+  release:
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    uses: spice-framework/.github/.github/workflows/go-module-release.yml@`+releaseWorkflowCommit+`
+    with:
+      module: `+modulePath+`
+      workflow_commit: `+releaseWorkflowCommit+`
+`)
+	if err := checkReleaseWorkflow(root); err != nil {
+		t.Fatal(err)
+	}
+	writeGateFile(t, root, ".github/workflows/release.yml", "secrets: inherit\n")
+	if err := checkReleaseWorkflow(root); err == nil {
+		t.Fatal("unsafe release workflow passed")
+	}
+}
+
 func TestBootstrapUsesCopiedModuleGraphAndPreservesSource(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
