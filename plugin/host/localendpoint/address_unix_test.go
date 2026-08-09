@@ -5,6 +5,7 @@ package localendpoint
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -90,7 +91,7 @@ func TestUnixClosePreservesUnprovenFileAndRedactsFailure(t *testing.T) {
 	if repeated == nil {
 		t.Fatalf("repeated Close error = nil, want stable %v", err)
 	}
-	if repeated.Error() != err.Error() {
+	if fmt.Sprint(repeated) != fmt.Sprint(err) {
 		t.Fatalf("repeated Close error = %v, want stable %v", repeated, err)
 	}
 }
