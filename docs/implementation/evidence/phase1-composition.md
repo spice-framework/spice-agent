@@ -7,7 +7,7 @@ This evidence is executable and repository-owned. The
 machine-specific absolute paths.
 
 The proof is pinned to Spice core
-`v0.1.0-preview.1.0.20260806200749-524424a04df0` and toolchain
+`v0.1.0-preview.2` and toolchain
 `v0.1.0-preview.1.0.20260806203056-d0b9ac086bd6`; the latter passed its own
 full verification in 422.9 seconds at 85.1% coverage before this consumer was
 vendored. On the final Windows/amd64 edit loop before repository verification,
