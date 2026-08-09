@@ -31,6 +31,38 @@ func TestPrepareLocalResumeRejectsSequenceOverflow(t *testing.T) {
 	}
 }
 
+func TestPrepareLocalResumePrioritizesVisibleCancellationWhileFinishing(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	resumeSignal := make(chan struct{})
+	run := &Run{
+		ctx:                ctx,
+		status:             runStatusFinishing,
+		resumeSignal:       resumeSignal,
+		lastSequence:       17,
+		activeInteractions: make(map[interaction.ID]struct{}),
+	}
+
+	if prepared, err := run.PrepareLocalResume(); prepared != nil || !errors.Is(err, context.Canceled) {
+		t.Fatalf("finishing cancellation preparation = %#v, %v", prepared, err)
+	}
+	if run.status != runStatusFinishing || run.localResume != nil || run.resumeSignal != resumeSignal || run.lastSequence != 17 {
+		t.Fatalf(
+			"cancelled preparation mutated boundary: status=%s prepared=%#v signal_changed=%t sequence=%d",
+			run.status,
+			run.localResume,
+			run.resumeSignal != resumeSignal,
+			run.lastSequence,
+		)
+	}
+	select {
+	case <-resumeSignal:
+		t.Fatal("cancelled preparation closed the resume signal")
+	default:
+	}
+}
+
 func TestResumeMakesSnapshotImmediatelyNonExportable(t *testing.T) {
 	t.Parallel()
 	resumeSignal := make(chan struct{})
