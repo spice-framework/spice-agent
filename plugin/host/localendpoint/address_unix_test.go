@@ -79,7 +79,7 @@ func TestUnixClosePreservesUnprovenFileAndRedactsFailure(t *testing.T) {
 	if !errors.Is(err, ErrCleanup) || !errors.Is(err, localipc.ErrUnsafeEndpoint) {
 		t.Fatalf("Close error = %v, want ErrCleanup and ErrUnsafeEndpoint", err)
 	}
-	assertRedacted(t, err.Error(), owned.Address(), identity)
+	assertRedacted(t, fmt.Sprint(err), owned.Address(), identity)
 	got, readErr := os.ReadFile(owned.Address())
 	if readErr != nil {
 		t.Fatalf("ReadFile after Close: %v", readErr)
