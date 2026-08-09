@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestDirectoryRelativeFilesLocksAndClose(t *testing.T) {
@@ -60,6 +61,66 @@ func TestDirectoryRelativeFilesLocksAndClose(t *testing.T) {
 	}
 	if _, err = directory.ReadFile("metadata", 3); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("read after close = %v", err)
+	}
+}
+
+func TestInitializationLockSerializesDistinctDirectoryBindings(t *testing.T) {
+	directoryPath := filepath.Join(storageTestRoot(t), "initialization-lock")
+	firstDirectory, err := Bind(directoryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = firstDirectory.Close() }()
+	secondDirectory, err := Bind(directoryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = secondDirectory.Close() }()
+
+	first, err := firstDirectory.AcquireInitializationLock("identity.lock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = first.Close() })
+
+	type acquireResult struct {
+		lock *Lock
+		err  error
+	}
+	attempted := make(chan struct{})
+	result := make(chan acquireResult, 1)
+	go func() {
+		close(attempted)
+		second, acquireErr := secondDirectory.AcquireInitializationLock("identity.lock")
+		result <- acquireResult{lock: second, err: acquireErr}
+	}()
+	<-attempted
+
+	select {
+	case early := <-result:
+		if early.lock != nil {
+			_ = early.lock.Close()
+		}
+		t.Fatalf("second binding completed before first released initialization lock: %v", early.err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	if err = first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case completed := <-result:
+		if completed.err != nil {
+			t.Fatalf("second binding failed after release: %v", completed.err)
+		}
+		if completed.lock == nil {
+			t.Fatal("second binding returned a nil initialization lock")
+		}
+		if err = completed.lock.Close(); err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("second binding did not acquire initialization lock after release")
 	}
 }
 

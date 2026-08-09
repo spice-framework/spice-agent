@@ -86,7 +86,11 @@ func TestUnixClosePreservesUnprovenFileAndRedactsFailure(t *testing.T) {
 	if string(got) != string(content) {
 		t.Fatalf("file content = %q, want %q", got, content)
 	}
-	if repeated := owned.Close(); repeated == nil || repeated.Error() != err.Error() {
+	repeated := owned.Close()
+	if repeated == nil {
+		t.Fatalf("repeated Close error = nil, want stable %v", err)
+	}
+	if repeated.Error() != err.Error() {
 		t.Fatalf("repeated Close error = %v, want stable %v", repeated, err)
 	}
 }
