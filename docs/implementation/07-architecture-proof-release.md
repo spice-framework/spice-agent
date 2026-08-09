@@ -2,7 +2,7 @@
 
 ## Objective and prerequisites
 
-Publish coordinated `v0.1.0-preview.1` Agent artifacts only after phases 0
+Publish coordinated `v0.1.0-preview.2` Agent artifacts only after phases 0
 through 5 prove the complete Spice-native architecture. The release graph must
 first replace every foundation and sibling pseudo-version with an immutable
 preview tag. Every repository records the exact compatible tags, commits,
@@ -13,6 +13,14 @@ complete. A component may be tagged after its exact candidate passes local and
 hosted gates plus the protected keyless module-release path. Phase 6 remains
 incomplete until the final distribution is independently rebuilt, attested,
 installed, and exercised through the decisive workflow.
+
+The immutable `v0.1.0-preview.1` Spice Agent tag is pre-artifact release
+history, not a published component. Its uncredentialed validation job failed
+before rendering, verification, attestation, or publication. The exact tag,
+commit, failure, and zero-artifact evidence are recorded in
+[`evidence/phase6-release-history.md`](evidence/phase6-release-history.md).
+Recovery advances the release identity; it never moves, deletes, or retries the
+failed tag as a different candidate.
 
 ## Decisive workflow
 

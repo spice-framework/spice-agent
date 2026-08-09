@@ -25,7 +25,7 @@ const (
 	requiredGoVersion     = "go1.26.5"
 	modulePath            = "github.com/spice-framework/spice-agent"
 	minimumCoverage       = 85.0
-	releaseWorkflowCommit = "c4df74b2c60640c60fe0fa3fe641dadafbc4148a"
+	releaseWorkflowCommit = "07f898b85e7d1c409b91bf280e47d62921e786b6"
 )
 
 func main() {
