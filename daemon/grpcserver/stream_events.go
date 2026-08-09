@@ -2,9 +2,11 @@ package grpcserver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math"
 
+	"github.com/spice-framework/spice-agent/agent"
 	"github.com/spice-framework/spice-agent/client"
 	commonv1 "github.com/spice-framework/spice-agent/common/v1"
 	"github.com/spice-framework/spice-agent/daemon"
@@ -307,14 +309,36 @@ func eventToWire(envelope event.Envelope) (*enginev1.RunEvent, error) {
 	if !ok {
 		return nil, errors.New("event kind is unsupported")
 	}
+	payload, err := eventPayloadToWire(envelope)
+	if err != nil {
+		return nil, err
+	}
 	value := &enginev1.RunEvent{
 		RunId: envelope.RunID(), Sequence: envelope.Sequence(), UnixNano: envelope.At().UnixNano(),
-		Kind: kind, PayloadJson: envelope.Data(), Terminal: envelope.Terminal(),
+		Kind: kind, PayloadJson: payload, Terminal: envelope.Terminal(),
 	}
 	if err := enginev1.ValidateRunEvent(value); err != nil {
 		return nil, err
 	}
 	return value, nil
+}
+
+func eventPayloadToWire(envelope event.Envelope) ([]byte, error) {
+	if envelope.Kind() != event.ToolStarted {
+		return envelope.Data(), nil
+	}
+	occurrence, err := agent.DecodeToolStartedOccurrence(envelope.Data())
+	if err != nil {
+		return nil, errors.New("tool started event payload is invalid")
+	}
+	legacy, err := json.Marshal(struct {
+		CallID string `json:"call_id"`
+		Name   string `json:"name"`
+	}{CallID: string(occurrence.CallID()), Name: occurrence.Name()})
+	if err != nil {
+		return nil, errors.New("encode legacy tool started event payload")
+	}
+	return legacy, nil
 }
 
 func eventKindToWire(kind event.Kind) (enginev1.EventKind, bool) {

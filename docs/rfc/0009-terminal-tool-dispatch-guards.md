@@ -37,6 +37,11 @@ The engine constructs the scope and remains the only lifecycle-event owner.
 Guards cannot emit `ToolStarted`, tool terminal, turn terminal, or run terminal
 events. Denial, panic, cancellation, or malformed guard output returns through
 ordinary dispatch failure and the engine finalizes each started lifecycle once.
+Before guard entry, the engine commits the strict agent-owned typed
+`ToolStarted` occurrence from RFC 0002. It contains the same exact plan and
+workspace authority plus bounded definition security facts, never executable
+arguments. An undeclared model tool records false/false declaration facts and
+fails before any guard or base dispatcher.
 
 ## Workspace and snapshot compatibility
 

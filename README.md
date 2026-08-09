@@ -68,6 +68,13 @@ merged compiled/runtime dispatcher. Spice Agent ships no permission policy by
 default; trusted decorators remain outside that seam with their existing
 ordering and trust contract.
 
+Before that seam is entered, the kernel commits a strict typed `ToolStarted`
+occurrence containing only call identity, declared definition security facts,
+and exact plan/workspace authority. Arguments, paths, schemas, descriptions,
+provider payloads, and secrets cannot enter this durable record. Unknown model
+tool names fail before guard or executable dispatch. The current daemon wire
+retains its legacy `call_id`/`name` projection.
+
 The production runtime-plugin host merges a complete authenticated runtime-tool
 set with the compiled Spice dispatcher and atomically publishes it for future
 runs. Existing runs retain their exact generation. Candidate crashes fail new

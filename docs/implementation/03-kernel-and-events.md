@@ -37,6 +37,13 @@ round-trip, and deterministic replay tests. **Status:** in progress.
   Simultaneous execution and reporter failures retain the authoritative typed
   outcome plus explicitly inspectable durability without reporter-controlled
   cancellation classification.
+- Every `ToolStarted` event is a strict agent-owned 4 KiB occurrence rather
+  than an open map. It contains declared/executable status, the exact definition
+  security metadata and fingerprint, exact leased plan/workspace authority, and
+  turn, but cannot contain arguments, paths, descriptions, schemas, or secrets.
+  Unknown model tool names commit a false/false occurrence and fail before
+  guard or tool execution. Daemon `engine/v1` continues to expose only the
+  legacy `call_id` and `name` projection.
 - Each run owns a count-and-encoded-byte-bounded authoritative event log.
   `Subscribe(ctx, afterSequence)` creates an independent gap-free replay/tail
   cursor. Typed out-of-range and resource-exhaustion errors provide recovery

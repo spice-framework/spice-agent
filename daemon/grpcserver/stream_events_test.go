@@ -2,19 +2,24 @@ package grpcserver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"math"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/spice-framework/spice-agent/agent"
 	"github.com/spice-framework/spice-agent/client"
 	commonv1 "github.com/spice-framework/spice-agent/common/v1"
 	"github.com/spice-framework/spice-agent/daemon"
 	enginev1 "github.com/spice-framework/spice-agent/engine/v1"
 	"github.com/spice-framework/spice-agent/event"
+	"github.com/spice-framework/spice-agent/stage"
+	"github.com/spice-framework/spice-agent/tool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -42,17 +47,71 @@ func TestEventToWirePreservesEveryEnvelopeKind(t *testing.T) {
 		event.InteractionStarted, event.InteractionCompleted, event.InteractionFailed, event.InteractionCancelled,
 	}
 	for index, kind := range kinds {
-		envelope := eventEnvelope(t, uint64(index+1), kind, []byte(`{"index":1}`))
+		payload := []byte(`{"index":1}`)
+		expectedPayload := payload
+		if kind == event.ToolStarted {
+			payload = toolStartedEventPayload(t)
+			expectedPayload = []byte(`{"call_id":"call","name":"read"}`)
+		}
+		envelope := eventEnvelope(t, uint64(index+1), kind, payload)
 		wire, err := eventToWire(envelope)
 		if err != nil {
 			t.Fatalf("convert %s: %v", kind, err)
 		}
 		if wire.GetRunId() != envelope.RunID() || wire.GetSequence() != envelope.Sequence() ||
-			wire.GetUnixNano() != envelope.At().UnixNano() || string(wire.GetPayloadJson()) != string(envelope.Data()) ||
+			wire.GetUnixNano() != envelope.At().UnixNano() || string(wire.GetPayloadJson()) != string(expectedPayload) ||
 			wire.GetTerminal() != envelope.Terminal() || wire.GetKind() == enginev1.EventKind_EVENT_KIND_UNSPECIFIED {
 			t.Fatalf("lossy %s conversion: %#v", kind, wire)
 		}
 	}
+}
+
+func TestEventToWireRejectsCorruptToolStartAndProjectsOnlyLegacyIdentity(t *testing.T) {
+	t.Parallel()
+	envelope := eventEnvelope(t, 1, event.ToolStarted, toolStartedEventPayload(t))
+	wire, err := eventToWire(envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]json.RawMessage
+	if err = json.Unmarshal(wire.GetPayloadJson(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload) != 2 || payload["call_id"] == nil || payload["name"] == nil || payload["tool_plan_id"] != nil ||
+		payload["capabilities"] != nil || payload["workspace_fingerprint"] != nil {
+		t.Fatalf("legacy tool-start projection = %s", wire.GetPayloadJson())
+	}
+	corrupt := eventEnvelope(t, 2, event.ToolStarted, []byte(`{"call_id":"call","name":"read"}`))
+	if _, err = eventToWire(corrupt); err == nil {
+		t.Fatal("legacy-only durable tool-start payload succeeded")
+	}
+}
+
+func toolStartedEventPayload(t *testing.T) []byte {
+	t.Helper()
+	definition, err := tool.NewDefinition(
+		"read", "Read.", json.RawMessage(`{}`), tool.EffectReadOnly, tool.ReplaySafe,
+		tool.CapabilityFilesystemRead,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	planID, _ := stage.NewPlanID("generation:daemon-wire")
+	plan, err := agent.NewPlanIdentity(
+		[]string{"provider:test"}, "daemon-wire:v1", "sha256:"+strings.Repeat("a", 64), planID, []tool.Definition{definition},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	occurrence, err := agent.NewToolStartedOccurrence("call", "read", true, true, &definition, plan, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := occurrence.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
 }
 
 func TestStreamEventObservationPrevalidatesPageBeforeDisclosure(t *testing.T) {

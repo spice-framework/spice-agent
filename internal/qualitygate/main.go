@@ -675,6 +675,7 @@ func fuzzTargets() []fuzzTarget {
 		{"./process", "FuzzExitedOutcome"},
 		{"./process", "FuzzLookupValidation"},
 		{"./agent", "FuzzParseSnapshot"},
+		{"./agent", "FuzzDecodeToolStartedOccurrence"},
 		{"./annotation/agent", "FuzzToolHandler"},
 		{"./common/v1", "FuzzCommonEnvelope"},
 		{"./engine/v1", "FuzzEngineEnvelope"},
@@ -810,7 +811,19 @@ func checkToolDispatchBoundary(root string) error {
 	}{
 		{name: "agent/agent.go", fragments: []string{
 			"stage.NewToolDispatchScope(",
+			"NewToolStartedOccurrence(",
+			"occurrence.Encode()",
 			"dispatcher.Dispatch(ctx, scope, call, reporter)",
+		}},
+		{name: "agent/tool_started.go", fragments: []string{
+			"ToolStartedOccurrenceVersion = \"spice.agent.tool-started/v1alpha1\"",
+			"MaximumToolStartedOccurrenceBytes = 4096",
+			"func DecodeToolStartedOccurrence(",
+		}},
+		{name: "daemon/grpcserver/stream_events.go", fragments: []string{
+			"agent.DecodeToolStartedOccurrence(envelope.Data())",
+			"CallID string `json:\"call_id\"`",
+			"Name   string `json:\"name\"`",
 		}},
 		{name: "plugin/host/host.go", fragments: []string{
 			"stage.SnapshotToolDispatcher(config.Compiled)",

@@ -1,10 +1,12 @@
 package agent_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -365,6 +367,62 @@ func TestEngineRejectsDuplicateToolCallsBeforeRedispatch(t *testing.T) {
 				t.Fatalf("tool start events = %v", countKinds(events))
 			}
 		})
+	}
+}
+
+func TestEngineRecordsTypedToolStartedFactsWithoutArguments(t *testing.T) {
+	call, _ := tool.NewCall("call-facts", "read", json.RawMessage(`{"path":"C:/SECRET/private"}`))
+	provider := &scriptedProvider{scripts: [][]model.StreamEvent{
+		{toolEvent(t, call), completed(t)},
+		{completed(t)},
+	}}
+	run := startRun(t, newEngine(t, provider, map[string]tool.Tool{"read": testTool{}}, nil, nil), 2)
+	events := collect(t, run)
+	if err := run.Wait(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	payload := json.RawMessage(eventData(t, events, event.ToolStarted))
+	if bytes.Contains(payload, []byte("SECRET")) || bytes.Contains(payload, []byte("private")) {
+		t.Fatalf("tool start leaked arguments = %s", payload)
+	}
+	occurrence, err := agent.DecodeToolStartedOccurrence(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition := testTool{}.Definition()
+	identity := run.PlanIdentity()
+	if occurrence.CallID() != call.ID() || occurrence.Name() != call.Name() || !occurrence.Declared() || !occurrence.Executable() ||
+		occurrence.DefinitionFingerprint() != definition.Fingerprint() || occurrence.Effect() != definition.Effect() ||
+		occurrence.ReplaySafety() != definition.ReplaySafety() || !slices.Equal(occurrence.Capabilities(), definition.Capabilities()) ||
+		occurrence.ToolPlanID() != identity.ToolPlanID() || occurrence.PlanFingerprint() != identity.Fingerprint() ||
+		occurrence.WorkspaceFingerprint() != identity.WorkspaceFingerprint() || occurrence.Turn() != 1 {
+		t.Fatalf("tool started occurrence = %#v", occurrence)
+	}
+}
+
+func TestEngineFailsClosedOnUnknownModelToolAfterDurableStart(t *testing.T) {
+	call, _ := tool.NewCall("call-unknown", "unknown", json.RawMessage(`{"secret":"SECRET"}`))
+	provider := &scriptedProvider{scripts: [][]model.StreamEvent{{toolEvent(t, call), completed(t)}}}
+	implementation := &countingTool{}
+	run := startRun(t, newEngine(t, provider, map[string]tool.Tool{"read": implementation}, nil, nil), 1)
+	events := collect(t, run)
+	waitErr := run.Wait(t.Context())
+	if waitErr == nil || !strings.Contains(waitErr.Error(), "undeclared tool") || implementation.calls.Load() != 0 {
+		t.Fatalf("unknown model tool = %v, calls=%d", waitErr, implementation.calls.Load())
+	}
+	counts := countKinds(events)
+	if counts[event.ToolStarted] != 1 || counts[event.ToolFailed] != 1 || counts[event.TurnFailed] != 1 || counts[event.RunFailed] != 1 ||
+		counts[event.ToolCompleted] != 0 {
+		t.Fatalf("unknown model tool terminals = %v", counts)
+	}
+	payload := json.RawMessage(eventData(t, events, event.ToolStarted))
+	if bytes.Contains(payload, []byte("SECRET")) {
+		t.Fatalf("unknown start leaked arguments = %s", payload)
+	}
+	occurrence, err := agent.DecodeToolStartedOccurrence(payload)
+	if err != nil || occurrence.Declared() || occurrence.Executable() || occurrence.Name() != "unknown" ||
+		occurrence.DefinitionFingerprint() != "" || len(occurrence.Capabilities()) != 0 {
+		t.Fatalf("unknown occurrence = %#v, %v", occurrence, err)
 	}
 }
 

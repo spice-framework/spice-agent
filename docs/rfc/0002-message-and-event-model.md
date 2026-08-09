@@ -37,6 +37,19 @@ call ID, canonical tool name, bounded error text, and—when supplied by a valid
 typed execution failure—its definitive/uncertain outcome and retry disposition.
 This correlation is retained even when execution terminates the turn and run.
 
+`ToolStarted` uses the agent-owned
+`spice.agent.tool-started/v1alpha1` occurrence encoding. It records only call
+identity, declared/executable status, definition fingerprint, effect,
+replay-safety and canonical capabilities, exact leased `ToolPlanID`, combined
+plan and workspace fingerprints, and positive turn. The 4 KiB decoder rejects
+missing, unknown, duplicate, corrupt, trailing, contradictory, or oversized
+data. Tool arguments, schemas, descriptions, paths, provider payloads, and
+secrets are structurally absent. An unknown model-requested tool commits a
+false/false start occurrence and then fails before any guard or executable is
+entered. The current daemon protocol deliberately projects this richer local
+event to its legacy `call_id` and `name` JSON until a future additive wire
+contract is reviewed.
+
 ## Authoritative replay
 
 Each run owns one count-and-encoded-byte-bounded authoritative in-memory log.
@@ -82,6 +95,7 @@ private fields.
 ## Acceptance
 
 Table, race, and fuzz tests cover message immutability, malformed stream unions,
-partial failures, all lifecycle terminals, required-observer partial failure,
-retention boundaries, cursor recovery, slow consumers, cancellation, shutdown,
-and byte-identical event reconstruction.
+typed tool-start corruption and secret exclusion, unknown model tools, partial
+failures, all lifecycle terminals, required-observer partial failure, retention
+boundaries, cursor recovery, slow consumers, cancellation, shutdown, and
+byte-identical event reconstruction.

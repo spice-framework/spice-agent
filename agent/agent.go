@@ -1051,10 +1051,7 @@ func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, 
 	}
 	*history = append(*history, assistantMessage)
 	for _, call := range calls {
-		if err = emitter.emit(ctx, event.ToolStarted, map[string]string{"call_id": string(call.ID()), "name": call.Name()}); err != nil {
-			if committed(err) {
-				return errors.Join(err, emitter.toolFailure(ctx, call, err))
-			}
+		if err = emitToolStarted(ctx, emitter, turn, call); err != nil {
 			return err
 		}
 		interactionAuthority, authorityErr := interaction.NewScope(emitter.run.id)
@@ -1090,6 +1087,35 @@ func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, 
 			return messageErr
 		}
 		*history = append(*history, resultMessage)
+	}
+	return nil
+}
+
+func emitToolStarted(ctx context.Context, emitter *runEmitter, turn uint32, call tool.Call) error {
+	definition, declared := emitter.run.dispatcher.Definition(call.Name())
+	var declaredDefinition *tool.Definition
+	if declared {
+		declaredDefinition = &definition
+	}
+	occurrence, err := NewToolStartedOccurrence(
+		call.ID(), call.Name(), declared, declared, declaredDefinition, emitter.run.planIdentity, turn,
+	)
+	if err != nil {
+		return err
+	}
+	payload, err := occurrence.Encode()
+	if err != nil {
+		return err
+	}
+	if err = emitter.emit(ctx, event.ToolStarted, payload); err != nil {
+		if committed(err) {
+			return errors.Join(err, emitter.toolFailure(ctx, call, err))
+		}
+		return err
+	}
+	if !declared {
+		err = fmt.Errorf("model requested undeclared tool %q", call.Name())
+		return errors.Join(err, emitter.toolFailure(ctx, call, err))
 	}
 	return nil
 }

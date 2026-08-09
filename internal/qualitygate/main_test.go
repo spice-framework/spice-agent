@@ -431,6 +431,7 @@ func TestFuzzSmokeUsesDeterministicExecutionBudgetForEveryTarget(t *testing.T) {
 		{"./process", "FuzzExitedOutcome"},
 		{"./process", "FuzzLookupValidation"},
 		{"./agent", "FuzzParseSnapshot"},
+		{"./agent", "FuzzDecodeToolStartedOccurrence"},
 		{"./annotation/agent", "FuzzToolHandler"},
 		{"./common/v1", "FuzzCommonEnvelope"},
 		{"./engine/v1", "FuzzEngineEnvelope"},
@@ -487,7 +488,19 @@ func TestToolDispatchBoundaryFailsClosed(t *testing.T) {
 	for name, content := range map[string]string{
 		"agent/agent.go": `package agent
 // stage.NewToolDispatchScope(
+// NewToolStartedOccurrence(
+// occurrence.Encode()
 // dispatcher.Dispatch(ctx, scope, call, reporter)
+`,
+		"agent/tool_started.go": `package agent
+// ToolStartedOccurrenceVersion = "spice.agent.tool-started/v1alpha1"
+// MaximumToolStartedOccurrenceBytes = 4096
+// func DecodeToolStartedOccurrence(
+`,
+		"daemon/grpcserver/stream_events.go": `package grpcserver
+// agent.DecodeToolStartedOccurrence(envelope.Data())
+// CallID string ` + "`json:\"call_id\"`" + `
+// Name   string ` + "`json:\"name\"`" + `
 `,
 		"plugin/host/host.go": `package pluginhost
 // stage.SnapshotToolDispatcher(config.Compiled)

@@ -32,6 +32,12 @@ so cross-workspace resume fails before leasing dynamic resources. The optional
 external permission policy and its user interaction remain the next isolated
 stress prototype.
 
+The kernel now durably records each `ToolStarted` occurrence with typed,
+bounded, secret-free definition and exact plan/workspace facts. Corrupt,
+unknown, duplicate, missing, or oversized occurrence payloads fail closed, and
+an unknown model tool cannot reach a guard or executable. The current daemon
+wire remains intentionally compatible by projecting only `call_id` and `name`.
+
 ## Current Phase 5 boundary
 
 The initial tool-only protocol and independent Go/Python conformance processes
