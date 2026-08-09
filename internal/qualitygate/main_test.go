@@ -432,6 +432,7 @@ func TestFuzzSmokeUsesDeterministicExecutionBudgetForEveryTarget(t *testing.T) {
 		{"./process", "FuzzLookupValidation"},
 		{"./agent", "FuzzParseSnapshot"},
 		{"./agent", "FuzzDecodeToolStartedOccurrence"},
+		{"./agent", "FuzzDecodeToolTerminalOccurrence"},
 		{"./annotation/agent", "FuzzToolHandler"},
 		{"./common/v1", "FuzzCommonEnvelope"},
 		{"./engine/v1", "FuzzEngineEnvelope"},
@@ -492,6 +493,7 @@ func TestToolDispatchBoundaryFailsClosed(t *testing.T) {
 // type runInteractionRequester struct
 // return requester.run.Interact(ctx, request)
 // NewToolStartedOccurrence(
+// NewToolTerminalOccurrence(
 // occurrence.Encode()
 // dispatcher.Dispatch(ctx, scope, call, reporter)
 `,
@@ -503,8 +505,16 @@ func TestToolDispatchBoundaryFailsClosed(t *testing.T) {
 // MaximumToolStartedOccurrenceBytes = 4096
 // func DecodeToolStartedOccurrence(
 `,
+		"agent/tool_terminal.go": `package agent
+// ToolTerminalOccurrenceVersion = "spice.agent.tool-terminal/v1alpha1"
+// MaximumToolTerminalOccurrenceBytes = 1024
+// func DecodeToolTerminalOccurrence(
+// kind == event.ToolCompleted || kind == event.ToolFailed
+`,
 		"daemon/grpcserver/stream_events.go": `package grpcserver
-// agent.DecodeToolStartedOccurrence(envelope.Data())
+// agent.DecodeToolStartedOccurrence(payload)
+// agent.DecodeToolTerminalOccurrence(kind, payload)
+// problem = "tool execution failed"
 // CallID string ` + "`json:\"call_id\"`" + `
 // Name   string ` + "`json:\"name\"`" + `
 `,
@@ -530,6 +540,16 @@ func TestToolDispatchBoundaryFailsClosed(t *testing.T) {
 	if err := checkToolDispatchBoundary(root); err != nil {
 		t.Fatal(err)
 	}
+	writeGateFile(t, root, "agent/tool_terminal.go", "package agent\n")
+	if err := checkToolDispatchBoundary(root); err == nil || !strings.Contains(err.Error(), "ToolTerminalOccurrenceVersion") {
+		t.Fatalf("missing typed tool terminal occurrence = %v", err)
+	}
+	writeGateFile(t, root, "agent/tool_terminal.go", `package agent
+// ToolTerminalOccurrenceVersion = "spice.agent.tool-terminal/v1alpha1"
+// MaximumToolTerminalOccurrenceBytes = 1024
+// func DecodeToolTerminalOccurrence(
+// kind == event.ToolCompleted || kind == event.ToolFailed
+`)
 	writeGateFile(t, root, "agent/prepared_execution.go", "package agent\n")
 	if err := checkToolDispatchBoundary(root); err == nil || !strings.Contains(err.Error(), "runInteractionRequester") {
 		t.Fatalf("missing run-owned interaction requester = %v", err)

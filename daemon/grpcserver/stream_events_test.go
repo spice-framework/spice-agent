@@ -49,9 +49,16 @@ func TestEventToWirePreservesEveryEnvelopeKind(t *testing.T) {
 	for index, kind := range kinds {
 		payload := []byte(`{"index":1}`)
 		expectedPayload := payload
-		if kind == event.ToolStarted {
+		switch kind {
+		case event.ToolStarted:
 			payload = toolStartedEventPayload(t)
 			expectedPayload = []byte(`{"call_id":"call","name":"read"}`)
+		case event.ToolCompleted:
+			payload = toolTerminalEventPayload(t, kind, "", "")
+			expectedPayload = []byte(`{"call_id":"call","name":"read","error":""}`)
+		case event.ToolFailed:
+			payload = toolTerminalEventPayload(t, kind, tool.ExecutionDefinitive, tool.RetryAllowed)
+			expectedPayload = []byte(`{"call_id":"call","name":"read","error":"tool execution failed","outcome":"definitive","retry":"allowed"}`)
 		}
 		envelope := eventEnvelope(t, uint64(index+1), kind, payload)
 		wire, err := eventToWire(envelope)
@@ -63,6 +70,46 @@ func TestEventToWirePreservesEveryEnvelopeKind(t *testing.T) {
 			wire.GetTerminal() != envelope.Terminal() || wire.GetKind() == enginev1.EventKind_EVENT_KIND_UNSPECIFIED {
 			t.Fatalf("lossy %s conversion: %#v", kind, wire)
 		}
+	}
+}
+
+func TestEventToWireRejectsCorruptToolTerminalAndProjectsOnlyLegacySafeFields(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name     string
+		kind     event.Kind
+		outcome  tool.ExecutionState
+		retry    tool.RetryDisposition
+		expected string
+	}{
+		{name: "completed", kind: event.ToolCompleted, expected: `{"call_id":"call","name":"read","error":""}`},
+		{
+			name: "failed", kind: event.ToolFailed, outcome: tool.ExecutionUncertain, retry: tool.RetryNever,
+			expected: `{"call_id":"call","name":"read","error":"tool execution failed","outcome":"uncertain","retry":"never"}`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			payload := toolTerminalEventPayload(t, test.kind, test.outcome, test.retry)
+			wire, err := eventToWire(eventEnvelope(t, 1, test.kind, payload))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(wire.GetPayloadJson()) != test.expected || strings.Contains(string(wire.GetPayloadJson()), "SECRET") {
+				t.Fatalf("legacy tool-terminal projection = %s", wire.GetPayloadJson())
+			}
+			otherKind := event.ToolCompleted
+			if test.kind == event.ToolCompleted {
+				otherKind = event.ToolFailed
+			}
+			if _, err = eventToWire(eventEnvelope(t, 2, otherKind, payload)); err == nil {
+				t.Fatal("mismatched terminal occurrence kind succeeded")
+			}
+		})
+	}
+	legacy := []byte(`{"call_id":"call","name":"read","error":"SECRET"}`)
+	if _, err := eventToWire(eventEnvelope(t, 3, event.ToolFailed, legacy)); err == nil {
+		t.Fatal("legacy-only durable tool-terminal payload succeeded")
 	}
 }
 
@@ -104,6 +151,24 @@ func toolStartedEventPayload(t *testing.T) []byte {
 		t.Fatal(err)
 	}
 	occurrence, err := agent.NewToolStartedOccurrence("call", "read", true, true, &definition, plan, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := occurrence.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
+}
+
+func toolTerminalEventPayload(
+	t *testing.T,
+	kind event.Kind,
+	outcome tool.ExecutionState,
+	retry tool.RetryDisposition,
+) []byte {
+	t.Helper()
+	occurrence, err := agent.NewToolTerminalOccurrence(kind, "call", "read", outcome, retry)
 	if err != nil {
 		t.Fatal(err)
 	}

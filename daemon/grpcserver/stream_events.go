@@ -12,6 +12,7 @@ import (
 	"github.com/spice-framework/spice-agent/daemon"
 	enginev1 "github.com/spice-framework/spice-agent/engine/v1"
 	"github.com/spice-framework/spice-agent/event"
+	"github.com/spice-framework/spice-agent/tool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -324,10 +325,18 @@ func eventToWire(envelope event.Envelope) (*enginev1.RunEvent, error) {
 }
 
 func eventPayloadToWire(envelope event.Envelope) ([]byte, error) {
-	if envelope.Kind() != event.ToolStarted {
+	switch envelope.Kind() {
+	case event.ToolStarted:
+		return toolStartedPayloadToWire(envelope.Data())
+	case event.ToolCompleted, event.ToolFailed:
+		return toolTerminalPayloadToWire(envelope.Kind(), envelope.Data())
+	default:
 		return envelope.Data(), nil
 	}
-	occurrence, err := agent.DecodeToolStartedOccurrence(envelope.Data())
+}
+
+func toolStartedPayloadToWire(payload json.RawMessage) ([]byte, error) {
+	occurrence, err := agent.DecodeToolStartedOccurrence(payload)
 	if err != nil {
 		return nil, errors.New("tool started event payload is invalid")
 	}
@@ -337,6 +346,31 @@ func eventPayloadToWire(envelope event.Envelope) ([]byte, error) {
 	}{CallID: string(occurrence.CallID()), Name: occurrence.Name()})
 	if err != nil {
 		return nil, errors.New("encode legacy tool started event payload")
+	}
+	return legacy, nil
+}
+
+func toolTerminalPayloadToWire(kind event.Kind, payload json.RawMessage) ([]byte, error) {
+	occurrence, err := agent.DecodeToolTerminalOccurrence(kind, payload)
+	if err != nil {
+		return nil, errors.New("tool terminal event payload is invalid")
+	}
+	problem := ""
+	if kind == event.ToolFailed {
+		problem = "tool execution failed"
+	}
+	legacy, err := json.Marshal(struct {
+		CallID  string                `json:"call_id"`
+		Name    string                `json:"name"`
+		Error   string                `json:"error"`
+		Outcome tool.ExecutionState   `json:"outcome,omitempty"`
+		Retry   tool.RetryDisposition `json:"retry,omitempty"`
+	}{
+		CallID: string(occurrence.CallID()), Name: occurrence.Name(), Error: problem,
+		Outcome: occurrence.ExecutionState(), Retry: occurrence.RetryDisposition(),
+	})
+	if err != nil {
+		return nil, errors.New("encode legacy tool terminal event payload")
 	}
 	return legacy, nil
 }

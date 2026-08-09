@@ -40,6 +40,11 @@ bounded, secret-free definition and exact plan/workspace facts. Corrupt,
 unknown, duplicate, missing, or oversized occurrence payloads fail closed, and
 an unknown model tool cannot reach a guard or executable. The current daemon
 wire remains intentionally compatible by projecting only `call_id` and `name`.
+Each `ToolCompleted` or `ToolFailed` now closes that start with a strict typed,
+bounded, secret-free terminal occurrence. Its event kind and correlation are
+validated, optional execution state/retry facts remain typed, and exactly-one
+ledger tests prove no started call is left ambiguously closed. The daemon keeps
+the legacy terminal shape using a fixed safe failure problem.
 
 ## Current Phase 5 boundary
 

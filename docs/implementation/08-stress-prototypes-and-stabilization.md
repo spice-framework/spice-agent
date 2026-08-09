@@ -28,7 +28,10 @@ informs policy but does not become enforcement by itself.
 Build an observer/snapshot extension that records events durably, marks crashes,
 restores safe snapshots, branches history, and refuses to replay uncertain
 mutating operations. It must exercise required-observer backpressure and
-durability failure without changing kernel storage policy.
+durability failure without changing kernel storage policy. Core now supplies
+strict versioned secret-free start and terminal occurrences, so the recorder can
+distinguish a correlated close from a crash-interrupted open operation without
+parsing private maps or persisting free-form tool errors.
 
 ### Alternate client and rich companion
 

@@ -58,6 +58,14 @@ older cursors fail explicitly with the snapshot sequence as the recovery cursor.
 The plan ID records immutable host identity; successful resume requires a real
 live lease and never treats serialized identity as a process handle.
 
+Durable recorders classify tool operation state from the versioned local
+occurrences in RFC 0002. A `ToolStarted` without one correlated
+`ToolCompleted`/`ToolFailed` occurrence is open or crash-interrupted; it is not
+silently treated as failed. Terminal occurrence data is bounded and secret-free
+and retains safe typed uncertain/retry facts when the dispatcher supplied them.
+This makes crash-marker and uncertain-operation decisions possible without
+persisting executable arguments, tool output, or free-form failure text.
+
 Convenience engine constructors intentionally leave snapshot compatibility
 empty. Their runs support local suspend/resume and deterministic export for
 inspection, but another engine refuses import. Generated applications must set

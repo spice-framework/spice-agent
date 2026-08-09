@@ -57,6 +57,11 @@ Before guard entry, the engine commits the strict agent-owned typed
 workspace authority plus bounded definition security facts, never executable
 arguments. An undeclared model tool records false/false declaration facts and
 fails before any guard or base dispatcher.
+Every started call then closes with the strict typed terminal occurrence from
+RFC 0002. It preserves correlation, terminal kind, and optional safe execution
+state/retry facts without output, problem text, paths, or recovered errors.
+Guard denial, interaction cancellation, panic, and dispatcher failure all flow
+through that same engine-owned close path.
 
 ## Workspace and snapshot compatibility
 
@@ -82,4 +87,4 @@ ordering, exact plan binding, workspace-bound resume, cancellation, denial,
 panic secrecy, re-entry, retained and double continuation use, forged results,
 concurrency, requester delegation/substitution, interaction terminal ordering,
 pending-interaction snapshot refusal, cancellation join, deterministic snapshot
-round trips, and engine-owned terminals.
+round trips, strict start-to-terminal correlation, and engine-owned terminals.

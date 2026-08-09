@@ -369,17 +369,16 @@ func TestToolPanicIsSecretSafeAndTerminalRemainsEngineOwned(t *testing.T) {
 	if countKinds(events)[event.RunFailed] != 1 {
 		t.Fatal("run failure terminal was not committed")
 	}
-	var payload struct {
-		CallID string `json:"call_id"`
-		Name   string `json:"name"`
-		Error  string `json:"error"`
+	payload := json.RawMessage(eventData(t, events, event.ToolFailed))
+	if bytes.Contains(payload, []byte("sensitive")) || bytes.Contains(payload, []byte(`"error"`)) {
+		t.Fatalf("tool panic leaked problem text = %s", payload)
 	}
-	if err := json.Unmarshal([]byte(eventData(t, events, event.ToolFailed)), &payload); err != nil {
+	occurrence, err := agent.DecodeToolTerminalOccurrence(event.ToolFailed, payload)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if payload.CallID != string(call.ID()) || payload.Name != call.Name() ||
-		payload.Error != "tool \"read\" dispatch panicked" || strings.Contains(payload.Error, "sensitive") {
-		t.Fatalf("bounded tool failure payload = %#v", payload)
+	if occurrence.CallID() != call.ID() || occurrence.Name() != call.Name() || occurrence.Kind() != event.ToolFailed {
+		t.Fatalf("bounded tool failure occurrence = %#v", occurrence)
 	}
 	if _, err := run.ExportSnapshot(); err == nil || !strings.Contains(err.Error(), "uncertain tool calls") {
 		t.Fatalf("unsafe snapshot = %v", err)

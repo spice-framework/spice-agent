@@ -13,7 +13,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unicode/utf8"
 
 	"github.com/spice-framework/spice-agent/event"
 	"github.com/spice-framework/spice-agent/interaction"
@@ -991,14 +990,6 @@ type modelFailedPayload struct {
 	Metadata     []modelMetadataPayload `json:"metadata,omitempty"`
 }
 
-type toolTerminalPayload struct {
-	CallID  string                `json:"call_id"`
-	Name    string                `json:"name"`
-	Error   string                `json:"error"`
-	Outcome tool.ExecutionState   `json:"outcome,omitempty"`
-	Retry   tool.RetryDisposition `json:"retry,omitempty"`
-}
-
 func (engine *Engine) filterMetadata(metadata []model.Metadata) []modelMetadataPayload {
 	byNamespace := make(map[string]modelMetadataPayload, len(metadata))
 	for _, value := range metadata {
@@ -1071,12 +1062,15 @@ func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, 
 			return errors.Join(dispatchErr, emitter.toolFailure(ctx, call, dispatchErr))
 		}
 		terminalKind := event.ToolCompleted
-		problem, failed := result.Problem()
+		_, failed := result.Problem()
 		if failed {
 			terminalKind = event.ToolFailed
 		}
-		payload := toolTerminalPayload{CallID: string(call.ID()), Name: call.Name(), Error: problem}
-		if err = emitter.toolTerminal(ctx, terminalKind, payload); err != nil {
+		occurrence, occurrenceErr := NewToolTerminalOccurrence(terminalKind, call.ID(), call.Name(), "", "")
+		if occurrenceErr != nil {
+			return occurrenceErr
+		}
+		if err = emitter.toolTerminal(ctx, occurrence); err != nil {
 			return err
 		}
 		part, partErr := message.ToolResult(string(call.ID()), call.Name(), result.Content())
@@ -1405,54 +1399,33 @@ func (emitter *runEmitter) turnFailure(ctx context.Context, err error) error {
 }
 
 func (emitter *runEmitter) toolFailure(ctx context.Context, call tool.Call, err error) error {
-	payload := toolTerminalPayload{
-		CallID: string(call.ID()),
-		Name:   call.Name(),
-		Error:  boundedToolFailureMessage(err),
-	}
+	var outcome tool.ExecutionState
+	var retry tool.RetryDisposition
 	if failure, typed := errors.AsType[*tool.ExecutionError](err); typed && failure != nil &&
 		failure.Validate() == nil && failure.CallID() == call.ID() {
-		payload.Outcome = failure.State()
-		payload.Retry = failure.RetryDisposition()
+		outcome = failure.State()
+		retry = failure.RetryDisposition()
 	}
-	finalizationContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), emitter.engine.finalizationTimeout)
-	defer cancel()
-	if persistErr := emitter.persist(finalizationContext, event.ToolFailed, payload); persistErr != nil {
-		return &DurabilityError{Kind: event.ToolFailed, Cause: persistErr}
+	occurrence, occurrenceErr := NewToolTerminalOccurrence(
+		event.ToolFailed, call.ID(), call.Name(), outcome, retry,
+	)
+	if occurrenceErr != nil {
+		return occurrenceErr
 	}
-	return nil
+	return emitter.toolTerminal(ctx, occurrence)
 }
 
-func (emitter *runEmitter) toolTerminal(
-	ctx context.Context,
-	kind event.Kind,
-	payload toolTerminalPayload,
-) error {
-	finalizationContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), emitter.engine.finalizationTimeout)
-	defer cancel()
-	if persistErr := emitter.persist(finalizationContext, kind, payload); persistErr != nil {
-		return &DurabilityError{Kind: kind, Cause: persistErr}
-	}
-	return nil
-}
-
-func boundedToolFailureMessage(err error) string {
-	message := "tool execution failed"
+func (emitter *runEmitter) toolTerminal(ctx context.Context, occurrence ToolTerminalOccurrence) error {
+	payload, err := occurrence.Encode()
 	if err != nil {
-		candidate := strings.TrimSpace(strings.ToValidUTF8(err.Error(), "\uFFFD"))
-		if candidate != "" {
-			message = candidate
-		}
+		return err
 	}
-	if len(message) <= tool.MaximumExecutionErrorBytes {
-		return message
+	finalizationContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), emitter.engine.finalizationTimeout)
+	defer cancel()
+	if persistErr := emitter.persist(finalizationContext, occurrence.Kind(), payload); persistErr != nil {
+		return &DurabilityError{Kind: occurrence.Kind(), Cause: persistErr}
 	}
-	const suffix = "..."
-	cutoff := tool.MaximumExecutionErrorBytes - len(suffix)
-	for cutoff > 0 && !utf8.ValidString(message[:cutoff]) {
-		cutoff--
-	}
-	return message[:cutoff] + suffix
+	return nil
 }
 
 func (emitter *runEmitter) modelFailure(ctx context.Context, err error) error {

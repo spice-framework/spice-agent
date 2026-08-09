@@ -30,8 +30,10 @@ round-trip, and deterministic replay tests. **Status:** in progress.
   distinct from bounded, call-correlated infrastructure failures. Typed
   failures preserve cancellation, distinguish definitive from uncertain
   mutation outcomes, and cannot carry unsafe retry advice. Execution errors
-  must be direct typed values rather than wrappers or joins. Tool-failure events
-  retain bounded call, name, outcome, and retry correlation. A valid successful
+  must be direct typed values rather than wrappers or joins. Tool terminal
+  events use a strict versioned occurrence retaining bounded call, name, kind,
+  outcome, and retry correlation while structurally excluding result output,
+  problem/error text, paths, and secrets. A valid successful
   result wins a concurrent cancellation after tool commit; a cancellation
   sentinel returned while the run context is active remains a run failure.
   Simultaneous execution and reporter failures retain the authoritative typed
@@ -44,6 +46,11 @@ round-trip, and deterministic replay tests. **Status:** in progress.
   Unknown model tool names commit a false/false occurrence and fail before
   guard or tool execution. Daemon `engine/v1` continues to expose only the
   legacy `call_id` and `name` projection.
+- Every `ToolCompleted` and `ToolFailed` event is a strict agent-owned 1 KiB
+  terminal occurrence. Its kind must match the event, each open call closes
+  exactly once, and optional execution-state/retry facts are validated as one
+  pair. The daemon retains the legacy terminal JSON using an empty completion
+  error or fixed safe failure problem rather than exposing local error text.
 - Each run owns a count-and-encoded-byte-bounded authoritative event log.
   `Subscribe(ctx, afterSequence)` creates an independent gap-free replay/tail
   cursor. Typed out-of-range and resource-exhaustion errors provide recovery

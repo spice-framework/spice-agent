@@ -252,20 +252,18 @@ func TestEngineDistinguishesModelVisibleToolProblemsFromExecutionFailures(t *tes
 		if counts[event.ToolFailed] != 1 || counts[event.RunFailed] != 1 || counts[event.RunCompleted] != 0 {
 			t.Fatalf("event counts = %v", counts)
 		}
-		var payload struct {
-			CallID  string                `json:"call_id"`
-			Name    string                `json:"name"`
-			Error   string                `json:"error"`
-			Outcome tool.ExecutionState   `json:"outcome"`
-			Retry   tool.RetryDisposition `json:"retry"`
+		payload := json.RawMessage(eventData(t, events, event.ToolFailed))
+		if bytes.Contains(payload, []byte("tool host unavailable")) || bytes.Contains(payload, []byte(`"error"`)) {
+			t.Fatalf("tool failure leaked problem text = %s", payload)
 		}
-		if err = json.Unmarshal([]byte(eventData(t, events, event.ToolFailed)), &payload); err != nil {
+		occurrence, err := agent.DecodeToolTerminalOccurrence(event.ToolFailed, payload)
+		if err != nil {
 			t.Fatal(err)
 		}
-		if payload.CallID != string(call.ID()) || payload.Name != call.Name() ||
-			payload.Error != "tool host unavailable" || payload.Outcome != tool.ExecutionDefinitive ||
-			payload.Retry != tool.RetryAllowed {
-			t.Fatalf("tool failure payload = %#v", payload)
+		if occurrence.CallID() != call.ID() || occurrence.Name() != call.Name() ||
+			occurrence.Kind() != event.ToolFailed || occurrence.ExecutionState() != tool.ExecutionDefinitive ||
+			occurrence.RetryDisposition() != tool.RetryAllowed {
+			t.Fatalf("tool failure occurrence = %#v", occurrence)
 		}
 		if len(provider.requests) != 1 {
 			t.Fatalf("provider request count = %d", len(provider.requests))
@@ -327,15 +325,16 @@ func TestToolExecutionAndReporterDurabilityFailuresRemainStructured(t *testing.T
 		counts[event.RunFailed] != 1 || counts[event.RunCancelled] != 0 {
 		t.Fatalf("combined failure terminals = %v", counts)
 	}
-	var payload struct {
-		Outcome tool.ExecutionState   `json:"outcome"`
-		Retry   tool.RetryDisposition `json:"retry"`
+	payload := json.RawMessage(eventData(t, events, event.ToolFailed))
+	if bytes.Contains(payload, []byte("commit acknowledgement lost")) {
+		t.Fatalf("uncertain terminal leaked problem text = %s", payload)
 	}
-	if err = json.Unmarshal([]byte(eventData(t, events, event.ToolFailed)), &payload); err != nil {
+	occurrence, err := agent.DecodeToolTerminalOccurrence(event.ToolFailed, payload)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if payload.Outcome != tool.ExecutionUncertain || payload.Retry != tool.RetryNever {
-		t.Fatalf("uncertain terminal metadata = %#v", payload)
+	if occurrence.ExecutionState() != tool.ExecutionUncertain || occurrence.RetryDisposition() != tool.RetryNever {
+		t.Fatalf("uncertain terminal metadata = %#v", occurrence)
 	}
 }
 

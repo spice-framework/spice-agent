@@ -78,6 +78,12 @@ provider payloads, and secrets cannot enter this durable record. Unknown model
 tool names fail before guard or executable dispatch. The current daemon wire
 retains its legacy `call_id`/`name` projection.
 
+Tool completion and failure events use a second strict versioned occurrence
+that closes the call with identity, name, exact terminal kind, and optional safe
+execution-state/retry facts. It cannot contain result output, problem/error
+text, paths, or secrets. Daemon clients retain their legacy payload through an
+explicit projection with a fixed safe failure message.
+
 The production runtime-plugin host merges a complete authenticated runtime-tool
 set with the compiled Spice dispatcher and atomically publishes it for future
 runs. Existing runs retain their exact generation. Candidate crashes fail new

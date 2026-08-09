@@ -32,11 +32,6 @@ Run/Turn/Model/Tool/Interaction Started event receives exactly one matching
 Completed, Failed, or Cancelled terminal. Cancellation preserves history and no
 replay or import operation renumbers committed events.
 
-Tool infrastructure failures carry a tool-specific payload with the active
-call ID, canonical tool name, bounded error text, and—when supplied by a valid
-typed execution failure—its definitive/uncertain outcome and retry disposition.
-This correlation is retained even when execution terminates the turn and run.
-
 `ToolStarted` uses the agent-owned
 `spice.agent.tool-started/v1alpha1` occurrence encoding. It records only call
 identity, declared/executable status, definition fingerprint, effect,
@@ -49,6 +44,19 @@ false/false start occurrence and then fails before any guard or executable is
 entered. The current daemon protocol deliberately projects this richer local
 event to its legacy `call_id` and `name` JSON until a future additive wire
 contract is reviewed.
+
+Both tool terminal kinds use the agent-owned
+`spice.agent.tool-terminal/v1alpha1` occurrence encoding. It closes one start
+with the call ID, canonical name, exact `tool.completed` or `tool.failed` kind,
+and an optional complete validated definitive/uncertain outcome and retry pair.
+Completed occurrences cannot carry failure metadata. The strict 1 KiB decoder
+accepts exactly `ToolCompleted` and `ToolFailed`, binds the encoded kind to the
+owning event kind, and rejects missing, unknown, duplicate, corrupt, trailing,
+or oversized data. Tool output, model-visible problems, free-form errors,
+arguments, paths, and secrets are structurally absent. The daemon preserves its
+existing client contract by projecting completed events with an empty error and
+failed events with the fixed safe problem `tool execution failed`, plus safe
+typed outcome/retry values when present.
 
 ## Authoritative replay
 
@@ -95,7 +103,8 @@ private fields.
 ## Acceptance
 
 Table, race, and fuzz tests cover message immutability, malformed stream unions,
-typed tool-start corruption and secret exclusion, unknown model tools, partial
+typed tool-start and tool-terminal corruption, correlation, secret exclusion,
+unknown model tools, exactly-one open-to-terminal ledger closure, partial
 failures, all lifecycle terminals, required-observer partial failure, retention
 boundaries, cursor recovery, slow consumers, cancellation, shutdown, and
 byte-identical event reconstruction.
