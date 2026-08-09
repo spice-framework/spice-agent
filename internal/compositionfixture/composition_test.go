@@ -39,6 +39,9 @@ func TestGeneratedCompositionSelectsAndOrdersExactInterfaceBeans(t *testing.T) {
 	if selected := proof.AliasSelectedName(); selected != "read" {
 		t.Fatalf("alias-selected tool = %q, want read", selected)
 	}
+	if guardCalls, dispatchErr := proof.DispatchProof(context.Background()); dispatchErr != nil || guardCalls != 1 {
+		t.Fatalf("generated guard dispatch = %d, %v", guardCalls, dispatchErr)
+	}
 	if events := proof.CleanupEvents(); len(events) != 0 {
 		t.Fatalf("cleanup before stop = %v", events)
 	}

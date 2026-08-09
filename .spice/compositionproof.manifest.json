@@ -10,7 +10,7 @@
   },
   "generator_version": "0.1.0-dev",
   "go_format_line": "1.26",
-  "input_sha256": "sha256:e8a791a1abcb68536e0dcea5bf812563d3de358c9ac025cc9bdb1b7a4989e7c3",
+  "input_sha256": "sha256:6a0878bc0e60f7fd02ef9e4d50c08218b022d574aaa829666c13aad365c943d4",
   "files": [
     {
       "path": "internal/spicegen/compositionproof/sources/internal_/compositionfixture/application_spice_gen.go",
@@ -72,11 +72,11 @@
     },
     {
       "path": "internal/spicegen/compositionproof/sources/internal_/compositionfixture/proof_spice_gen.go",
-      "sha256": "sha256:9cd467516e74dc7290a432ca6578bb9221db385a915c8691d0e0856dc9c04a32",
+      "sha256": "sha256:597149b89218700645a7f1101a27942d4475b6092d1512b13c628ac0ecce3a80",
       "role": "source-unit",
       "primary_source": {
         "path": "internal/compositionfixture/proof.go",
-        "line": 24,
+        "line": 32,
         "column": 4,
         "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|8:NewProof"
       },
@@ -86,14 +86,14 @@
           "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|8:NewProof",
           "source": {
             "path": "internal/compositionfixture/proof.go",
-            "line": 24,
+            "line": 32,
             "column": 4,
             "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|8:NewProof"
           },
           "generated": {
-            "start_line": 13,
+            "start_line": 14,
             "start_column": 4,
-            "end_line": 13,
+            "end_line": 14,
             "end_column": 27
           }
         }
@@ -255,13 +255,13 @@
     },
     {
       "path": "internal/spicegen/compositionproof/sources/internal_/compositionfixture/tools_spice_gen.go",
-      "sha256": "sha256:5426692368878ffb1bf57210f53538e6e32bfaa15297d9ec72cf9fae2f5e2527",
+      "sha256": "sha256:146965dc788e7d4b8a36e40d67d4390ff23beba5dab04b0b9da9fbbf773a4117",
       "role": "source-unit",
       "primary_source": {
         "path": "internal/compositionfixture/tools.go",
-        "line": 52,
+        "line": 23,
         "column": 4,
-        "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|11:NewReadTool"
+        "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|19:NewDispatchGuardLog"
       },
       "mappings": [
         {
@@ -269,14 +269,14 @@
           "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|11:NewReadTool",
           "source": {
             "path": "internal/compositionfixture/tools.go",
-            "line": 52,
+            "line": 86,
             "column": 4,
             "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|11:NewReadTool"
           },
           "generated": {
-            "start_line": 16,
+            "start_line": 19,
             "start_column": 4,
-            "end_line": 16,
+            "end_line": 19,
             "end_column": 26
           }
         },
@@ -285,22 +285,54 @@
           "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|12:NewWriteTool",
           "source": {
             "path": "internal/compositionfixture/tools.go",
-            "line": 66,
+            "line": 100,
             "column": 4,
             "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|12:NewWriteTool"
           },
           "generated": {
-            "start_line": 27,
+            "start_line": 30,
             "start_column": 4,
-            "end_line": 27,
+            "end_line": 30,
             "end_column": 27
+          }
+        },
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|19:NewDispatchGuardLog",
+          "source": {
+            "path": "internal/compositionfixture/tools.go",
+            "line": 23,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|19:NewDispatchGuardLog"
+          },
+          "generated": {
+            "start_line": 41,
+            "start_column": 4,
+            "end_line": 41,
+            "end_column": 38
+          }
+        },
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|23:NewFixtureDispatchGuard",
+          "source": {
+            "path": "internal/compositionfixture/tools.go",
+            "line": 42,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|23:NewFixtureDispatchGuard"
+          },
+          "generated": {
+            "start_line": 48,
+            "start_column": 4,
+            "end_line": 48,
+            "end_column": 42
           }
         }
       ]
     },
     {
       "path": "internal/spicegen/compositionproof/spice_assembly_gen.go",
-      "sha256": "sha256:26c7f3d349676ebdad2d7e1b1f0e2dd3eb4f5726d149ca6e1585c808e8bca15e",
+      "sha256": "sha256:747b397559ac9b41fabe14684421bd0ae41b17a52e5eea00e1a6bf04368dc887",
       "role": "target-assembly",
       "related_sources": [
         {
@@ -317,7 +349,7 @@
         },
         {
           "path": "internal/compositionfixture/proof.go",
-          "line": 24,
+          "line": 32,
           "column": 4,
           "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|8:NewProof"
         },
@@ -371,13 +403,25 @@
         },
         {
           "path": "internal/compositionfixture/tools.go",
-          "line": 52,
+          "line": 23,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|19:NewDispatchGuardLog"
+        },
+        {
+          "path": "internal/compositionfixture/tools.go",
+          "line": 42,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|23:NewFixtureDispatchGuard"
+        },
+        {
+          "path": "internal/compositionfixture/tools.go",
+          "line": 86,
           "column": 4,
           "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|11:NewReadTool"
         },
         {
           "path": "internal/compositionfixture/tools.go",
-          "line": 66,
+          "line": 100,
           "column": 4,
           "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|12:NewWriteTool"
         }
@@ -411,7 +455,7 @@
     },
     {
       "path": "internal/spicegen/compositionproof/spice_contracts_gen.go",
-      "sha256": "sha256:a55f82096d7a7f573418b0147e528f91a13820ee360380358bd05c102e8e0f0d",
+      "sha256": "sha256:a8ed0db5d055a7b39d1a5667c17386c855595905fef8bb680f44b4057bce36e9",
       "role": "target-contracts",
       "related_sources": [
         {
@@ -428,7 +472,7 @@
         },
         {
           "path": "internal/compositionfixture/proof.go",
-          "line": 24,
+          "line": 32,
           "column": 4,
           "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|8:NewProof"
         },
@@ -482,13 +526,25 @@
         },
         {
           "path": "internal/compositionfixture/tools.go",
-          "line": 52,
+          "line": 23,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|19:NewDispatchGuardLog"
+        },
+        {
+          "path": "internal/compositionfixture/tools.go",
+          "line": 42,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|23:NewFixtureDispatchGuard"
+        },
+        {
+          "path": "internal/compositionfixture/tools.go",
+          "line": 86,
           "column": 4,
           "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|11:NewReadTool"
         },
         {
           "path": "internal/compositionfixture/tools.go",
-          "line": 66,
+          "line": 100,
           "column": 4,
           "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|12:NewWriteTool"
         }
@@ -509,7 +565,7 @@
     },
     {
       "path": "internal/spicegen/compositionproof/spice_providers_gen.go",
-      "sha256": "sha256:5b0d614ecb7453297b2e5761520bdda9c1e53ad998aba975166aca097f7e0cfb",
+      "sha256": "sha256:7a79fbbad8095ba2ffdc6136e4ca696d731771df2ac4f2575958b037b1688673",
       "role": "target-providers",
       "related_sources": [
         {
@@ -526,7 +582,7 @@
         },
         {
           "path": "internal/compositionfixture/proof.go",
-          "line": 24,
+          "line": 32,
           "column": 4,
           "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|8:NewProof"
         },
@@ -580,13 +636,25 @@
         },
         {
           "path": "internal/compositionfixture/tools.go",
-          "line": 52,
+          "line": 23,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|19:NewDispatchGuardLog"
+        },
+        {
+          "path": "internal/compositionfixture/tools.go",
+          "line": 42,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|23:NewFixtureDispatchGuard"
+        },
+        {
+          "path": "internal/compositionfixture/tools.go",
+          "line": 86,
           "column": 4,
           "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|11:NewReadTool"
         },
         {
           "path": "internal/compositionfixture/tools.go",
-          "line": 66,
+          "line": 100,
           "column": 4,
           "symbol": "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|12:NewWriteTool"
         }

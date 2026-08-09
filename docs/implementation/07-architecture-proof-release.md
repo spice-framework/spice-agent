@@ -98,6 +98,9 @@ fields with `PlanIdentity`, `ToolPlanID`, compiled executable-bean identities,
 and an explicit generated snapshot-compatibility identity. Applications that
 need cross-engine import must regenerate construction with that identity;
 convenience/default engines remain local-resume and inspection only.
+Phase 7 makes a second deliberate hard cut to `v1alpha3`, adding the workspace
+SHA-256 to `PlanIdentity`. Portable import now refuses cross-workspace authority
+before leasing a tool generation; v1alpha2 remains unsupported.
 
 ## Verification and evidence
 

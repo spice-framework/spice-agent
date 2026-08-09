@@ -43,7 +43,7 @@ provider errors, capability-aware dispatch, and phase 1 auto-configuration.
   privileges.
 - Process construction uses the public provider-neutral `process.Launcher`
   bean. Immutable specifications preserve exact argv/environment/streams and
-  declared capabilities for later permission decorators; no coding tool may
+  declared capabilities for later terminal permission guards; no coding tool may
   expose or construct `*exec.Cmd` as its public boundary.
 - Natural names such as `go` and `git`, workspace-relative executables, and
   absolute paths first use an injected `process.ExecutableResolver`. Its

@@ -332,6 +332,7 @@ func TestBlockingReleaseCannotSuppressAuthoritativeTerminal(t *testing.T) {
 	options := agent.DefaultEngineOptions()
 	options.FinalizationTimeout = 20 * time.Millisecond
 	options.SnapshotCompatibilityIdentity = testSnapshotCompatibility
+	options.WorkspaceFingerprint = testWorkspaceFingerprint
 	engine, err := agent.NewEngineWithToolPlanSource(
 		&scriptedProvider{scripts: [][]model.StreamEvent{{completed(t)}}}, source,
 		&agent.AtomicIDSource{}, time.Now, nil, nil, options,
@@ -394,6 +395,7 @@ func TestCancelledAcquisitionsReleaseBeforeStartOrResumeMutation(t *testing.T) {
 		identity, err := agent.NewPlanIdentity(
 			agent.DefaultEngineOptions().CompiledPlanIdentities,
 			testSnapshotCompatibility,
+			testWorkspaceFingerprint,
 			id,
 			empty.Definitions(),
 		)
@@ -447,7 +449,7 @@ func TestResumeSnapshotLeasesExactRecordedPlan(t *testing.T) {
 	newDispatcher, _ := stage.NewDispatcher(nil)
 	compiled := agent.DefaultEngineOptions().CompiledPlanIdentities
 	identity, err := agent.NewPlanIdentity(
-		compiled, testSnapshotCompatibility, oldID, oldDispatcher.Definitions(),
+		compiled, testSnapshotCompatibility, testWorkspaceFingerprint, oldID, oldDispatcher.Definitions(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -480,6 +482,7 @@ func TestResumeSnapshotLeasesExactRecordedPlan(t *testing.T) {
 	mismatchSource := newFakePlanSource(oldID, map[stage.PlanID]fakePlanRecord{oldID: {dispatcher: oldDispatcher}})
 	mismatchOptions := agent.DefaultEngineOptions()
 	mismatchOptions.SnapshotCompatibilityIdentity = "tests:v2"
+	mismatchOptions.WorkspaceFingerprint = testWorkspaceFingerprint
 	mismatchEngine, err := agent.NewEngineWithToolPlanSource(
 		blockingProvider{}, mismatchSource, &agent.AtomicIDSource{}, time.Now, nil, nil, mismatchOptions,
 	)
@@ -490,11 +493,26 @@ func TestResumeSnapshotLeasesExactRecordedPlan(t *testing.T) {
 		!strings.Contains(err.Error(), "compiled compatibility") || mismatchSource.generationCallCount() != 0 {
 		t.Fatalf("incompatible resume = %v, generation calls=%d", err, mismatchSource.generationCallCount())
 	}
+	workspaceMismatchSource := newFakePlanSource(oldID, map[stage.PlanID]fakePlanRecord{oldID: {dispatcher: oldDispatcher}})
+	workspaceMismatchOptions := agent.DefaultEngineOptions()
+	workspaceMismatchOptions.SnapshotCompatibilityIdentity = testSnapshotCompatibility
+	workspaceMismatchOptions.WorkspaceFingerprint = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	workspaceMismatchEngine, err := agent.NewEngineWithToolPlanSource(
+		blockingProvider{}, workspaceMismatchSource, &agent.AtomicIDSource{}, time.Now, nil, nil, workspaceMismatchOptions,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = workspaceMismatchEngine.ResumeSnapshot(t.Context(), snapshot); err == nil ||
+		!strings.Contains(err.Error(), "compiled compatibility") || workspaceMismatchSource.generationCallCount() != 0 {
+		t.Fatalf("cross-workspace resume = %v, generation calls=%d", err, workspaceMismatchSource.generationCallCount())
+	}
 	compiledMismatchSource := newFakePlanSource(
 		oldID, map[stage.PlanID]fakePlanRecord{oldID: {dispatcher: oldDispatcher}},
 	)
 	compiledMismatchOptions := agent.DefaultEngineOptions()
 	compiledMismatchOptions.SnapshotCompatibilityIdentity = testSnapshotCompatibility
+	compiledMismatchOptions.WorkspaceFingerprint = testWorkspaceFingerprint
 	compiledMismatchOptions.CompiledPlanIdentities = append(
 		compiledMismatchOptions.CompiledPlanIdentities, "tool:changed-implementation",
 	)
@@ -569,17 +587,24 @@ func TestPlanIdentityCoversCompatibilityAndAllExecutableBeanCategories(t *testin
 	compiled := []string{
 		"broker:b", "decorator:policy", "observer:o", "provider:p", "stage:s", "tool:read",
 	}
-	first, err := agent.NewPlanIdentity(compiled, "application:v1", id, nil)
+	first, err := agent.NewPlanIdentity(compiled, "application:v1", testWorkspaceFingerprint, id, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := agent.NewPlanIdentity(compiled, "application:v2", id, nil)
+	second, err := agent.NewPlanIdentity(compiled, "application:v2", testWorkspaceFingerprint, id, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if first.SnapshotCompatibilityIdentity() != "application:v1" ||
+		first.WorkspaceFingerprint() != testWorkspaceFingerprint ||
 		first.Fingerprint() == second.Fingerprint() {
 		t.Fatalf("compatibility fingerprint = %q/%q", first.Fingerprint(), second.Fingerprint())
+	}
+	otherWorkspace, err := agent.NewPlanIdentity(
+		compiled, "application:v1", "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", id, nil,
+	)
+	if err != nil || otherWorkspace.Fingerprint() == first.Fingerprint() {
+		t.Fatalf("workspace identity fingerprint = %q/%q, %v", first.Fingerprint(), otherWorkspace.Fingerprint(), err)
 	}
 }
 
@@ -638,6 +663,7 @@ func newEngineWithPlanSource(
 	t.Helper()
 	options := agent.DefaultEngineOptions()
 	options.SnapshotCompatibilityIdentity = testSnapshotCompatibility
+	options.WorkspaceFingerprint = testWorkspaceFingerprint
 	engine, err := agent.NewEngineWithToolPlanSource(
 		provider,
 		source,

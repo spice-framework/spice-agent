@@ -172,10 +172,10 @@ func TestHostRecoversCompleteSetWithDistinctGeneration(t *testing.T) {
 		}
 		defer func() { _ = lease.Release() }()
 		return lease.ToolPlanID() != oldID &&
-			dispatchHostTool(t, lease.Dispatcher(), "runtime_a") == `"second-a"` &&
-			dispatchHostTool(t, lease.Dispatcher(), "runtime_b") == `"second-b"`
+			dispatchHostTool(t, lease, "runtime_a") == `"second-a"` &&
+			dispatchHostTool(t, lease, "runtime_b") == `"second-b"`
 	})
-	if oldLease.ToolPlanID() != oldID || dispatchHostTool(t, oldLease.Dispatcher(), "runtime_b") != `"first-b"` {
+	if oldLease.ToolPlanID() != oldID || dispatchHostTool(t, oldLease, "runtime_b") != `"first-b"` {
 		t.Fatal("recovery changed the retained old generation")
 	}
 	_ = oldLease.Release()
@@ -276,7 +276,7 @@ func TestHostExplicitActivationSupersedesStaleRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 	lease, err := host.LeaseCurrent(t.Context())
-	if err != nil || lease.ToolPlanID() != newID || dispatchHostTool(t, lease.Dispatcher(), "new") != `"new"` {
+	if err != nil || lease.ToolPlanID() != newID || dispatchHostTool(t, lease, "new") != `"new"` {
 		t.Fatalf("explicit generation was superseded: %#v, %v", lease, err)
 	}
 	_ = lease.Release()
@@ -321,7 +321,7 @@ func TestHostFailedExplicitActivationRearmsPriorDesiredRecovery(t *testing.T) {
 			return false
 		}
 		defer func() { _ = lease.Release() }()
-		return lease.ToolPlanID() != oldID && dispatchHostTool(t, lease.Dispatcher(), "runtime") == `"recovered"`
+		return lease.ToolPlanID() != oldID && dispatchHostTool(t, lease, "runtime") == `"recovered"`
 	})
 	if err = host.Close(t.Context()); err != nil {
 		t.Fatal(err)
@@ -449,7 +449,7 @@ func TestHostRecoveryNeverReplaysMutatingCalls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := dispatchHostTool(t, lease.Dispatcher(), "mutate"); got != `"mutated"` {
+	if got := dispatchHostTool(t, lease, "mutate"); got != `"mutated"` {
 		t.Fatalf("mutating result = %s", got)
 	}
 	first.crash(errors.New("crash after mutation"))

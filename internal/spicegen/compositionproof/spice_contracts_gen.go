@@ -11,6 +11,7 @@ import (
 
 	compositionfixture "github.com/spice-framework/spice-agent/internal/compositionfixture"
 	spiceCompositionfixture "github.com/spice-framework/spice-agent/internal/spicegen/compositionproof/sources/internal_/compositionfixture"
+	stage "github.com/spice-framework/spice-agent/stage"
 	spicebean "github.com/spice-framework/spice/bean"
 	spiceconfig "github.com/spice-framework/spice/config"
 	spicelifecycle "github.com/spice-framework/spice/lifecycle"
@@ -41,14 +42,18 @@ type Components struct {
 	Beta compositionfixture.ProviderAlias
 	// Alpha is bean "alpha".
 	Alpha compositionfixture.ProviderAlias
+	// DispatchGuardLog is bean "dispatchGuardLog".
+	DispatchGuardLog *compositionfixture.DispatchGuardLog
 	// Fallback is bean "fallback".
 	Fallback compositionfixture.ProviderAlias
-	// Provider8 is bean "fallback-only".
-	Provider8 compositionfixture.FallbackStage
-	// Provider9 is bean "replaceable-normal".
-	Provider9 compositionfixture.ReplaceableStage
-	// Provider10 is bean "replaceable-default".
-	Provider10 compositionfixture.ReplaceableStage
+	// Provider9 is bean "fallback-only".
+	Provider9 compositionfixture.FallbackStage
+	// FixtureDispatchGuard is bean "fixtureDispatchGuard".
+	FixtureDispatchGuard stage.ToolDispatchGuard
+	// Provider11 is bean "replaceable-normal".
+	Provider11 compositionfixture.ReplaceableStage
+	// Provider12 is bean "replaceable-default".
+	Provider12 compositionfixture.ReplaceableStage
 	// Proof is bean "proof".
 	Proof *compositionfixture.Proof
 }
@@ -70,14 +75,18 @@ type BeanOverrides struct {
 	Beta spicebean.Override[compositionfixture.ProviderAlias]
 	// Alpha replaces bean "alpha".
 	Alpha spicebean.Override[compositionfixture.ProviderAlias]
+	// DispatchGuardLog replaces bean "dispatchGuardLog".
+	DispatchGuardLog spicebean.Override[*compositionfixture.DispatchGuardLog]
 	// Fallback replaces bean "fallback".
 	Fallback spicebean.Override[compositionfixture.ProviderAlias]
-	// Provider8 replaces bean "fallback-only".
-	Provider8 spicebean.Override[compositionfixture.FallbackStage]
-	// Provider9 replaces bean "replaceable-normal".
-	Provider9 spicebean.Override[compositionfixture.ReplaceableStage]
-	// Provider10 replaces bean "replaceable-default".
-	Provider10 spicebean.Override[compositionfixture.ReplaceableStage]
+	// Provider9 replaces bean "fallback-only".
+	Provider9 spicebean.Override[compositionfixture.FallbackStage]
+	// FixtureDispatchGuard replaces bean "fixtureDispatchGuard".
+	FixtureDispatchGuard spicebean.Override[stage.ToolDispatchGuard]
+	// Provider11 replaces bean "replaceable-normal".
+	Provider11 spicebean.Override[compositionfixture.ReplaceableStage]
+	// Provider12 replaces bean "replaceable-default".
+	Provider12 spicebean.Override[compositionfixture.ReplaceableStage]
 	// Proof replaces bean "proof".
 	Proof spicebean.Override[*compositionfixture.Proof]
 }
@@ -123,17 +132,23 @@ func ComposeBeanOverrides(layers ...BeanOverrideLayer) (BeanOverrides, error) {
 		if layer.Overrides.Alpha.Enabled() {
 			result.Alpha = layer.Overrides.Alpha
 		}
+		if layer.Overrides.DispatchGuardLog.Enabled() {
+			result.DispatchGuardLog = layer.Overrides.DispatchGuardLog
+		}
 		if layer.Overrides.Fallback.Enabled() {
 			result.Fallback = layer.Overrides.Fallback
-		}
-		if layer.Overrides.Provider8.Enabled() {
-			result.Provider8 = layer.Overrides.Provider8
 		}
 		if layer.Overrides.Provider9.Enabled() {
 			result.Provider9 = layer.Overrides.Provider9
 		}
-		if layer.Overrides.Provider10.Enabled() {
-			result.Provider10 = layer.Overrides.Provider10
+		if layer.Overrides.FixtureDispatchGuard.Enabled() {
+			result.FixtureDispatchGuard = layer.Overrides.FixtureDispatchGuard
+		}
+		if layer.Overrides.Provider11.Enabled() {
+			result.Provider11 = layer.Overrides.Provider11
+		}
+		if layer.Overrides.Provider12.Enabled() {
+			result.Provider12 = layer.Overrides.Provider12
 		}
 		if layer.Overrides.Proof.Enabled() {
 			result.Proof = layer.Overrides.Proof

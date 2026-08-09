@@ -262,7 +262,7 @@ func TestSuspendResumeAndSnapshotImportPreserveRunIdentity(t *testing.T) {
 	if err := enginev1.ValidateResumeRunRequest(&enginev1.ResumeRunRequest{}, protocolLimits()); err == nil {
 		t.Fatal("unowned resume succeeded")
 	}
-	payload := []byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"run-1"}`)
+	payload := []byte(`{"version":"spice.agent.snapshot/v1alpha3","run_id":"run-1"}`)
 	snapshot, err := enginev1.NewSnapshotEnvelope(
 		context.Background(), snapshotAuthority(t),
 		"run-1", 7, enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED, payload,

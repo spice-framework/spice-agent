@@ -9,12 +9,15 @@ multiple implementations demonstrate a generic need.
 
 ## Phase 7 stress prototypes
 
-### Permission decorator
+### Permission guard
 
-Build an optional dispatcher decorator that observes and can deny every compiled
-and runtime tool execution. It must prove there is no bypass around canonical
-dispatch, including retries, interactions, and plugin generations. Capability
-metadata informs policy but does not become enforcement by itself.
+Build an optional `stage.ToolDispatchGuard` that observes and can deny every
+compiled and runtime tool execution through RFC 0009. The generic immutable
+scope, exact-plan binding, generated collection injection, and terminal guard
+ordering are implemented in core; no external policy is installed by default.
+The prototype must prove there is no bypass around canonical dispatch,
+including retries, interactions, and plugin generations. Capability metadata
+informs policy but does not become enforcement by itself.
 
 ### SQLite recorder/restorer
 

@@ -286,7 +286,7 @@ func TestStaleInteractionResponseFailsBeforePayloadAcceptance(t *testing.T) {
 
 func TestSnapshotDigestLifecycleAndImportSafety(t *testing.T) {
 	t.Parallel()
-	payload := []byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"run-1"}`)
+	payload := []byte(`{"version":"spice.agent.snapshot/v1alpha3","run_id":"run-1"}`)
 	snapshot, err := enginev1.NewSnapshotEnvelope(
 		context.Background(),
 		snapshotAuthority(t),

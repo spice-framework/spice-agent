@@ -793,6 +793,49 @@ func checkArchitecture(root string) error {
 				}
 			}
 		}
+		if relative != "stage/plan.go" && bytes.Contains(content, []byte("ApplyToolDispatchDecorators(")) {
+			return fmt.Errorf("%s bypasses terminal tool dispatch pipeline composition", relative)
+		}
+	}
+	if _, statErr := os.Stat(filepath.Join(root, "go.mod")); statErr == nil {
+		return checkToolDispatchBoundary(root)
+	}
+	return nil
+}
+
+func checkToolDispatchBoundary(root string) error {
+	required := []struct {
+		name      string
+		fragments []string
+	}{
+		{name: "agent/agent.go", fragments: []string{
+			"stage.NewToolDispatchScope(",
+			"dispatcher.Dispatch(ctx, scope, call, reporter)",
+		}},
+		{name: "plugin/host/host.go", fragments: []string{
+			"stage.SnapshotToolDispatcher(config.Compiled)",
+			"stage.ApplyToolDispatchPipeline(base, guards, decorators)",
+			"stage.ApplyToolDispatchPipeline(merged, host.guards, host.decorators)",
+		}},
+		{name: "stage/dispatch_guard.go", fragments: []string{
+			"type ToolDispatchScope struct",
+			"type ToolDispatchGuard interface",
+			"tool dispatch continuation is closed or was already invoked",
+		}},
+		{name: "internal/spicegen/compositionproof/spice_providers_gen.go", fragments: []string{
+			"[]stage.ToolDispatchGuard{fixtureDispatchGuard}",
+		}},
+	}
+	for _, source := range required {
+		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(source.name))) // #nosec G304 -- fixed repository paths.
+		if err != nil {
+			return fmt.Errorf("tool dispatch boundary source %s: %w", source.name, err)
+		}
+		for _, fragment := range source.fragments {
+			if !bytes.Contains(content, []byte(fragment)) {
+				return fmt.Errorf("tool dispatch boundary source %s is missing %q", source.name, fragment)
+			}
+		}
 	}
 	return nil
 }

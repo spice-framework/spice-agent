@@ -444,6 +444,7 @@ func preparedResumeFixtureWithPlan(
 	identity, err := agent.NewPlanIdentity(
 		agent.DefaultEngineOptions().CompiledPlanIdentities,
 		testSnapshotCompatibility,
+		testWorkspaceFingerprint,
 		id,
 		dispatcher.Definitions(),
 	)

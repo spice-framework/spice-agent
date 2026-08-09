@@ -7,13 +7,14 @@ secrets, functions, processes, and mutable registries. Import validates schema,
 identity, monotonic sequence, and terminal state. Uncertain mutating operations
 are recorded explicitly and never replayed automatically.
 
-The `v1alpha2` snapshot is deterministic, immutable, and bounded. It contains
+The `v1alpha3` snapshot is deterministic, immutable, and bounded. It contains
 only run ID, definition identity/model/turn limit, completed turn count,
 provider-neutral message history, one combined plan identity, sorted previously
 used interaction IDs, last committed sequence, and a safe lifecycle status. The
 plan identity contains sorted compiled bean identities, the exact tool-plan ID,
-an explicit generated snapshot-compatibility identity, and a canonical
-fingerprint over all of them plus the leased tool definitions. It
+an explicit generated snapshot-compatibility identity, a canonical workspace
+SHA-256, and a canonical fingerprint over all of them plus the leased tool
+definitions. It
 never serializes providers, tools, brokers, contexts, functions, credentials,
 process handles, clients, logs, or mutable registries. Conversation content is
 application data and persistence extensions must protect it accordingly.
@@ -64,6 +65,9 @@ one semantic compatibility identity and compiled identities for every
 executable provider, stage, observer, broker, static tool, and decorator bean.
 Static compatibility mismatches are rejected before `LeaseGeneration` can
 launch or revive dynamic resources.
+Portable compatibility also requires the engine workspace fingerprint to match
+before any lease or identity mutation. `v1alpha2` lacks this authority fact and
+is deliberately rejected rather than upgraded implicitly.
 
 HMAC authority is integrity and provenance, not encryption. The OS-backed
 authority stores a random scope ID and a distinct random key separately from

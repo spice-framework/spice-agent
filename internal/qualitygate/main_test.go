@@ -480,6 +480,44 @@ var _ = pluginv1.ProtocolMajor
 	}
 }
 
+func TestToolDispatchBoundaryFailsClosed(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeGateFile(t, root, "go.mod", "module github.com/spice-framework/spice-agent\n")
+	for name, content := range map[string]string{
+		"agent/agent.go": `package agent
+// stage.NewToolDispatchScope(
+// dispatcher.Dispatch(ctx, scope, call, reporter)
+`,
+		"plugin/host/host.go": `package pluginhost
+// stage.SnapshotToolDispatcher(config.Compiled)
+// stage.ApplyToolDispatchPipeline(base, guards, decorators)
+// stage.ApplyToolDispatchPipeline(merged, host.guards, host.decorators)
+`,
+		"stage/dispatch_guard.go": `package stage
+// type ToolDispatchScope struct
+// type ToolDispatchGuard interface
+// tool dispatch continuation is closed or was already invoked
+`,
+		"internal/spicegen/compositionproof/spice_providers_gen.go": `package compositionproof
+// []stage.ToolDispatchGuard{fixtureDispatchGuard}
+`,
+	} {
+		writeGateFile(t, root, name, content)
+	}
+	if err := checkToolDispatchBoundary(root); err != nil {
+		t.Fatal(err)
+	}
+	writeGateFile(t, root, "plugin/host/host.go", "package pluginhost\n// stage.SnapshotToolDispatcher(config.Compiled)\n")
+	if err := checkToolDispatchBoundary(root); err == nil || !strings.Contains(err.Error(), "ApplyToolDispatchPipeline") {
+		t.Fatalf("missing host pipeline = %v", err)
+	}
+	writeGateFile(t, root, "other/bypass.go", "package other\nfunc x() { ApplyToolDispatchDecorators(nil, nil) }\n")
+	if err := checkArchitecture(root); err == nil || !strings.Contains(err.Error(), "bypasses terminal") {
+		t.Fatalf("decorator-only composition = %v", err)
+	}
+}
+
 func writeGateFile(t *testing.T, root, name, content string) {
 	t.Helper()
 	path := filepath.Join(root, filepath.FromSlash(name))

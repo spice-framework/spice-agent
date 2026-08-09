@@ -19,7 +19,10 @@ import (
 	"github.com/spice-framework/spice-agent/tool"
 )
 
-const testSnapshotCompatibility = "tests:v1"
+const (
+	testSnapshotCompatibility = "tests:v1"
+	testWorkspaceFingerprint  = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+)
 
 type scriptedProvider struct {
 	mu       sync.Mutex
@@ -29,6 +32,12 @@ type scriptedProvider struct {
 	closeErr error
 	recvErr  error
 	requests []model.Request
+}
+
+type engineGuardFunc func(context.Context, stage.ToolDispatchScope, tool.Definition, tool.Call, stage.ToolDispatchNext) (tool.Result, error)
+
+func (guard engineGuardFunc) Guard(ctx context.Context, scope stage.ToolDispatchScope, definition tool.Definition, call tool.Call, next stage.ToolDispatchNext) (tool.Result, error) {
+	return guard(ctx, scope, definition, call, next)
 }
 
 func (provider *scriptedProvider) Stream(ctx context.Context, request model.Request) (model.Stream, error) {
@@ -499,7 +508,7 @@ func TestEngineContainsPanicsAndAggregatesCloseError(t *testing.T) {
 		engine := newEngine(t, provider, map[string]tool.Tool{"read": testTool{panicAt: true}}, nil, nil)
 		run := startRun(t, engine, 1)
 		events := collect(t, run)
-		if err := run.Wait(t.Context()); err == nil || !strings.Contains(err.Error(), "tool \"read\" panic") {
+		if err := run.Wait(t.Context()); err == nil || !strings.Contains(err.Error(), "tool \"read\" dispatch panicked") {
 			t.Fatalf("Wait error = %v", err)
 		}
 		if countKinds(events)[event.ToolFailed] != 1 {
@@ -514,6 +523,58 @@ func TestEngineContainsPanicsAndAggregatesCloseError(t *testing.T) {
 			t.Fatalf("Wait error = %v", err)
 		}
 	})
+}
+
+func TestEngineAloneOwnsTerminalEventsForGuardFailures(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		guard stage.ToolDispatchGuard
+	}{
+		{
+			name: "denial",
+			guard: engineGuardFunc(func(context.Context, stage.ToolDispatchScope, tool.Definition, tool.Call, stage.ToolDispatchNext) (tool.Result, error) {
+				return tool.Result{}, errors.New("policy denied")
+			}),
+		},
+		{
+			name: "panic",
+			guard: engineGuardFunc(func(context.Context, stage.ToolDispatchScope, tool.Definition, tool.Call, stage.ToolDispatchNext) (tool.Result, error) {
+				panic("SECRET guard panic")
+			}),
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			call, _ := tool.NewCall("call", "read", json.RawMessage(`{}`))
+			provider := &scriptedProvider{scripts: [][]model.StreamEvent{{toolEvent(t, call), completed(t)}}}
+			base, _ := stage.NewDispatcher(map[string]tool.Tool{"read": testTool{}})
+			dispatcher, err := stage.ApplyToolDispatchPipeline(base, []stage.ToolDispatchGuard{test.guard}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			options := agent.DefaultEngineOptions()
+			options.SnapshotCompatibilityIdentity = testSnapshotCompatibility
+			options.WorkspaceFingerprint = testWorkspaceFingerprint
+			engine, err := agent.NewEngineWithOptions(provider, dispatcher, &agent.AtomicIDSource{}, time.Now, nil, nil, options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			run := startRun(t, engine, 1)
+			events := collect(t, run)
+			waitErr := run.Wait(t.Context())
+			if waitErr == nil || strings.Contains(waitErr.Error(), "SECRET") {
+				t.Fatalf("guard failure = %v", waitErr)
+			}
+			counts := countKinds(events)
+			for _, kind := range []event.Kind{event.ToolStarted, event.ToolFailed, event.TurnFailed, event.RunFailed} {
+				if counts[kind] != 1 {
+					t.Fatalf("terminal count %s = %d; all=%v", kind, counts[kind], counts)
+				}
+			}
+			if counts[event.ToolCompleted] != 0 || counts[event.RunCompleted] != 0 {
+				t.Fatalf("contradictory terminals = %v", counts)
+			}
+		})
+	}
 }
 
 func TestFirstFailedStreamItemIsObservedAndNotRetryable(t *testing.T) {
@@ -682,6 +743,15 @@ func TestEngineRejectsInvalidConstructionAndContexts(t *testing.T) {
 	if _, err := agent.NewEngineWithOptions(provider, dispatcher, ids, time.Now, nil, nil, options); err == nil {
 		t.Fatal("invalid snapshot compatibility identity succeeded")
 	}
+	options = agent.DefaultEngineOptions()
+	options.SnapshotCompatibilityIdentity = "portable:v1"
+	if _, err := agent.NewEngineWithOptions(provider, dispatcher, ids, time.Now, nil, nil, options); err == nil || !strings.Contains(err.Error(), "workspace fingerprint") {
+		t.Fatalf("portable engine without workspace fingerprint = %v", err)
+	}
+	options.WorkspaceFingerprint = "sha256:INVALID"
+	if _, err := agent.NewEngineWithOptions(provider, dispatcher, ids, time.Now, nil, nil, options); err == nil {
+		t.Fatal("invalid workspace fingerprint succeeded")
+	}
 	limited, err := agent.NewEngineWithLimits(provider, dispatcher, ids, time.Now, nil, nil, event.DefaultLogLimits())
 	if err != nil {
 		t.Fatalf("construct engine with explicit limits: %v", err)
@@ -765,6 +835,7 @@ func newEngine(t *testing.T, provider model.Provider, tools map[string]tool.Tool
 	}
 	options := agent.DefaultEngineOptions()
 	options.SnapshotCompatibilityIdentity = testSnapshotCompatibility
+	options.WorkspaceFingerprint = testWorkspaceFingerprint
 	engine, err := agent.NewEngineWithOptions(
 		provider, dispatcher, &agent.AtomicIDSource{},
 		func() time.Time { return time.Unix(1, 0).UTC() }, observers, bestEffort, options,

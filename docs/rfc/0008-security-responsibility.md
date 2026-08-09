@@ -17,10 +17,12 @@ may not imply containment that the implementation does not enforce.
 
 ## Canonical interception
 
-Every compiled or runtime tool call traverses one typed dispatcher. Definitions
+Every compiled or runtime tool call traverses one typed dispatcher and the
+terminal guard seam in RFC 0009. Definitions
 declare exact filesystem read/write, process, network, secret, and environment
-capabilities. A future permission decorator can inspect definition, call,
-workspace, run, and interaction facts and deny before execution. Tools cannot
+capabilities. A permission guard can inspect definition, call, exact leased
+plan, workspace, run, turn, and interaction facts and deny before execution.
+Tools cannot
 publish an alternate executable route or event directly.
 
 Each run uses one immutable leased definition snapshot. The guard rejects tool
@@ -96,7 +98,7 @@ retry by itself.
 ## Acceptance
 
 Security tests scan generated/release artifacts for canary secrets, prove all
-tool routes hit a dispatcher decorator, verify endpoint permissions and digest
+tool routes hit a terminal guard, verify endpoint permissions and digest
 changes, exercise process/plugin uncertain outcomes, and audit standalone module
-graphs. The phase 7 permission prototype must intercept every executable route
-without changing the kernel.
+graphs. The phase 7 permission prototype must use `ToolDispatchGuard` to
+intercept every executable route without another kernel change.

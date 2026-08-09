@@ -17,7 +17,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-const snapshotPayload = `{"version":"spice.agent.snapshot/v1alpha2","run_id":"run-1"}`
+const snapshotPayload = `{"version":"spice.agent.snapshot/v1alpha3","run_id":"run-1"}`
 
 func TestSnapshotAuthorityCanonicalGoldenAndDefensiveCopies(t *testing.T) {
 	t.Parallel()
@@ -38,7 +38,7 @@ func TestSnapshotAuthorityCanonicalGoldenAndDefensiveCopies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const expected = "a7ddca34b14c95bfa8f90bead111efa46aa97892aa7a093905e1a367fd77ebfd"
+	const expected = "05ba8690fd9c49aab5d06fda233627ef15eb12832c97c0d26cfff9243dcb9897"
 	if got := hex.EncodeToString(snapshot.GetAuthority().GetHmacSha256()); got != expected {
 		t.Fatalf("snapshot authority HMAC = %s", got)
 	}
@@ -95,13 +95,13 @@ func TestSnapshotImportRejectsEveryAuthenticatedTamper(t *testing.T) {
 		"HMAC":       func(value *enginev1.SnapshotEnvelope) { value.Authority.HmacSha256[0] ^= 0xff },
 		"sequence":   func(value *enginev1.SnapshotEnvelope) { value.LastSequence++ },
 		"payload": func(value *enginev1.SnapshotEnvelope) {
-			value.Payload = []byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"run-1","changed":true}`)
+			value.Payload = []byte(`{"version":"spice.agent.snapshot/v1alpha3","run_id":"run-1","changed":true}`)
 			digest := sha256.Sum256(value.Payload)
 			value.Sha256 = digest[:]
 		},
 		"run ID": func(value *enginev1.SnapshotEnvelope) {
 			value.RunId = "run-2"
-			value.Payload = []byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"run-2"}`)
+			value.Payload = []byte(`{"version":"spice.agent.snapshot/v1alpha3","run_id":"run-2"}`)
 			digest := sha256.Sum256(value.Payload)
 			value.Sha256 = digest[:]
 		},

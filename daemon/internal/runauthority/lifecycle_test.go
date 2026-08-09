@@ -239,7 +239,7 @@ func TestLocalResumeGenerationBoundaryAndTerminalFromSuspended(t *testing.T) {
 		writes++
 		return nil
 	}
-	payload := []byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"generation-boundary"}`)
+	payload := []byte(`{"version":"spice.agent.snapshot/v1alpha3","run_id":"generation-boundary"}`)
 	if _, err = enginev1.NewSnapshotEnvelope(
 		t.Context(), active, "generation-boundary", 1,
 		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED, payload,
@@ -323,7 +323,7 @@ func TestActivePrewriteCancellationRemainsUsable(t *testing.T) {
 	if _, err = enginev1.NewSnapshotEnvelope(
 		cancelled, active, "resume-cancellation", 1,
 		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED,
-		[]byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"resume-cancellation"}`),
+		[]byte(`{"version":"spice.agent.snapshot/v1alpha3","run_id":"resume-cancellation"}`),
 	); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled suspended signing = %v", err)
 	}
@@ -333,7 +333,7 @@ func TestActivePrewriteCancellationRemainsUsable(t *testing.T) {
 	if _, err = enginev1.NewSnapshotEnvelope(
 		t.Context(), active, "resume-cancellation", 1,
 		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED,
-		[]byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"resume-cancellation"}`),
+		[]byte(`{"version":"spice.agent.snapshot/v1alpha3","run_id":"resume-cancellation"}`),
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -407,7 +407,7 @@ func TestSuspendedTerminalAndSigningFailuresAreUncertain(t *testing.T) {
 	if _, err = enginev1.NewSnapshotEnvelope(
 		t.Context(), signer, "sign-write-failure", 1,
 		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED,
-		[]byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"sign-write-failure"}`),
+		[]byte(`{"version":"spice.agent.snapshot/v1alpha3","run_id":"sign-write-failure"}`),
 	); !errors.Is(err, enginev1.ErrSnapshotAuthoritySigning) {
 		t.Fatalf("failed suspended signing = %v", err)
 	}
@@ -435,7 +435,7 @@ func TestTerminalSnapshotCleanupFailureIsClassifiedUnavailable(t *testing.T) {
 	_, err = enginev1.NewSnapshotEnvelope(
 		t.Context(), active, "terminal-cleanup-failure", 1,
 		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_COMPLETED,
-		[]byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"terminal-cleanup-failure"}`),
+		[]byte(`{"version":"spice.agent.snapshot/v1alpha3","run_id":"terminal-cleanup-failure"}`),
 	)
 	if !errors.Is(err, enginev1.ErrSnapshotAuthoritySigning) {
 		t.Fatalf("terminal snapshot cleanup error = %v", err)
@@ -462,7 +462,7 @@ func TestTerminalSnapshotCleanupFailureIsClassifiedUnavailable(t *testing.T) {
 	_, err = enginev1.NewSnapshotEnvelope(
 		t.Context(), uncertain, "uncertain-cleanup-failure", 1,
 		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED,
-		[]byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"uncertain-cleanup-failure"}`),
+		[]byte(`{"version":"spice.agent.snapshot/v1alpha3","run_id":"uncertain-cleanup-failure"}`),
 	)
 	if !errors.Is(err, enginev1.ErrSnapshotAuthoritySigning) || strings.Contains(err.Error(), "secret") {
 		t.Fatalf("uncertain signing error = %v", err)
@@ -641,7 +641,7 @@ func internalSnapshot(
 	lifecycle enginev1.SnapshotLifecycle,
 ) *enginev1.SnapshotEnvelope {
 	t.Helper()
-	payload := []byte(fmt.Sprintf(`{"version":"spice.agent.snapshot/v1alpha2","run_id":%q}`, runID))
+	payload := []byte(fmt.Sprintf(`{"version":"spice.agent.snapshot/v1alpha3","run_id":%q}`, runID))
 	snapshot, err := enginev1.NewSnapshotEnvelope(t.Context(), signer, runID, 1, lifecycle, payload)
 	if err != nil {
 		t.Fatal(err)

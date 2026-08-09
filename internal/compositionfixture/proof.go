@@ -2,8 +2,14 @@ package compositionfixture
 
 import (
 	"context"
+	"encoding/json"
 	"maps"
 	"slices"
+	"strings"
+
+	"github.com/spice-framework/spice-agent/interaction"
+	"github.com/spice-framework/spice-agent/stage"
+	"github.com/spice-framework/spice-agent/tool"
 )
 
 // @import { Bean, Qualifier } from "github.com/spice-framework/spice/annotation/core"
@@ -15,6 +21,8 @@ type Proof struct {
 	fallbackStage FallbackStage
 	replacedStage ReplaceableStage
 	tools         map[string]ToolAlias
+	guards        []stage.ToolDispatchGuard
+	guardLog      *DispatchGuardLog
 	aliasSelected ToolAlias
 	cleanup       *CleanupLog
 }
@@ -28,6 +36,8 @@ func NewProof(
 	fallbackStage FallbackStage,
 	replacedStage ReplaceableStage,
 	tools map[string]ToolAlias,
+	guards []stage.ToolDispatchGuard,
+	guardLog *DispatchGuardLog,
 	// @Qualifier("inspect")
 	aliasSelected ToolAlias,
 	cleanup *CleanupLog,
@@ -38,9 +48,43 @@ func NewProof(
 		fallbackStage: fallbackStage,
 		replacedStage: replacedStage,
 		tools:         cloneTools(tools),
+		guards:        append([]stage.ToolDispatchGuard(nil), guards...),
+		guardLog:      guardLog,
 		aliasSelected: aliasSelected,
 		cleanup:       cleanup,
 	}
+}
+
+// DispatchProof executes the generated named tool map through the generated
+// terminal guard collection and returns the observed guard count.
+func (proof *Proof) DispatchProof(ctx context.Context) (uint32, error) {
+	base, err := stage.NewDispatcher(proof.tools)
+	if err != nil {
+		return 0, err
+	}
+	dispatcher, err := stage.ApplyToolDispatchPipeline(base, proof.guards, nil)
+	if err != nil {
+		return 0, err
+	}
+	authority, err := interaction.NewScope("composition-proof")
+	if err != nil {
+		return 0, err
+	}
+	scope, err := stage.NewToolDispatchScope(
+		"composition-proof", 1, stage.PlanID("composition:static"),
+		"sha256:"+strings.Repeat("0", 64), "", authority,
+	)
+	if err != nil {
+		return 0, err
+	}
+	call, err := tool.NewCall("composition-call", "read", json.RawMessage(`{}`))
+	if err != nil {
+		return 0, err
+	}
+	if _, err = dispatcher.Dispatch(ctx, scope, call, nil); err != nil {
+		return 0, err
+	}
+	return proof.guardLog.Calls(), nil
 }
 
 // StageSelections reports the fallback-only and normal-replaced stage names.

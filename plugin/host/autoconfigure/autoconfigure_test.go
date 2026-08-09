@@ -65,7 +65,7 @@ func TestDefaultHostReceivesExplicitRestartPolicy(t *testing.T) {
 	}
 	policy := pluginhost.DefaultRestartPolicy()
 	host, cleanup, err := DefaultHost(
-		validHostIdentity(), dispatcher, nil, policy,
+		validHostIdentity(), dispatcher, nil, nil, policy,
 		inertLauncher(), DefaultCurrentUserEndpointFactory(),
 	)
 	if err != nil {
@@ -129,6 +129,7 @@ func TestDefaultHostRejectsMissingMandatoryDependencies(t *testing.T) {
 				test.identity,
 				test.dispatcher,
 				nil,
+				nil,
 				test.restart,
 				test.launcher,
 				test.endpoints,
@@ -149,6 +150,7 @@ func TestDefaultHostProvidesInitialPlanAdapterAndCleanup(t *testing.T) {
 	host, cleanup, err := DefaultHost(
 		validHostIdentity(),
 		dispatcher,
+		nil,
 		nil,
 		DefaultDisabledRestartPolicy(),
 		inertLauncher(),

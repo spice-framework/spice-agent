@@ -220,7 +220,7 @@ func structuralImportRequest(t *testing.T) *enginev1.ImportSnapshotRequest {
 	snapshot, err := enginev1.NewSnapshotEnvelope(
 		t.Context(), snapshotAuthority(t), "run-structural", 11,
 		enginev1.SnapshotLifecycle_SNAPSHOT_LIFECYCLE_SUSPENDED,
-		[]byte(`{"version":"spice.agent.snapshot/v1alpha2","run_id":"run-structural"}`),
+		[]byte(`{"version":"spice.agent.snapshot/v1alpha3","run_id":"run-structural"}`),
 	)
 	if err != nil {
 		t.Fatal(err)

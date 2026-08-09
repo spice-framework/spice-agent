@@ -40,6 +40,9 @@ type EngineOptions struct {
 	// SnapshotCompatibilityIdentity is an explicit compiler-generated semantic
 	// identity for portable snapshot import. Empty disables Engine.ResumeSnapshot.
 	SnapshotCompatibilityIdentity string
+	// WorkspaceFingerprint is a canonical sha256 identity of the workspace
+	// authority. Portable snapshots require it and refuse cross-workspace resume.
+	WorkspaceFingerprint string
 }
 
 // DefaultEngineOptions returns conservative architecture-proof bounds.
@@ -162,6 +165,7 @@ type Engine struct {
 	broker                interaction.Broker
 	compiledPlan          []string
 	snapshotCompatibility string
+	workspaceFingerprint  string
 
 	mu         sync.Mutex
 	closed     bool
@@ -255,6 +259,9 @@ func NewEngineWithToolPlanSourceAndInteractionBroker(
 	if err = validateSnapshotCompatibilityIdentity(options.SnapshotCompatibilityIdentity); err != nil {
 		return nil, err
 	}
+	if err = validateWorkspaceFingerprint(options.WorkspaceFingerprint, options.SnapshotCompatibilityIdentity != ""); err != nil {
+		return nil, err
+	}
 	probe, err := event.NewLog("validation", options.LogLimits)
 	if err != nil {
 		return nil, fmt.Errorf("agent replay limits: %w", err)
@@ -270,6 +277,7 @@ func NewEngineWithToolPlanSourceAndInteractionBroker(
 		broker:                broker,
 		compiledPlan:          compiledPlan,
 		snapshotCompatibility: options.SnapshotCompatibilityIdentity,
+		workspaceFingerprint:  options.WorkspaceFingerprint,
 		active:                make(map[string]*Run), identities: newRunIdentityLedger(options.RunIdentityLimits), drained: drained,
 	}, nil
 }
@@ -890,7 +898,7 @@ func (engine *Engine) executeTurn(ctx context.Context, emitter *runEmitter, defi
 		}
 		return true, nil
 	}
-	if err = engine.appendToolRound(ctx, emitter, text, calls, history); err != nil {
+	if err = engine.appendToolRound(ctx, emitter, turn, text, calls, history); err != nil {
 		return false, errors.Join(err, emitter.turnFailure(ctx, err))
 	}
 	if err = emitter.emit(ctx, event.TurnCompleted, map[string]uint32{"turn": turn}); err != nil {
@@ -1018,7 +1026,7 @@ func normalizeStartError(err error) error {
 	return errors.Join(operationErr, constructionErr)
 }
 
-func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, textValue string, calls []tool.Call, history *[]message.Message) error {
+func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, turn uint32, textValue string, calls []tool.Call, history *[]message.Message) error {
 	if err := validateNewToolCalls(*history, calls); err != nil {
 		return err
 	}
@@ -1049,7 +1057,18 @@ func (engine *Engine) appendToolRound(ctx context.Context, emitter *runEmitter, 
 			}
 			return err
 		}
-		result, dispatchErr := safeDispatch(ctx, emitter.run.dispatcher, call, emitter)
+		interactionAuthority, authorityErr := interaction.NewScope(emitter.run.id)
+		if authorityErr != nil {
+			return errors.Join(authorityErr, emitter.toolFailure(ctx, call, authorityErr))
+		}
+		dispatchScope, scopeErr := stage.NewToolDispatchScope(
+			emitter.run.id, turn, emitter.run.planIdentity.ToolPlanID(), emitter.run.planIdentity.Fingerprint(),
+			emitter.run.planIdentity.WorkspaceFingerprint(), interactionAuthority,
+		)
+		if scopeErr != nil {
+			return errors.Join(scopeErr, emitter.toolFailure(ctx, call, scopeErr))
+		}
+		result, dispatchErr := safeDispatch(ctx, emitter.run.dispatcher, dispatchScope, call, emitter)
 		if dispatchErr != nil {
 			return errors.Join(dispatchErr, emitter.toolFailure(ctx, call, dispatchErr))
 		}
@@ -1139,13 +1158,14 @@ func safeClose(stream model.Stream) (err error) {
 	return stream.Close()
 }
 
-func safeDispatch(ctx context.Context, dispatcher stage.ToolDispatcher, call tool.Call, reporter tool.Reporter) (result tool.Result, err error) {
+func safeDispatch(ctx context.Context, dispatcher stage.ToolDispatcher, scope stage.ToolDispatchScope, call tool.Call, reporter tool.Reporter) (result tool.Result, err error) {
 	defer func() {
-		if recovered := recover(); recovered != nil {
-			err = fmt.Errorf("tool %q panic: %v", call.Name(), recovered)
+		if recover() != nil {
+			result = tool.Result{}
+			err = fmt.Errorf("tool %q dispatch panicked", call.Name())
 		}
 	}()
-	return dispatcher.Dispatch(ctx, call, reporter)
+	return dispatcher.Dispatch(ctx, scope, call, reporter)
 }
 
 func safeInteraction(ctx context.Context, broker interaction.Broker, scope interaction.Scope, request interaction.Request) (response interaction.Response, err error) {

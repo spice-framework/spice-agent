@@ -158,7 +158,7 @@ func (dispatcher *mutableDispatcher) Definition(name string) (tool.Definition, b
 	return tool.Definition{}, false
 }
 
-func (dispatcher *mutableDispatcher) Dispatch(_ context.Context, call tool.Call, _ tool.Reporter) (tool.Result, error) {
+func (dispatcher *mutableDispatcher) Dispatch(_ context.Context, _ stage.ToolDispatchScope, call tool.Call, _ tool.Reporter) (tool.Result, error) {
 	dispatcher.calls.Add(1)
 	return tool.NewResult(call.ID(), json.RawMessage(`"mutable"`))
 }
@@ -185,14 +185,43 @@ func TestLeaseDispatcherRejectsNamesOutsideImmutableSnapshot(t *testing.T) {
 		t.Fatalf("leased definitions changed = %v", definitions)
 	}
 	bCall, _ := tool.NewCall("call-b", "b", json.RawMessage(`{}`))
-	if _, err = leasedDispatcher.Dispatch(t.Context(), bCall, nil); err == nil || base.calls.Load() != 0 {
+	if _, err = leasedDispatcher.Dispatch(t.Context(), testToolDispatchScopeForPlan(t, id), bCall, nil); err == nil || base.calls.Load() != 0 {
 		t.Fatalf("undeclared mutable tool dispatched: calls=%d err=%v", base.calls.Load(), err)
 	}
 	aCall, _ := tool.NewCall("call-a", "a", json.RawMessage(`{}`))
-	if _, err = leasedDispatcher.Dispatch(t.Context(), aCall, nil); err != nil || base.calls.Load() != 1 {
+	if _, err = leasedDispatcher.Dispatch(t.Context(), testToolDispatchScopeForPlan(t, id), aCall, nil); err != nil || base.calls.Load() != 1 {
 		t.Fatalf("snapshotted tool did not dispatch: calls=%d err=%v", base.calls.Load(), err)
 	}
+	if _, err = leasedDispatcher.Dispatch(t.Context(), testToolDispatchScope(t), aCall, nil); err == nil || base.calls.Load() != 1 {
+		t.Fatalf("mismatched dispatch plan = %v, calls=%d", err, base.calls.Load())
+	}
 	_ = lease.Release()
+}
+
+func TestSnapshotToolDispatcherFreezesDefinitionsWithoutComposingPolicy(t *testing.T) {
+	t.Parallel()
+	a, _ := tool.NewDefinition("a", "a", json.RawMessage(`{}`), tool.EffectReadOnly, tool.ReplaySafe)
+	b, _ := tool.NewDefinition("b", "b", json.RawMessage(`{}`), tool.EffectReadOnly, tool.ReplaySafe)
+	base := &mutableDispatcher{definitions: []tool.Definition{a}}
+	snapshot, err := stage.SnapshotToolDispatcher(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	base.definitions = []tool.Definition{b}
+	if definitions := snapshot.Definitions(); len(definitions) != 1 || definitions[0].Name() != "a" {
+		t.Fatalf("snapshot definitions changed = %v", definitions)
+	}
+	bCall, _ := tool.NewCall("call-b", "b", json.RawMessage(`{}`))
+	if _, err = snapshot.Dispatch(t.Context(), testToolDispatchScope(t), bCall, nil); err == nil || base.calls.Load() != 0 {
+		t.Fatalf("undeclared mutable tool dispatched: calls=%d err=%v", base.calls.Load(), err)
+	}
+	aCall, _ := tool.NewCall("call-a", "a", json.RawMessage(`{}`))
+	if _, err = snapshot.Dispatch(t.Context(), testToolDispatchScope(t), aCall, nil); err != nil || base.calls.Load() != 1 {
+		t.Fatalf("snapshotted tool did not dispatch: calls=%d err=%v", base.calls.Load(), err)
+	}
+	if _, err = stage.SnapshotToolDispatcher(nil); err == nil {
+		t.Fatal("nil snapshot dispatcher succeeded")
+	}
 }
 
 type tracingDecorator struct {
@@ -218,9 +247,9 @@ func (dispatcher tracingDispatcher) Definition(name string) (tool.Definition, bo
 	return dispatcher.next.Definition(name)
 }
 
-func (dispatcher tracingDispatcher) Dispatch(ctx context.Context, call tool.Call, reporter tool.Reporter) (tool.Result, error) {
+func (dispatcher tracingDispatcher) Dispatch(ctx context.Context, scope stage.ToolDispatchScope, call tool.Call, reporter tool.Reporter) (tool.Result, error) {
 	*dispatcher.trace = append(*dispatcher.trace, dispatcher.name+":before")
-	result, err := dispatcher.next.Dispatch(ctx, call, reporter)
+	result, err := dispatcher.next.Dispatch(ctx, scope, call, reporter)
 	*dispatcher.trace = append(*dispatcher.trace, dispatcher.name+":after")
 	return result, err
 }
@@ -251,7 +280,7 @@ func TestApplyToolDispatchDecoratorsOrdersAndValidates(t *testing.T) {
 		t.Fatal(err)
 	}
 	call, _ := tool.NewCall("call", "a", json.RawMessage(`{}`))
-	if _, err = decorated.Dispatch(t.Context(), call, nil); err != nil {
+	if _, err = decorated.Dispatch(t.Context(), testToolDispatchScope(t), call, nil); err != nil {
 		t.Fatal(err)
 	}
 	want := []string{"first:before", "second:before", "second:after", "first:after"}

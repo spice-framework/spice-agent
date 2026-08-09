@@ -56,18 +56,20 @@ func NewApplicationWithOptions(ctx context.Context, options ApplicationOptions) 
 	}
 	_ = dependencies
 	application.components = Components{
-		Trim:       dependencies.trim,
-		Cleanup:    dependencies.cleanup,
-		Read:       dependencies.read,
-		Write:      dependencies.write,
-		Suffix:     dependencies.suffix,
-		Beta:       dependencies.beta,
-		Alpha:      dependencies.alpha,
-		Fallback:   dependencies.fallback,
-		Provider8:  dependencies.fallbackOnly,
-		Provider9:  dependencies.replaceableNormal,
-		Provider10: dependencies.replaceableDefault,
-		Proof:      dependencies.proof,
+		Trim:                 dependencies.trim,
+		Cleanup:              dependencies.cleanup,
+		Read:                 dependencies.read,
+		Write:                dependencies.write,
+		Suffix:               dependencies.suffix,
+		Beta:                 dependencies.beta,
+		Alpha:                dependencies.alpha,
+		DispatchGuardLog:     dependencies.dispatchGuardLog,
+		Fallback:             dependencies.fallback,
+		Provider9:            dependencies.fallbackOnly,
+		FixtureDispatchGuard: dependencies.fixtureDispatchGuard,
+		Provider11:           dependencies.replaceableNormal,
+		Provider12:           dependencies.replaceableDefault,
+		Proof:                dependencies.proof,
 	}
 	return application, nil
 }

@@ -293,7 +293,7 @@ func TestRemoteToolReporterFailureIsPreservedByDispatcher(t *testing.T) {
 	}
 	call, _ := tool.NewCall("call-1", "remote.write", []byte(`{}`))
 	reporterErr := errors.New("reporter stopped")
-	_, err = dispatcher.Dispatch(t.Context(), call, rejectingReporter{err: reporterErr})
+	_, err = dispatcher.Dispatch(t.Context(), testToolDispatchScope(t), call, rejectingReporter{err: reporterErr})
 	var (
 		combined  *stage.DispatchFailure
 		execution *tool.ExecutionError

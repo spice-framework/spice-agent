@@ -294,7 +294,7 @@ func copyFixtureModule(t *testing.T, source, destination string) {
 	}
 	for _, name := range []string{
 		".spice", "annotation", "cmd", "internal/annotationtool",
-		"internal/compositionfixture", "internal/spicegen", "message", "model",
+		"internal/compositionfixture", "internal/spicegen", "interaction", "message", "model",
 		"stage", "tool", "vendor",
 	} {
 		copyTree(t, filepath.Join(source, filepath.FromSlash(name)), filepath.Join(destination, filepath.FromSlash(name)))

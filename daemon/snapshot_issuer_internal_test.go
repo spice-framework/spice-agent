@@ -111,7 +111,7 @@ func internalKernelSnapshot(t *testing.T, runID string, status agent.LifecycleSt
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan, err := agent.NewPlanIdentity([]string{"provider:scripted"}, "compatibility-1", planID, nil)
+	plan, err := agent.NewPlanIdentity([]string{"provider:scripted"}, "compatibility-1", "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", planID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

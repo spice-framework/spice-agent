@@ -68,7 +68,7 @@ func TestDispatcherPreservesAndValidatesTypedExecutionFailures(t *testing.T) {
 	call, _ := tool.NewCall("c", "a", json.RawMessage(`{}`))
 	cancelled, _ := tool.NewExecutionError(call.ID(), tool.ExecutionDefinitive, tool.RetryAllowed, context.Canceled)
 	dispatcher, _ := stage.NewDispatcher(map[string]tool.Tool{"a": fakeTool{name: "a", executionErr: cancelled}})
-	if _, err := dispatcher.Dispatch(t.Context(), call, nil); !errors.Is(err, context.Canceled) {
+	if _, err := dispatcher.Dispatch(t.Context(), testToolDispatchScope(t), call, nil); !errors.Is(err, context.Canceled) {
 		t.Fatalf("typed cancellation = %v", err)
 	} else {
 		var typed *tool.ExecutionError
@@ -79,24 +79,24 @@ func TestDispatcherPreservesAndValidatesTypedExecutionFailures(t *testing.T) {
 
 	uncertain, _ := tool.NewExecutionError(call.ID(), tool.ExecutionUncertain, tool.RetryNever, errors.New("commit acknowledgement lost"))
 	readOnly, _ := stage.NewDispatcher(map[string]tool.Tool{"a": fakeTool{name: "a", executionErr: uncertain}})
-	if _, err := readOnly.Dispatch(t.Context(), call, nil); err == nil || !strings.Contains(err.Error(), "read-only") {
+	if _, err := readOnly.Dispatch(t.Context(), testToolDispatchScope(t), call, nil); err == nil || !strings.Contains(err.Error(), "read-only") {
 		t.Fatalf("read-only uncertain execution = %v", err)
 	}
 
 	mutatingDefinition, _ := tool.NewDefinition("a", "test", json.RawMessage(`{}`), tool.EffectMutating, tool.ReplayUnsafe)
 	mutating, _ := stage.NewDispatcher(map[string]tool.Tool{"a": fakeTool{name: "a", definition: mutatingDefinition, executionErr: uncertain}})
-	if _, err := mutating.Dispatch(t.Context(), call, nil); !errors.Is(err, uncertain) {
+	if _, err := mutating.Dispatch(t.Context(), testToolDispatchScope(t), call, nil); !errors.Is(err, uncertain) {
 		t.Fatalf("uncertain mutation was not preserved: %T, %v", err, err)
 	}
 
 	retryable, _ := tool.NewExecutionError(call.ID(), tool.ExecutionDefinitive, tool.RetryAllowed, errors.New("worker unavailable"))
 	replayUnsafe, _ := stage.NewDispatcher(map[string]tool.Tool{"a": fakeTool{name: "a", definition: mutatingDefinition, executionErr: retryable}})
-	if _, err := replayUnsafe.Dispatch(t.Context(), call, nil); err == nil || !strings.Contains(err.Error(), "replay-unsafe") {
+	if _, err := replayUnsafe.Dispatch(t.Context(), testToolDispatchScope(t), call, nil); err == nil || !strings.Contains(err.Error(), "replay-unsafe") {
 		t.Fatalf("unsafe retry = %v", err)
 	}
 	idempotentDefinition, _ := tool.NewDefinition("a", "test", json.RawMessage(`{}`), tool.EffectMutating, tool.ReplayIdempotent)
 	idempotent, _ := stage.NewDispatcher(map[string]tool.Tool{"a": fakeTool{name: "a", definition: idempotentDefinition, executionErr: retryable}})
-	if _, err := idempotent.Dispatch(t.Context(), call, nil); !errors.Is(err, retryable) {
+	if _, err := idempotent.Dispatch(t.Context(), testToolDispatchScope(t), call, nil); !errors.Is(err, retryable) {
 		t.Fatalf("idempotent retryable failure was not preserved: %T, %v", err, err)
 	}
 }
@@ -120,7 +120,7 @@ func TestDispatcherRejectsUntypedMismatchedAndAmbiguousExecutionFailures(t *test
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = dispatcher.Dispatch(t.Context(), call, nil); err == nil {
+		if _, err = dispatcher.Dispatch(t.Context(), testToolDispatchScope(t), call, nil); err == nil {
 			t.Errorf("%s execution failure succeeded", name)
 		} else if len(err.Error()) > 256 || strings.Contains(err.Error(), "SECRET") {
 			t.Errorf("%s leaked unbounded rejected error: %q", name, err)
@@ -156,7 +156,7 @@ func TestDispatcherPreservesTypedExecutionAndReporterFailuresWithoutLeakingText(
 	dispatcher, _ := stage.NewDispatcher(map[string]tool.Tool{
 		"a": fakeTool{name: "a", progressID: call.ID(), executionErr: wrappedReporter},
 	})
-	_, err := dispatcher.Dispatch(t.Context(), call, fixedErrorReporter{err: reporterErr})
+	_, err := dispatcher.Dispatch(t.Context(), testToolDispatchScope(t), call, fixedErrorReporter{err: reporterErr})
 	if !errors.Is(err, reporterErr) {
 		t.Fatalf("reporter rejection was not preserved: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestDispatcherPreservesTypedExecutionAndReporterFailuresWithoutLeakingText(
 	dispatcher, _ = stage.NewDispatcher(map[string]tool.Tool{
 		"a": fakeTool{name: "a", progressID: call.ID(), executionErr: unrelated},
 	})
-	_, err = dispatcher.Dispatch(t.Context(), call, fixedErrorReporter{err: reporterErr})
+	_, err = dispatcher.Dispatch(t.Context(), testToolDispatchScope(t), call, fixedErrorReporter{err: reporterErr})
 	combined = nil
 	execution = nil
 	if !errors.As(err, &combined) || !errors.As(err, &execution) || execution != unrelated ||
@@ -186,7 +186,7 @@ func TestDispatcherPreservesTypedExecutionAndReporterFailuresWithoutLeakingText(
 		t.Fatalf("sanitized combined failure was not preserved safely: %T, %v", err, err)
 	}
 
-	_, err = dispatcher.Dispatch(t.Context(), call, fixedErrorReporter{err: context.Canceled})
+	_, err = dispatcher.Dispatch(t.Context(), testToolDispatchScope(t), call, fixedErrorReporter{err: context.Canceled})
 	combined = nil
 	if !errors.As(err, &combined) || !errors.Is(combined.ReporterFailure(), context.Canceled) ||
 		errors.Is(err, context.Canceled) {
@@ -196,7 +196,7 @@ func TestDispatcherPreservesTypedExecutionAndReporterFailuresWithoutLeakingText(
 	conflicting, _ := tool.NewExecutionError(
 		"different-call", tool.ExecutionDefinitive, tool.RetryNever, errors.New("conflicting reporter payload"),
 	)
-	_, err = dispatcher.Dispatch(t.Context(), call, fixedErrorReporter{err: conflicting})
+	_, err = dispatcher.Dispatch(t.Context(), testToolDispatchScope(t), call, fixedErrorReporter{err: conflicting})
 	combined = nil
 	execution = nil
 	if !errors.As(err, &combined) || !errors.As(err, &execution) || execution != unrelated ||
@@ -243,17 +243,17 @@ func TestDispatcherSnapshotsDefinitionsAndEnforcesCorrelation(t *testing.T) {
 	}
 	call, _ := tool.NewCall("c", "a", json.RawMessage(`{}`))
 	reporter := &collectingReporter{}
-	result, err := dispatcher.Dispatch(t.Context(), call, reporter)
+	result, err := dispatcher.Dispatch(t.Context(), testToolDispatchScope(t), call, reporter)
 	if err != nil || result.CallID() != call.ID() {
 		t.Fatalf("dispatch: %v", err)
 	}
 	forged, _ := stage.NewDispatcher(map[string]tool.Tool{"a": fakeTool{name: "a", resultID: "other"}})
-	if _, err = forged.Dispatch(t.Context(), call, reporter); err == nil {
+	if _, err = forged.Dispatch(t.Context(), testToolDispatchScope(t), call, reporter); err == nil {
 		t.Fatal("forged result correlation succeeded")
 	}
 	badProgress, _ := stage.NewDispatcher(map[string]tool.Tool{"a": fakeTool{name: "a", progressID: "other"}})
 	// The fake deliberately ignores Report's error; the dispatcher still fails.
-	if _, err = badProgress.Dispatch(t.Context(), call, reporter); err == nil {
+	if _, err = badProgress.Dispatch(t.Context(), testToolDispatchScope(t), call, reporter); err == nil {
 		t.Fatal("forged progress correlation succeeded")
 	}
 }
@@ -263,15 +263,15 @@ func TestDispatcherRejectsCancellationAndInvalidInputs(t *testing.T) {
 	call, _ := tool.NewCall("c", "a", json.RawMessage(`{}`))
 	cancelled, cancel := context.WithCancel(t.Context())
 	cancel()
-	if _, err := dispatcher.Dispatch(cancelled, call, nil); !errors.Is(err, context.Canceled) {
+	if _, err := dispatcher.Dispatch(cancelled, testToolDispatchScope(t), call, nil); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled dispatch = %v", err)
 	}
 	var nilContext context.Context
-	if _, err := dispatcher.Dispatch(nilContext, call, nil); err == nil {
+	if _, err := dispatcher.Dispatch(nilContext, testToolDispatchScope(t), call, nil); err == nil {
 		t.Fatal("nil context succeeded")
 	}
 	missing, _ := tool.NewCall("c", "missing", json.RawMessage(`{}`))
-	if _, err := dispatcher.Dispatch(t.Context(), missing, nil); err == nil {
+	if _, err := dispatcher.Dispatch(t.Context(), testToolDispatchScope(t), missing, nil); err == nil {
 		t.Fatal("missing tool succeeded")
 	}
 	if _, err := stage.NewDispatcher(map[string]tool.Tool{"nil": nil}); err == nil {
@@ -281,13 +281,13 @@ func TestDispatcherRejectsCancellationAndInvalidInputs(t *testing.T) {
 		t.Fatal("mismatched name succeeded")
 	}
 	progressTool, _ := stage.NewDispatcher(map[string]tool.Tool{"a": fakeTool{name: "a", progressID: "c"}})
-	if _, err := progressTool.Dispatch(t.Context(), call, errorReporter{}); err == nil {
+	if _, err := progressTool.Dispatch(t.Context(), testToolDispatchScope(t), call, errorReporter{}); err == nil {
 		t.Fatal("delegate progress error succeeded")
 	}
 	postContext, postCancel := context.WithCancel(t.Context())
 	postDispatcher, _ := stage.NewDispatcher(map[string]tool.Tool{"cancel": cancellingTool{cancel: postCancel}})
 	postCall, _ := tool.NewCall("c", "cancel", json.RawMessage(`{}`))
-	if result, err := postDispatcher.Dispatch(postContext, postCall, nil); err != nil || result.CallID() != postCall.ID() {
+	if result, err := postDispatcher.Dispatch(postContext, testToolDispatchScope(t), postCall, nil); err != nil || result.CallID() != postCall.ID() {
 		t.Fatalf("committed result lost to concurrent cancellation: %#v, %v", result, err)
 	}
 }

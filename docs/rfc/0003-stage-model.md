@@ -23,13 +23,20 @@ Tools are exposed to models as immutable definitions but execute only through
 one `ToolDispatcher`. The dispatcher owns a canonical map built from
 `map[string]tool.Tool` injection, rejects name/definition mismatches, snapshots
 definitions for each model request, enforces call/progress correlation, contains
-panics, and preserves cancellation. Policy, telemetry, retry, and runtime-plugin
-support are ordered typed dispatcher decorators.
+panics, and preserves cancellation. Telemetry, retry, and runtime-plugin
+support are ordered typed dispatcher decorators. Terminal policy uses the
+separate guard seam in RFC 0009.
 `ApplyToolDispatchDecorators` applies the already Spice-ordered collection to
 the merged dispatcher: the first decorator is outermost. Nil, panicking,
 nil-returning, and definition-changing decorators fail construction. Every
 wrapper is guarded by the same immutable definition snapshot, so it cannot
 dispatch an undeclared tool.
+
+`ApplyToolDispatchPipeline` installs ordered `ToolDispatchGuard` values exactly
+once closest to the merged base and then applies trusted decorators outside
+them. The guard continuation is bound and single-use; it cannot substitute
+dispatch authority or executable input. Trusted decorators retain their
+documented ability to short-circuit before the terminal guard layer.
 
 Each definition has mandatory `Effect` (`read_only` or `mutating`) and
 `ReplaySafety` (`safe`, `idempotent`, or `unsafe`) metadata. Capabilities are an
@@ -98,8 +105,8 @@ tools do not add compiled stages or mutate static DI.
 Generated fixtures prove fallback replacement, deterministic ambiguity, typed
 primary/qualifier resolution, ordered decorators, named tool maps, test overrides,
 capability snapshots, panic/cancellation, and absence of registry/reflection
-source. A future permission stress prototype must intercept every executable
-route without kernel changes.
+source. The Phase 7 permission stress prototype must intercept every executable
+route through RFC 0009 without another kernel change.
 
 The in-module `CompositionProof` target is the canonical compiled-composition
 fixture. It returns exact aliased interfaces from the agent annotations, uses

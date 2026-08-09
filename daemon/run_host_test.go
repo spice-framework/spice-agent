@@ -148,6 +148,7 @@ func TestRunHostMapsEngineIdentityCapacityAndRetriesAfterDurableRetirement(t *te
 	source, _ := stage.NewStaticToolPlanSource(dispatcher)
 	options := agent.DefaultEngineOptions()
 	options.SnapshotCompatibilityIdentity = "run-host-tests:v1"
+	options.WorkspaceFingerprint = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	options.RunIdentityLimits, _ = agent.NewRunIdentityLimits(1, 1<<20)
 	fixture := newRunHostFixtureWithPlanSourceAndPendingTurnsAndOptions(
 		t, provider, pending, source, 2, 2, 2, options,
@@ -854,6 +855,7 @@ func newRunHostFixtureWithPlanSourceAndPendingTurns(
 	t.Helper()
 	options := agent.DefaultEngineOptions()
 	options.SnapshotCompatibilityIdentity = "run-host-tests:v1"
+	options.WorkspaceFingerprint = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	return newRunHostFixtureWithPlanSourceAndPendingTurnsAndOptions(
 		t, provider, pending, source, activeRuns, terminalRuns, maxTurns, options,
 	)

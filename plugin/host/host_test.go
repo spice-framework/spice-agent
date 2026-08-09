@@ -9,12 +9,34 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/spice-framework/spice-agent/interaction"
 	"github.com/spice-framework/spice-agent/stage"
 	"github.com/spice-framework/spice-agent/tool"
 )
+
+func testToolDispatchScope(t *testing.T) stage.ToolDispatchScope {
+	t.Helper()
+	return testToolDispatchScopeForPlan(t, stage.PlanID("generation:test"))
+}
+
+func testToolDispatchScopeForPlan(t *testing.T, planID stage.PlanID) stage.ToolDispatchScope {
+	t.Helper()
+	authority, err := interaction.NewScope("run-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scope, err := stage.NewToolDispatchScope(
+		"run-test", 1, planID, "sha256:"+strings.Repeat("0", 64), "", authority,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return scope
+}
 
 type hostTestTool struct {
 	definition tool.Definition
@@ -46,6 +68,12 @@ func (implementation hostTestTool) Execute(
 
 type fakeHostStarter struct {
 	fn func(context.Context, Executable) (generationCandidate, error)
+}
+
+type hostGuardFunc func(context.Context, stage.ToolDispatchScope, tool.Definition, tool.Call, stage.ToolDispatchNext) (tool.Result, error)
+
+func (guard hostGuardFunc) Guard(ctx context.Context, scope stage.ToolDispatchScope, definition tool.Definition, call tool.Call, next stage.ToolDispatchNext) (tool.Result, error) {
+	return guard(ctx, scope, definition, call, next)
 }
 
 func (starter fakeHostStarter) start(
@@ -161,8 +189,9 @@ func oneExecutableSet(t *testing.T, id string) Set {
 	return set
 }
 
-func dispatchHostTool(t *testing.T, dispatcher stage.ToolDispatcher, name string) string {
+func dispatchHostTool(t *testing.T, lease *stage.ToolPlanLease, name string) string {
 	t.Helper()
+	dispatcher := lease.Dispatcher()
 	if dispatcher == nil {
 		t.Error("tool dispatcher is nil")
 		return ""
@@ -171,7 +200,7 @@ func dispatchHostTool(t *testing.T, dispatcher stage.ToolDispatcher, name string
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := dispatcher.Dispatch(t.Context(), call, nil)
+	result, err := dispatcher.Dispatch(t.Context(), testToolDispatchScopeForPlan(t, lease.ToolPlanID()), call, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +217,7 @@ func TestHostStartsCompiledAndAtomicallyActivatesMergedGeneration(t *testing.T) 
 		}})
 
 	old, err := host.LeaseCurrent(t.Context())
-	if err != nil || dispatchHostTool(t, old.Dispatcher(), "compiled") != `"compiled"` {
+	if err != nil || dispatchHostTool(t, old, "compiled") != `"compiled"` {
 		t.Fatalf("compiled lease = %#v, %v", old, err)
 	}
 	newID, err := host.Activate(t.Context(), oneExecutableSet(t, "one"))
@@ -197,8 +226,8 @@ func TestHostStartsCompiledAndAtomicallyActivatesMergedGeneration(t *testing.T) 
 	}
 	current, err := host.LeaseCurrent(t.Context())
 	if err != nil || current.ToolPlanID() != newID ||
-		dispatchHostTool(t, current.Dispatcher(), "compiled") != `"compiled"` ||
-		dispatchHostTool(t, current.Dispatcher(), "runtime") != `"runtime"` {
+		dispatchHostTool(t, current, "compiled") != `"compiled"` ||
+		dispatchHostTool(t, current, "runtime") != `"runtime"` {
 		t.Fatalf("merged current = %#v, %v", current, err)
 	}
 	retired, err := host.LeaseGeneration(t.Context(), old.ToolPlanID())
@@ -209,6 +238,55 @@ func TestHostStartsCompiledAndAtomicallyActivatesMergedGeneration(t *testing.T) 
 	_ = old.Release()
 	if _, err = host.LeaseGeneration(t.Context(), old.ToolPlanID()); err == nil {
 		t.Fatal("cleaning retired generation remained leasable")
+	}
+	_ = current.Release()
+	if err = host.Close(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestHostAppliesOneTerminalGuardToCompiledAndRuntimeRoutes(t *testing.T) {
+	t.Parallel()
+	compiled, _ := stage.NewDispatcher(map[string]tool.Tool{
+		"compiled": newHostTestTool(t, "compiled", "compiled"),
+	})
+	runtimeCandidate := newFakeHostCandidate("guarded-runtime", map[string]tool.Tool{
+		"runtime": newHostTestTool(t, "runtime", "runtime"),
+	})
+	var calls atomic.Uint32
+	guard := hostGuardFunc(func(ctx context.Context, scope stage.ToolDispatchScope, definition tool.Definition, call tool.Call, next stage.ToolDispatchNext) (tool.Result, error) {
+		if scope.ToolPlanID() == "" || definition.Name() != call.Name() {
+			return tool.Result{}, errors.New("guard received incomplete dispatch facts")
+		}
+		calls.Add(1)
+		return next()
+	})
+	host, err := newHost(
+		HostConfig{Compiled: compiled, Guards: []stage.ToolDispatchGuard{guard}}, nil,
+		fakeHostStarter{fn: func(context.Context, Executable) (generationCandidate, error) {
+			return runtimeCandidate, nil
+		}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initial, _ := host.LeaseCurrent(t.Context())
+	if got := dispatchHostTool(t, initial, "compiled"); got != `"compiled"` {
+		t.Fatalf("initial compiled result = %s", got)
+	}
+	_ = initial.Release()
+	if _, err = host.Activate(t.Context(), oneExecutableSet(t, "guarded")); err != nil {
+		t.Fatal(err)
+	}
+	current, _ := host.LeaseCurrent(t.Context())
+	if got := dispatchHostTool(t, current, "compiled"); got != `"compiled"` {
+		t.Fatalf("merged compiled result = %s", got)
+	}
+	if got := dispatchHostTool(t, current, "runtime"); got != `"runtime"` {
+		t.Fatalf("runtime result = %s", got)
+	}
+	if calls.Load() != 3 {
+		t.Fatalf("terminal guard calls = %d, want 3", calls.Load())
 	}
 	_ = current.Release()
 	if err = host.Close(t.Context()); err != nil {
@@ -336,7 +414,7 @@ func TestHostCurrentCrashFailsClosedButExistingLeaseRemainsStable(t *testing.T) 
 	if _, err = host.LeaseGeneration(t.Context(), id); err == nil {
 		t.Fatal("unhealthy exact generation was leased")
 	}
-	if got := dispatchHostTool(t, lease.Dispatcher(), "runtime"); got != `"stable"` {
+	if got := dispatchHostTool(t, lease, "runtime"); got != `"stable"` {
 		t.Fatalf("existing lease changed after crash: %s", got)
 	}
 	_ = lease.Release()

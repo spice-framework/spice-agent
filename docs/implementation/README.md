@@ -12,12 +12,25 @@ Repository roadmaps link here and must not duplicate status.
 | 4 — daemon and TUI | In progress | generated daemon/TUI distribution targets and managed local composition proven; installed Windows/Linux terminal interaction pending |
 | 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, bounded recovery/health, generated distribution activation, real-process cancellation, and real `spice dev` last-known-good proof complete; simultaneous installed daemon/TUI fault-reconnect proof pending |
 | 6 — architecture proof | In progress | dependency-ordered keyless module releases, then independently attested preview distribution; [Agent preview.1/preview.2/preview.3 failure history](evidence/phase6-release-history.md) |
-| 7 — stress prototypes | Planned | permission, SQLite, alternate UI, two-worker experiments |
+| 7 — stress prototypes | In progress | generic terminal permission seam complete; external policy, SQLite, alternate UI, and two-worker experiments pending |
 | 8 — stabilization | Planned | external authors and frozen compatibility policy |
 
 Exact commits and command output are recorded only after the corresponding gate
 has run. A phase is not complete because code exists; every exit criterion in its
 document must be green on Windows and Linux where required.
+
+## Current Phase 7 boundary
+
+RFC 0009 defines and implements the generic permission seam without installing
+a permission policy. Generated Spice composition supplies ordered
+`ToolDispatchGuard` collections. The pipeline installs them exactly once inside
+trusted decorators and immediately above the merged compiled/runtime base.
+Each dispatch carries immutable run, turn, exact `PlanID`, combined plan,
+workspace, and interaction authority facts. Workspace identity is now part of
+`PlanIdentity` and the deliberately incompatible v1alpha3 snapshot contract,
+so cross-workspace resume fails before leasing dynamic resources. The optional
+external permission policy and its user interaction remain the next isolated
+stress prototype.
 
 ## Current Phase 5 boundary
 

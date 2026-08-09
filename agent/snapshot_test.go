@@ -259,6 +259,16 @@ func TestSnapshotRejectsUnsafeCorruptedAndMismatchedState(t *testing.T) {
 				identity["fingerprint"] = "sha256:not-a-digest"
 			}
 		}},
+		{"missing workspace fingerprint", func(value map[string]any) {
+			if identity, valid := value["plan_identity"].(map[string]any); valid {
+				delete(identity, "workspace_fingerprint")
+			}
+		}},
+		{"invalid workspace fingerprint", func(value map[string]any) {
+			if identity, valid := value["plan_identity"].(map[string]any); valid {
+				identity["workspace_fingerprint"] = "sha256:bad"
+			}
+		}},
 		{"duplicate interactions", func(value map[string]any) { value["seen_interaction_ids"] = []any{"same", "same"} }},
 		{"unsorted interactions", func(value map[string]any) { value["seen_interaction_ids"] = []any{"z", "a"} }},
 	} {
@@ -273,6 +283,10 @@ func TestSnapshotRejectsUnsafeCorruptedAndMismatchedState(t *testing.T) {
 				t.Fatal("corrupted snapshot succeeded")
 			}
 		})
+	}
+	legacy := bytes.Replace(encoded, []byte(agent.SnapshotVersion), []byte("spice.agent.snapshot/v1alpha2"), 1)
+	if _, err = agent.ParseSnapshot(legacy); err == nil || !strings.Contains(err.Error(), "unsupported") {
+		t.Fatalf("legacy v1alpha2 snapshot = %v", err)
 	}
 	withUnknown := append([]byte(nil), encoded[:len(encoded)-1]...)
 	withUnknown = append(withUnknown, []byte(`,"unknown":true}`)...)
@@ -294,6 +308,7 @@ func TestSnapshotRejectsUnsafeCorruptedAndMismatchedState(t *testing.T) {
 	dispatcher, _ := stage.NewDispatcher(nil)
 	options := agent.DefaultEngineOptions()
 	options.SnapshotCompatibilityIdentity = testSnapshotCompatibility
+	options.WorkspaceFingerprint = testWorkspaceFingerprint
 	engine, _ := agent.NewEngineWithOptions(&scriptedProvider{}, dispatcher, &agent.AtomicIDSource{}, time.Now, nil, nil, options)
 	if _, err = engine.ResumeSnapshot(t.Context(), valid); err == nil || !strings.Contains(err.Error(), "tool plan") {
 		t.Fatalf("mismatched plan resume = %v", err)
@@ -313,6 +328,7 @@ func newEngineWithBrokerAndTools(t *testing.T, provider model.Provider, broker i
 	}
 	options := agent.DefaultEngineOptions()
 	options.SnapshotCompatibilityIdentity = testSnapshotCompatibility
+	options.WorkspaceFingerprint = testWorkspaceFingerprint
 	engine, err := agent.NewEngineWithInteractionBroker(
 		provider, dispatcher, broker, &agent.AtomicIDSource{}, time.Now, nil, nil, options,
 	)
@@ -342,7 +358,7 @@ func TestTerminalSnapshotCannotResumeAndActiveRunCannotExport(t *testing.T) {
 	}
 }
 
-func TestSnapshotRejectsRunWhoseTerminalCouldNotCommit(t *testing.T) {
+func TestToolPanicIsSecretSafeAndTerminalRemainsEngineOwned(t *testing.T) {
 	call, _ := tool.NewCall("call", "read", json.RawMessage(`{}`))
 	provider := &scriptedProvider{scripts: [][]model.StreamEvent{{toolEvent(t, call), completed(t)}}}
 	run := startRun(t, newEngine(t, provider, map[string]tool.Tool{"read": hugePanicTool{}}, nil, nil), 1)
@@ -350,8 +366,8 @@ func TestSnapshotRejectsRunWhoseTerminalCouldNotCommit(t *testing.T) {
 	if err := run.Wait(t.Context()); err == nil {
 		t.Fatal("oversized terminal failure unexpectedly succeeded")
 	}
-	if countKinds(events)[event.RunFailed] != 0 {
-		t.Fatal("precommit run terminal appeared in log")
+	if countKinds(events)[event.RunFailed] != 1 {
+		t.Fatal("run failure terminal was not committed")
 	}
 	var payload struct {
 		CallID string `json:"call_id"`
@@ -362,11 +378,11 @@ func TestSnapshotRejectsRunWhoseTerminalCouldNotCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	if payload.CallID != string(call.ID()) || payload.Name != call.Name() ||
-		len(payload.Error) != tool.MaximumExecutionErrorBytes {
+		payload.Error != "tool \"read\" dispatch panicked" || strings.Contains(payload.Error, "sensitive") {
 		t.Fatalf("bounded tool failure payload = %#v", payload)
 	}
-	if _, err := run.ExportSnapshot(); err == nil {
-		t.Fatal("uncommitted terminal exported as safe snapshot")
+	if _, err := run.ExportSnapshot(); err == nil || !strings.Contains(err.Error(), "uncertain tool calls") {
+		t.Fatalf("unsafe snapshot = %v", err)
 	}
 }
 
@@ -399,7 +415,7 @@ func FuzzParseSnapshot(f *testing.F) {
 	id, _ := message.NewID("message")
 	value, _ := message.New(id, message.RoleUser, part)
 	toolPlanID, _ := stage.NewPlanID("generation:test")
-	plan, _ := agent.NewPlanIdentity([]string{"provider:test"}, "fuzz:v1", toolPlanID, nil)
+	plan, _ := agent.NewPlanIdentity([]string{"provider:test"}, "fuzz:v1", testWorkspaceFingerprint, toolPlanID, nil)
 	snapshot, _ := agent.NewSnapshot("run", definition, 1, []message.Message{value}, plan, 4, agent.LifecycleSuspended)
 	encoded, _ := snapshot.MarshalBinary()
 	f.Add(encoded)
@@ -432,7 +448,7 @@ func mustPlanIdentity(
 	if err != nil {
 		t.Fatal(err)
 	}
-	identity, err := agent.NewPlanIdentity(compiled, testSnapshotCompatibility, id, definitions)
+	identity, err := agent.NewPlanIdentity(compiled, testSnapshotCompatibility, testWorkspaceFingerprint, id, definitions)
 	if err != nil {
 		t.Fatal(err)
 	}

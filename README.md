@@ -53,12 +53,20 @@ failures, including explicit uncertain mutation outcomes.
 Every run leases one source-owned immutable `stage.ToolPlanLease` before the
 engine allocates an ID or commits an event. `Run.PlanIdentity` combines the
 compiler-generated identities of every executable static bean, an explicit
-snapshot-compatibility identity, the exact tool-plan generation, and canonical
+snapshot-compatibility identity, a workspace SHA-256, the exact tool-plan
+generation, and canonical
 definition fingerprints. Portable import is disabled when that compatibility
 identity is absent; configured import rejects static mismatches before leasing
 the exact generation. Lease release is bounded and happens once before the
 authoritative terminal is chosen, so failure becomes `RunFailed` rather than
 hidden cleanup.
+
+Every engine dispatch also carries those immutable facts plus run, turn, and
+interaction authority through `stage.ToolDispatchScope`. Ordered
+`ToolDispatchGuard` beans form the terminal policy seam immediately above the
+merged compiled/runtime dispatcher. Spice Agent ships no permission policy by
+default; trusted decorators remain outside that seam with their existing
+ordering and trust contract.
 
 The production runtime-plugin host merges a complete authenticated runtime-tool
 set with the compiled Spice dispatcher and atomically publishes it for future

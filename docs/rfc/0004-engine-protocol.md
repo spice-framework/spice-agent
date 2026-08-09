@@ -142,7 +142,7 @@ abandonment returned with a result remain committed uncertain outcomes.
   the same locally owned run without changing its identity.
 - `ExportSnapshot` returns a versioned provider-neutral safe snapshot at a
   supported boundary. `ImportSnapshot` is a separate explicit mutation with
-  idempotency and uncertain-outcome rules, accepts only suspended v1alpha2
+  idempotency and uncertain-outcome rules, accepts only suspended v1alpha3
   snapshots, and preserves the run ID embedded in the snapshot. Clients cannot
   rename an imported run or assert a replacement plan. Export requires a trusted
   signer and import requires keyed HMAC verification before state mutation; an

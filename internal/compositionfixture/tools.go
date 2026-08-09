@@ -5,13 +5,47 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync/atomic"
 
+	"github.com/spice-framework/spice-agent/stage"
 	"github.com/spice-framework/spice-agent/tool"
 	"github.com/spice-framework/spice/lifecycle"
 )
 
+// DispatchGuardLog records generated guard collection execution.
+type DispatchGuardLog struct{ calls atomic.Uint32 }
+
+func (log *DispatchGuardLog) record()       { log.calls.Add(1) }
+func (log *DispatchGuardLog) Calls() uint32 { return log.calls.Load() }
+
+// NewDispatchGuardLog owns guard evidence for the generated fixture.
+//
+// @Bean(name="dispatchGuardLog")
+func NewDispatchGuardLog() *DispatchGuardLog { return &DispatchGuardLog{} }
+
+type fixtureDispatchGuard struct{ log *DispatchGuardLog }
+
+func (guard *fixtureDispatchGuard) Guard(
+	ctx context.Context,
+	_ stage.ToolDispatchScope,
+	_ tool.Definition,
+	_ tool.Call,
+	next stage.ToolDispatchNext,
+) (tool.Result, error) {
+	guard.log.record()
+	return next()
+}
+
+// NewFixtureDispatchGuard contributes the terminal guard through ordinary
+// exact-interface Spice collection injection.
+//
+// @Bean(name="fixtureDispatchGuard")
+func NewFixtureDispatchGuard(log *DispatchGuardLog) stage.ToolDispatchGuard {
+	return &fixtureDispatchGuard{log: log}
+}
+
 // @import { Tool } from "github.com/spice-framework/spice-agent/annotation/agent"
-// @import { Qualifier } from "github.com/spice-framework/spice/annotation/core"
+// @import { Bean, Qualifier } from "github.com/spice-framework/spice/annotation/core"
 
 type fixtureTool struct {
 	definition tool.Definition

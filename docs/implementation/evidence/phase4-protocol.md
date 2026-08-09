@@ -38,7 +38,7 @@ state. Authentication is reserved out of the payload for transport metadata.
 Event replay captures bounds/page/tail registration atomically. Every
 interaction stream begins with one complete pending snapshot, followed by
 revision-contiguous opened/closed deltas. Snapshot import preserves its embedded
-v1alpha2 run ID.
+v1alpha3 run ID.
 
 This is not the final Phase 4 schema freeze. The contract-repair slice defines
 interaction discovery/run identity, reconnect ownership CAS, remote

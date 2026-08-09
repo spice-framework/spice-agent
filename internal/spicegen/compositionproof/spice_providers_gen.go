@@ -10,23 +10,26 @@ import (
 
 	compositionfixture "github.com/spice-framework/spice-agent/internal/compositionfixture"
 	spiceCompositionfixture "github.com/spice-framework/spice-agent/internal/spicegen/compositionproof/sources/internal_/compositionfixture"
+	stage "github.com/spice-framework/spice-agent/stage"
 	spiceconfig "github.com/spice-framework/spice/config"
 	spicelifecycle "github.com/spice-framework/spice/lifecycle"
 )
 
 type applicationDependencies struct {
-	trim               compositionfixture.TextStage
-	cleanup            *compositionfixture.CleanupLog
-	read               compositionfixture.ToolAlias
-	write              compositionfixture.ToolAlias
-	suffix             compositionfixture.TextStage
-	beta               compositionfixture.ProviderAlias
-	alpha              compositionfixture.ProviderAlias
-	fallback           compositionfixture.ProviderAlias
-	fallbackOnly       compositionfixture.FallbackStage
-	replaceableNormal  compositionfixture.ReplaceableStage
-	replaceableDefault compositionfixture.ReplaceableStage
-	proof              *compositionfixture.Proof
+	trim                 compositionfixture.TextStage
+	cleanup              *compositionfixture.CleanupLog
+	read                 compositionfixture.ToolAlias
+	write                compositionfixture.ToolAlias
+	suffix               compositionfixture.TextStage
+	beta                 compositionfixture.ProviderAlias
+	alpha                compositionfixture.ProviderAlias
+	dispatchGuardLog     *compositionfixture.DispatchGuardLog
+	fallback             compositionfixture.ProviderAlias
+	fallbackOnly         compositionfixture.FallbackStage
+	fixtureDispatchGuard stage.ToolDispatchGuard
+	replaceableNormal    compositionfixture.ReplaceableStage
+	replaceableDefault   compositionfixture.ReplaceableStage
+	proof                *compositionfixture.Proof
 }
 
 func constructApplicationDependencies(
@@ -144,6 +147,21 @@ func constructApplicationDependencies(
 		}
 	}
 	_ = alpha
+	dispatchGuardLog, dispatchGuardLogCleanup, err := func() (*compositionfixture.DispatchGuardLog, spicelifecycle.Cleanup, error) {
+		if options.Overrides.DispatchGuardLog.Enabled() {
+			return options.Overrides.DispatchGuardLog.Acquire(ctx)
+		}
+		return spiceCompositionfixture.ConstructDispatchGuardLog_797b8bbb()
+	}()
+	if err != nil {
+		return nil, application.coordinator.Abort(ctx, fmt.Errorf("construct bean dispatchGuardLog (*github.com/spice-framework/spice-agent/internal/compositionfixture.DispatchGuardLog, source spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|19:NewDispatchGuardLog): %w", err))
+	}
+	if dispatchGuardLogCleanup != nil {
+		if err := application.coordinator.RegisterModuleCleanup("github.com/spice-framework/spice-agent", "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|19:NewDispatchGuardLog", dispatchGuardLogCleanup); err != nil {
+			return nil, application.coordinator.Abort(ctx, fmt.Errorf("register cleanup for bean dispatchGuardLog (source spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|19:NewDispatchGuardLog): %w", err))
+		}
+	}
+	_ = dispatchGuardLog
 	fallback, fallbackCleanup, err := func() (compositionfixture.ProviderAlias, spicelifecycle.Cleanup, error) {
 		if options.Overrides.Fallback.Enabled() {
 			return options.Overrides.Fallback.Acquire(ctx)
@@ -160,8 +178,8 @@ func constructApplicationDependencies(
 	}
 	_ = fallback
 	fallbackOnly, fallbackOnlyCleanup, err := func() (compositionfixture.FallbackStage, spicelifecycle.Cleanup, error) {
-		if options.Overrides.Provider8.Enabled() {
-			return options.Overrides.Provider8.Acquire(ctx)
+		if options.Overrides.Provider9.Enabled() {
+			return options.Overrides.Provider9.Acquire(ctx)
 		}
 		return spiceCompositionfixture.ConstructFallbackOnly_7f31930c()
 	}()
@@ -174,9 +192,24 @@ func constructApplicationDependencies(
 		}
 	}
 	_ = fallbackOnly
+	fixtureDispatchGuard, fixtureDispatchGuardCleanup, err := func() (stage.ToolDispatchGuard, spicelifecycle.Cleanup, error) {
+		if options.Overrides.FixtureDispatchGuard.Enabled() {
+			return options.Overrides.FixtureDispatchGuard.Acquire(ctx)
+		}
+		return spiceCompositionfixture.ConstructFixtureDispatchGuard_70698017(dispatchGuardLog)
+	}()
+	if err != nil {
+		return nil, application.coordinator.Abort(ctx, fmt.Errorf("construct bean fixtureDispatchGuard (github.com/spice-framework/spice-agent/stage.ToolDispatchGuard, source spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|23:NewFixtureDispatchGuard): %w", err))
+	}
+	if fixtureDispatchGuardCleanup != nil {
+		if err := application.coordinator.RegisterModuleCleanup("github.com/spice-framework/spice-agent", "spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|23:NewFixtureDispatchGuard", fixtureDispatchGuardCleanup); err != nil {
+			return nil, application.coordinator.Abort(ctx, fmt.Errorf("register cleanup for bean fixtureDispatchGuard (source spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|23:NewFixtureDispatchGuard): %w", err))
+		}
+	}
+	_ = fixtureDispatchGuard
 	replaceableNormal, replaceableNormalCleanup, err := func() (compositionfixture.ReplaceableStage, spicelifecycle.Cleanup, error) {
-		if options.Overrides.Provider9.Enabled() {
-			return options.Overrides.Provider9.Acquire(ctx)
+		if options.Overrides.Provider11.Enabled() {
+			return options.Overrides.Provider11.Acquire(ctx)
 		}
 		return spiceCompositionfixture.ConstructReplaceableNormal_bf8e8d0b()
 	}()
@@ -190,8 +223,8 @@ func constructApplicationDependencies(
 	}
 	_ = replaceableNormal
 	replaceableDefault, replaceableDefaultCleanup, err := func() (compositionfixture.ReplaceableStage, spicelifecycle.Cleanup, error) {
-		if options.Overrides.Provider10.Enabled() {
-			return options.Overrides.Provider10.Acquire(ctx)
+		if options.Overrides.Provider12.Enabled() {
+			return options.Overrides.Provider12.Acquire(ctx)
 		}
 		return spiceCompositionfixture.ConstructReplaceableDefault_c1a89b56()
 	}()
@@ -208,7 +241,7 @@ func constructApplicationDependencies(
 		if options.Overrides.Proof.Enabled() {
 			return options.Overrides.Proof.Acquire(ctx)
 		}
-		return spiceCompositionfixture.ConstructProof_7ff50430(beta, []compositionfixture.TextStage{trim, suffix}, fallbackOnly, replaceableNormal, map[string]compositionfixture.ToolAlias{"read": read, "write": write}, read, cleanup)
+		return spiceCompositionfixture.ConstructProof_7ff50430(beta, []compositionfixture.TextStage{trim, suffix}, fallbackOnly, replaceableNormal, map[string]compositionfixture.ToolAlias{"read": read, "write": write}, []stage.ToolDispatchGuard{fixtureDispatchGuard}, dispatchGuardLog, read, cleanup)
 	}()
 	if err != nil {
 		return nil, application.coordinator.Abort(ctx, fmt.Errorf("construct bean proof (*github.com/spice-framework/spice-agent/internal/compositionfixture.Proof, source spice:symbol:v1|function|66:github.com/spice-framework/spice-agent/internal/compositionfixture|0:|8:NewProof): %w", err))
@@ -220,17 +253,19 @@ func constructApplicationDependencies(
 	}
 	_ = proof
 	return &applicationDependencies{
-		trim:               trim,
-		cleanup:            cleanup,
-		read:               read,
-		write:              write,
-		suffix:             suffix,
-		beta:               beta,
-		alpha:              alpha,
-		fallback:           fallback,
-		fallbackOnly:       fallbackOnly,
-		replaceableNormal:  replaceableNormal,
-		replaceableDefault: replaceableDefault,
-		proof:              proof,
+		trim:                 trim,
+		cleanup:              cleanup,
+		read:                 read,
+		write:                write,
+		suffix:               suffix,
+		beta:                 beta,
+		alpha:                alpha,
+		dispatchGuardLog:     dispatchGuardLog,
+		fallback:             fallback,
+		fallbackOnly:         fallbackOnly,
+		fixtureDispatchGuard: fixtureDispatchGuard,
+		replaceableNormal:    replaceableNormal,
+		replaceableDefault:   replaceableDefault,
+		proof:                proof,
 	}, nil
 }
