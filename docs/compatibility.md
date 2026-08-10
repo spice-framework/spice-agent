@@ -49,9 +49,15 @@ documentation.
 - The preview5 annotated tag exists and resolves to commit
   `3e8fe6406171a7e7f1765311a4fa7fc3b878e425`.
 - The public module proxy resolves preview5.
-- Release workflow run `31343998056` has completed all authority-free jobs and
-  is waiting at its protected attestation environment.
-- There is no GitHub Release object for preview5.
+- Release workflow run `31343998056` completed validation, rendering,
+  independent verification, keyless attestation, provenance authentication,
+  and protected publication.
+- The non-draft GitHub prerelease contains the exact five-asset module set:
+  source archive, SPDX SBOM, release metadata, checksums, and portable Sigstore
+  provenance bundle.
+- Fresh proxy and SumDB resolution yields module sum
+  `h1:rGND9DYx3pssliD1tZQOvPDOZ5GVfQLDc7VJQI3HLOM=` and go.mod sum
+  `h1:pbhYOeNgn4pCIhEmcdbjnFjJijY4ZSLM8ZHxaF2dxz0=`.
 - Engine 1.2/1.3 and plugin 1.0 evidence is source-built. No released-binary
   N/N-1 matrix is claimed.
 

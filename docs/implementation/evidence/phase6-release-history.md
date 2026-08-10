@@ -158,7 +158,7 @@ source archive, SPDX SBOM, release metadata, checksums, and portable Sigstore
 bundle. Preview.1, preview.2, and preview.3 metadata and caller identities
 remain explicit negative quality-gate fixtures.
 
-## `v0.1.0-preview.5`: Phase 7 pre-tag policy authorization
+## `v0.1.0-preview.5`: published Phase 7 module
 
 Preview.5 carries the generic Phase 7 terminal dispatch-guard seam, the
 run-owned interaction requester, typed tool-start and tool-terminal occurrence
@@ -175,6 +175,8 @@ tools byte is changed to authorize the candidate.
 | Reusable organization workflow | `a8f9cc6ffd3a2744c5cae3b52c05e6e91cbc875e` |
 | Product-base CI | [31342184213](https://github.com/spice-framework/spice-agent/actions/runs/31342184213) |
 | Product-base documentation | [31342184208](https://github.com/spice-framework/spice-agent/actions/runs/31342184208) |
+| Successful release run | [31343998056](https://github.com/spice-framework/spice-agent/actions/runs/31343998056) |
+| Published prerelease | [`v0.1.0-preview.5`](https://github.com/spice-framework/spice-agent/releases/tag/v0.1.0-preview.5) |
 
 Both artifact-free policy checks ran from clean hosted-green authority commits
 with Go 1.26.5, vendored dependencies, `GOWORK=off`, `GOPROXY=off`,
@@ -218,11 +220,13 @@ The later annotated tag object
 `3e8fe6406171a7e7f1765311a4fa7fc3b878e425`. The public Go proxy resolves the
 module at preview.5. Release workflow
 [31343998056](https://github.com/spice-framework/spice-agent/actions/runs/31343998056)
-completed candidate validation, rendering, and independent verification and is
-waiting at the protected keyless-attestation environment. There is no GitHub
-Release object for preview.5. A tag, a proxy module, a waiting protected run,
-and a GitHub Release are distinct facts and must not be collapsed into a single
-"released" claim.
+completed candidate validation, deterministic rendering, independent
+verification, keyless attestation, provenance authentication, and protected
+publication. The non-draft GitHub prerelease contains the exact source archive,
+SPDX SBOM, release metadata, checksums, and portable Sigstore provenance
+bundle. Fresh proxy and SumDB resolution yields module sum
+`h1:rGND9DYx3pssliD1tZQOvPDOZ5GVfQLDc7VJQI3HLOM=` and go.mod sum
+`h1:pbhYOeNgn4pCIhEmcdbjnFjJijY4ZSLM8ZHxaF2dxz0=` at the tagged commit.
 
 ## `v0.1.0-preview.6`: Phase 8 stabilization candidate authorization
 
@@ -271,5 +275,5 @@ This preparation changes only canonical release metadata, the reusable caller
 identity, their strict stale-preview.5 regressions, and this history. It does
 not create or move a tag, approve either protected environment, attest or
 publish artifacts, or create a GitHub Release. Preview.5 remains at its
-existing protected-attestation boundary; preview.6 is a distinct future
+immutable published tag and prerelease; preview.6 is a distinct future
 candidate and must never be used to rewrite that immutable history.
