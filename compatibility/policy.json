@@ -32,9 +32,14 @@
     "aggregation": "median-of-five",
     "budget_changes": "measured-evidence-and-reviewed-rationale"
   },
+  "public_authoring": {
+    "manifest": "compatibility/public-authoring.json",
+    "proof_model": "clean-room-released-artifacts-only",
+    "required_extensions": 3
+  },
   "security_exceptions": "compatibility/security-exceptions.json",
   "v1_blockers": [
-    "external-author-proof",
+    "clean-room-public-authoring-proof",
     "frozen-generated-source-contract",
     "released-engine-n-minus-one",
     "released-plugin-n-minus-one"

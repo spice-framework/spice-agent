@@ -111,6 +111,5 @@
       "migration": "docs/migrations/v0.1.0-preview.5-to-v0.1.0-preview.6.md"
     }
   ],
-  "v1_stable": false,
-  "external_author_proven": false
+  "v1_stable": false
 }

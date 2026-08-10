@@ -75,7 +75,7 @@ the current snapshot and plan hard cuts are recorded explicitly.
 Generated ownership and source maps remain deterministic and verified, but the
 generator still identifies itself as a development build. The contract is not
 frozen until an immutable non-development generator and ownership schema are
-released and exercised by external authors.
+released and exercised through the clean-room public-authoring contract.
 
 ### Security exceptions
 

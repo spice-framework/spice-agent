@@ -149,8 +149,8 @@ semantic identity fails before execution. A real terminal guard still denies a
 plan-recommended mutation, proving the plan has no authority. See
 [the planning evidence](evidence/phase8-planning-experiment.md).
 
-- Obtain three independently authored compiled extensions using only public
-  annotation/SDK contracts.
+- Obtain three separately versioned clean-room compiled extensions using only
+  released tools, public documentation, and public annotation/SDK contracts.
 - Run both runtime-plugin languages and a second client against current and
   previous compatible protocols. The plugin-language half is complete. The
   alternate semantic shell proves the second client contract independently,
@@ -164,9 +164,10 @@ plan-recommended mutation, proving the plan has no authority. See
 
 ## Stabilization criteria
 
-`v0.2` SDK beta requires successful stress prototypes plus at least one external
-author able to publish, configure, debug, and test an extension without private
-APIs or core changes. `v1.0` additionally requires:
+`v0.2` SDK beta requires successful stress prototypes plus one complete
+clean-room public-authoring proof able to install, configure, debug, test,
+package, and delete an extension without private APIs, workspace state, or core
+changes. Phase 8 requires three separately versioned proofs. `v1.0` additionally requires:
 
 1. an enforced written Go API and protocol compatibility policy (complete for
    pre-v1 review; stability remains blocked by the criteria below);
@@ -180,8 +181,9 @@ APIs or core changes. `v1.0` additionally requires:
 
 Prototype conformance covers interception completeness, crash markers, snapshot
 round trips, uncertain-operation refusal, alternate-client semantics, distributed
-cancellation, protocol skew, and generated DI replacement. External-author
-testing starts from public documentation and released artifacts only.
+cancellation, protocol skew, and generated DI replacement. Clean-room
+public-authoring tests start from public documentation and released artifacts
+only, use fresh caches, and may not inherit implementation context.
 
 Compatibility matrices are machine-readable and tested. Deprecations include a
 replacement, first/last supported release, migration example, and automated fix
@@ -196,7 +198,7 @@ cost when it is not imported.
 
 Status is **complete for Phase 7 experiments**. Permission, SQLite recovery,
 alternate semantic client, and two-worker extension proofs are implemented.
-Independent-author and broader optional-extension proofs remain Phase 8 work;
+Clean-room public-authoring and broader optional-extension proofs remain Phase 8 work;
 none of the experimental APIs are stabilized by this completion. The non-native
 parallel static extension design remains rejected history and may not be revived
 as a shortcut during experimentation.

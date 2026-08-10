@@ -14,7 +14,7 @@ The canonical status and acceptance evidence live in
 
 Phase 8 now enforces the written pre-v1 Go API, durable-state, engine/plugin
 protocol, generated-source, and security-exception policy. This does not freeze
-the APIs or claim v1: external-author proof, released N/N-1 protocol matrices,
-and an immutable generator contract remain outstanding. Stable kernel benchmark
+the APIs or claim v1: clean-room public-authoring proof, released N/N-1 protocol
+matrices, and an immutable generator contract remain outstanding. Stable kernel benchmark
 budgets and their change policy are now mandatory in the full verifier.
 See the canonical ledger.

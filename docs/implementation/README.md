@@ -13,7 +13,7 @@ Repository roadmaps link here and must not duplicate status.
 | 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, bounded recovery/health, generated activation, real-process cancellation, one real `spice dev` last-known-good proof, and installed daemon/TUI recovery are complete; the simultaneous two-supervisor edit/reconnect proof remains |
 | 6 — architecture proof | In progress | dependency-ordered keyless module releases, then independently attested preview distribution; [Agent preview.1/preview.2/preview.3 failure history](evidence/phase6-release-history.md) |
 | 7 — stress prototypes | Complete | permission, SQLite recovery, alternate semantic shell, and two-worker extension proven without stabilizing their APIs |
-| 8 — stabilization | In progress | enforced pre-v1 API/protocol/durable/security/benchmark policy plus removable deterministic compaction, guarded Git, safe telemetry projection, and advisory planning extensions proven; external authors, released N/N-1 matrices, and generator freeze remain |
+| 8 — stabilization | In progress | enforced pre-v1 API/protocol/durable/security/benchmark/public-authoring policy plus removable deterministic compaction, guarded Git, safe telemetry projection, and advisory planning extensions proven; clean-room public extensions, released N/N-1 matrices, and generator freeze remain |
 
 Exact commits and command output are recorded only after the corresponding gate
 has run. A phase is not complete because code exists; every exit criterion in its
@@ -66,6 +66,16 @@ planner stage and explicit review-before-start service. Canonical plan bytes are
 durable ordinary history, resume does not rerun planning, and existing guards
 remain authoritative. Exact scope is in
 [`phase8-planning-experiment.md`](evidence/phase8-planning-experiment.md).
+
+The former external-author criterion was impossible for the two-maintainer
+project and could not be machine-proven without inventing authorship. It is
+replaced by the stricter reproducible clean-room public-authoring contract in
+`compatibility/public-authoring.json`: three separately versioned modules must
+start from released artifacts and public documentation only, with fresh caches,
+no workspace/private/directive escape hatches, generated composition, full
+install-to-delete operations, and Windows/Linux vendor-offline verification.
+The contract is recorded in
+[`phase8-clean-room-public-authoring.md`](evidence/phase8-clean-room-public-authoring.md).
 
 ## Current Phase 7 boundary
 
@@ -214,7 +224,7 @@ continuation without a registry or `RuntimeGraph`. Exact reproducible commands
 and asserted core output are recorded in
 [`evidence/phase1-composition.md`](evidence/phase1-composition.md). This closes
 Phase 1 for the preview; pre-1.0 contract changes remain governed by the later
-stress and external-author phases.
+stress and clean-room public-authoring phases.
 
 ## Current Phase 3 boundary
 

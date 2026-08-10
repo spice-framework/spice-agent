@@ -22,15 +22,14 @@ import (
 const goAPICompatibilityPath = "compatibility/go-api.json"
 
 type goAPICompatibility struct {
-	Schema               string               `json:"schema"`
-	Module               string               `json:"module"`
-	Status               string               `json:"status"`
-	Baseline             goAPIRelease         `json:"baseline"`
-	PublicPackages       []string             `json:"packages"`
-	Platforms            []goAPIPlatform      `json:"platforms"`
-	ApprovedBreaks       []goAPIApprovedBreak `json:"approved_breaks"`
-	V1Stable             bool                 `json:"v1_stable"`
-	ExternalAuthorProven bool                 `json:"external_author_proven"`
+	Schema         string               `json:"schema"`
+	Module         string               `json:"module"`
+	Status         string               `json:"status"`
+	Baseline       goAPIRelease         `json:"baseline"`
+	PublicPackages []string             `json:"packages"`
+	Platforms      []goAPIPlatform      `json:"platforms"`
+	ApprovedBreaks []goAPIApprovedBreak `json:"approved_breaks"`
+	V1Stable       bool                 `json:"v1_stable"`
 }
 
 type goAPIRelease struct {
@@ -271,7 +270,7 @@ func framedSHA256(values []string) string {
 
 func validateGoAPICompatibility(value goAPICompatibility, root string) error {
 	if value.Schema != "spice.agent.go-api.compatibility/v1alpha1" || value.Module != modulePath ||
-		value.Status != "pre-v1-reviewed-not-stable" || value.V1Stable || value.ExternalAuthorProven {
+		value.Status != "pre-v1-reviewed-not-stable" || value.V1Stable {
 		return errors.New("go API compatibility manifest status differs from the reviewed pre-v1 contract")
 	}
 	if value.Baseline != (goAPIRelease{Release: "v0.1.0-preview.5", Commit: "3e8fe6406171a7e7f1765311a4fa7fc3b878e425", Go: requiredGoVersion}) {

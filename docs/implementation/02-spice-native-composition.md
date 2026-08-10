@@ -99,5 +99,5 @@ their generated provider → named tool → provider continuation through ordina
 Spice beans. The graph uses direct calls and contains no extension registry,
 `RuntimeGraph`, reflection lookup, or second container. Evidence is recorded in
 [`evidence/phase1-composition.md`](evidence/phase1-composition.md). Pre-1.0
-contract evolution and external-author ergonomics remain later-phase work; no
+contract evolution and clean-room public-authoring ergonomics remain later-phase work; no
 repository may introduce a substitute static composition mechanism.

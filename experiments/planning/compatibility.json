@@ -35,6 +35,6 @@
     "daemon_integration": false
   },
   "replace_directives": false,
-  "promotion": "blocked until a real application and independently authored planner prove the contract",
+  "promotion": "blocked until a real application and clean-room public planner prove the contract",
   "deletion": "remove the nested module and planning activation, regenerate the application, and remove the root quality step"
 }

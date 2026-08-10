@@ -1,0 +1,36 @@
+{
+  "schema": "spice.agent.public-authoring.compatibility/v1alpha1",
+  "module": "github.com/spice-framework/spice-agent",
+  "status": "required-not-proven",
+  "proof_model": "clean-room-released-artifacts-only",
+  "required_extensions": 3,
+  "separately_versioned_modules": true,
+  "generated_composition_proof": true,
+  "isolation": {
+    "released_artifacts_only": true,
+    "public_documentation_only": true,
+    "fresh_module_cache": true,
+    "fresh_build_cache": true,
+    "gowork": "off",
+    "replace_directives": false,
+    "exclude_directives": false,
+    "retract_directives": false,
+    "private_imports": false,
+    "workspace_paths": false
+  },
+  "platforms": [
+    "linux/amd64",
+    "windows/amd64"
+  ],
+  "vendor_offline": true,
+  "required_operations": [
+    "install",
+    "configure",
+    "debug",
+    "test",
+    "package",
+    "delete"
+  ],
+  "evidence": [],
+  "proven": false
+}

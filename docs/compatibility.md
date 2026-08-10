@@ -10,6 +10,7 @@ reviewable; it is not a stability promise.
 | policy and v1 blockers | `compatibility/policy.json` |
 | public Go packages and reviewed breaks | `compatibility/go-api.json` |
 | durable state identities and hard cuts | `compatibility/durable.json` |
+| clean-room public authoring | `compatibility/public-authoring.json` |
 | security exceptions | `compatibility/security-exceptions.json` |
 | engine protocol | `engine/v1/compatibility.json` |
 | plugin protocol | `plugin/v1/compatibility.json` |
@@ -64,8 +65,8 @@ documentation.
 
 ## What remains before v1
 
-The repository must still prove external extension authorship, publish and test
-two supported released generations of both protocols, freeze the generated
+The repository must still prove three clean-room public extensions, publish and
+test two supported released generations of both protocols, and freeze the generated
 source ownership contract with an immutable generator. Stable kernel benchmark
 ceilings and the stricter 20% time/10% allocation investigation policy are now
 machine-readable and enforced by `make verify`. See

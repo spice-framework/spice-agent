@@ -59,7 +59,7 @@ provisional and have no noisy pass/fail threshold.
 ## Promotion and deletion
 
 This is contract evidence, not a supported security product. Promotion needs
-independently authored policies plus dependency and threat-model review. To
+clean-room public policy implementations plus dependency and threat-model review. To
 delete it, remove `experiments/permission` and these ledger/RFC evidence links.
 No Agent package, protocol, generated production target, core module graph, or
 release metadata changes.

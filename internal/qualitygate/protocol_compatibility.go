@@ -13,11 +13,12 @@ import (
 )
 
 const (
-	compatibilityPolicyPath         = "compatibility/policy.json"
-	durableCompatibilityPath        = "compatibility/durable.json"
-	engineProtocolCompatibilityPath = "engine/v1/compatibility.json"
-	pluginProtocolCompatibilityPath = "plugin/v1/compatibility.json"
-	securityExceptionsPath          = "compatibility/security-exceptions.json"
+	compatibilityPolicyPath          = "compatibility/policy.json"
+	durableCompatibilityPath         = "compatibility/durable.json"
+	engineProtocolCompatibilityPath  = "engine/v1/compatibility.json"
+	pluginProtocolCompatibilityPath  = "plugin/v1/compatibility.json"
+	publicAuthoringCompatibilityPath = "compatibility/public-authoring.json"
+	securityExceptionsPath           = "compatibility/security-exceptions.json"
 )
 
 type compatibilityPolicy struct {
@@ -29,6 +30,7 @@ type compatibilityPolicy struct {
 	DurableState       durablePolicy         `json:"durable_state"`
 	GeneratedSource    generatedSourcePolicy `json:"generated_source"`
 	Benchmarks         benchmarkPolicy       `json:"benchmarks"`
+	PublicAuthoring    publicAuthoringPolicy `json:"public_authoring"`
 	SecurityExceptions string                `json:"security_exceptions"`
 	V1Blockers         []string              `json:"v1_blockers"`
 }
@@ -66,6 +68,12 @@ type benchmarkPolicy struct {
 	Status        string `json:"status"`
 	Aggregation   string `json:"aggregation"`
 	BudgetChanges string `json:"budget_changes"`
+}
+
+type publicAuthoringPolicy struct {
+	Manifest           string `json:"manifest"`
+	ProofModel         string `json:"proof_model"`
+	RequiredExtensions int    `json:"required_extensions"`
 }
 
 type engineProtocolCompatibility struct {
@@ -224,6 +232,10 @@ func checkCompatibilityManifests(root string) error {
 	if err != nil {
 		return err
 	}
+	publicAuthoring, _, err := readCanonicalJSON[publicAuthoringCompatibility](root, publicAuthoringCompatibilityPath)
+	if err != nil {
+		return err
+	}
 	goAPI, _, err := readCanonicalJSON[goAPICompatibility](root, goAPICompatibilityPath)
 	if err != nil {
 		return err
@@ -241,6 +253,9 @@ func checkCompatibilityManifests(root string) error {
 		return err
 	}
 	if err := validateSecurityExceptions(security); err != nil {
+		return err
+	}
+	if err := validatePublicAuthoringCompatibility(publicAuthoring); err != nil {
 		return err
 	}
 	if err := validateGoAPICompatibility(goAPI, root); err != nil {
@@ -261,6 +276,7 @@ func compatibilityReferencesAreCanonical(policy compatibilityPolicy, engine engi
 		policy.Protocols.Plugin == pluginProtocolCompatibilityPath &&
 		policy.DurableState.Manifest == durableCompatibilityPath &&
 		policy.Benchmarks.Manifest == benchmarkBudgetPath &&
+		policy.PublicAuthoring.Manifest == publicAuthoringCompatibilityPath &&
 		policy.SecurityExceptions == securityExceptionsPath &&
 		engine.PluginCompatibilityManifest == pluginProtocolCompatibilityPath
 }
@@ -274,10 +290,13 @@ func checkEngineProtocolCompatibility(root string) error {
 }
 
 func validateCompatibilityPolicy(value compatibilityPolicy) error {
-	wantBlockers := []string{"external-author-proof", "frozen-generated-source-contract", "released-engine-n-minus-one", "released-plugin-n-minus-one"}
+	wantBlockers := []string{"clean-room-public-authoring-proof", "frozen-generated-source-contract", "released-engine-n-minus-one", "released-plugin-n-minus-one"}
 	wantBenchmarks := benchmarkPolicy{
 		Manifest: benchmarkBudgetPath, Status: "stable-enforced", Aggregation: "median-of-five",
 		BudgetChanges: "measured-evidence-and-reviewed-rationale",
+	}
+	wantPublicAuthoring := publicAuthoringPolicy{
+		Manifest: publicAuthoringCompatibilityPath, ProofModel: "clean-room-released-artifacts-only", RequiredExtensions: 3,
 	}
 	if value.Schema != "spice.agent.compatibility.policy/v1alpha1" || value.Module != modulePath || value.Status != "pre-v1-enforced-not-stable" ||
 		value.GoAPI.PreV1DeprecationReleases != 1 || value.GoAPI.PreV1DeprecationDays != 30 ||
@@ -286,6 +305,7 @@ func validateCompatibilityPolicy(value compatibilityPolicy) error {
 		value.DurableState.AutomaticMigration || value.DurableState.ReinterpretExistingVersion || value.GeneratedSource.Status != "blocked" ||
 		value.GeneratedSource.RequiredContract != "immutable-non-development-generator-and-frozen-ownership-schema" ||
 		value.Benchmarks != wantBenchmarks ||
+		value.PublicAuthoring != wantPublicAuthoring ||
 		!slices.Equal(value.V1Blockers, wantBlockers) {
 		return errors.New("compatibility policy differs from the reviewed pre-v1 contract")
 	}
@@ -433,5 +453,5 @@ func sortedUnique(values []string) bool {
 }
 
 func compatibilityManifestPaths() []string {
-	return []string{compatibilityPolicyPath, durableCompatibilityPath, goAPICompatibilityPath, benchmarkBudgetPath, securityExceptionsPath, engineProtocolCompatibilityPath, pluginProtocolCompatibilityPath}
+	return []string{compatibilityPolicyPath, durableCompatibilityPath, goAPICompatibilityPath, benchmarkBudgetPath, publicAuthoringCompatibilityPath, securityExceptionsPath, engineProtocolCompatibilityPath, pluginProtocolCompatibilityPath}
 }

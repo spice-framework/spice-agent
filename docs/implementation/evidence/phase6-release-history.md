@@ -237,7 +237,7 @@ engine protocol compatibility evidence, independent Go and Python runtime
 plugin breadth, removable permission, recovery, delegation, compaction, Git,
 telemetry, and planning experiments, and the enforced pre-v1 compatibility
 history. Those experiments remain opt-in evidence; this candidate does not
-claim a v1 API freeze, a released N/N-1 binary matrix, or external-author
+claim a v1 API freeze, a released N/N-1 binary matrix, or clean-room public-authoring
 completion.
 
 | Authority | Exact commit or run |

@@ -64,7 +64,7 @@ make benchmark
 
 All commands force `GOWORK=off`, `GOPROXY=off`, and `-mod=vendor`. See
 `benchmarks/README.md` for provisional measurements. Promotion requires
-independently authored policies and a contract/security review; passing these
+clean-room public policy implementations and a contract/security review; passing these
 tests does not stabilize the API. The parent quality gate enforces at least 85%
 handwritten package coverage; the initial experiment measures 88.3%.
 
