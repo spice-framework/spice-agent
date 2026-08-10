@@ -12,6 +12,8 @@ The canonical status and acceptance evidence live in
 7. Contract stress prototypes.
 8. Pre-1.0 stabilization and optional ecosystem breadth.
 
-Phase 8 has begun with the strict source-built engine-protocol compatibility
-matrix. External-author proofs, plugin-generation compatibility, optional
-extensions, and any API freeze remain outstanding; see the canonical ledger.
+Phase 8 now enforces the written pre-v1 Go API, durable-state, engine/plugin
+protocol, generated-source, and security-exception policy. This does not freeze
+the APIs or claim v1: external-author proof, released N/N-1 protocol matrices,
+an immutable generator contract, and stable benchmark policy remain outstanding.
+See the canonical ledger.

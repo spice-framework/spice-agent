@@ -9,11 +9,14 @@ Go and Python plugin/v1 process services then prove the same ordinary engine
 workflow behind each exact mode. This evidence does not claim released-binary
 N/N-1 compatibility and does not freeze the pre-1.0 Go APIs.
 
-[`engine/v1/compatibility.json`](../../../engine/v1/compatibility.json) is the
-canonical compatibility manifest. The repository quality gate rejects unknown
-fields, non-canonical JSON, range drift, retry-policy drift, missing platform
-coverage, a false released-binary claim, engine-coupled plugin versioning,
-missing language breadth, or a false Python production-host claim.
+[`engine/v1/compatibility.json`](../../../engine/v1/compatibility.json) and
+[`plugin/v1/compatibility.json`](../../../plugin/v1/compatibility.json) are
+independent canonical protocol manifests under the top-level
+[`compatibility/policy.json`](../../../compatibility/policy.json). The repository
+quality gate rejects unknown fields, non-canonical JSON, history removal,
+range or retry-policy drift, missing platform/language coverage, a false
+released-binary claim, engine-coupled plugin versioning, or a false Python
+production-host claim.
 
 ## Engine matrix and boundary
 
@@ -89,6 +92,12 @@ go test ./internal/qualitygate ./daemon/grpcserver -run 'TestEngineProtocol|Test
 go test ./internal/pluginconformanceacceptance -run 'TestRuntimePluginLanguagesBehindExactEngineModes/go' -count=1
 make verify-python
 ```
+
+The same gate inventories all 26 written public Go packages, including
+generated protocol exports, and computes declaration digests independently for
+Darwin/arm64, Linux/amd64, and Windows/amd64. Preview5 is an immutable historical
+baseline; current source changes require reviewed platform digests and an
+append-only migration record. This review mechanism does not stabilize the API.
 
 The normal `make fast`, `make check`, and `make verify` gates run the manifest
 validator and Go process matrix. Hosted CI supplies independent Linux and

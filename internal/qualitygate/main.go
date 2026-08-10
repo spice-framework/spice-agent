@@ -37,7 +37,7 @@ func main() {
 }
 
 func execute() int {
-	mode := flag.String("mode", "verify", "verification mode: tools-bootstrap, proto, fast, check, coverage, benchmark, or verify")
+	mode := flag.String("mode", "verify", "verification mode: tools-bootstrap, proto, api-baseline, fast, check, coverage, benchmark, or verify")
 	flag.Parse()
 	ctx, cancel := context.WithTimeout(context.Background(), gateTimeout(*mode))
 	defer cancel()
@@ -74,6 +74,9 @@ func run(ctx context.Context, root, mode string) error {
 	if mode == "proto" {
 		return generateProtocol(ctx, root, root)
 	}
+	if mode == "api-baseline" {
+		return renderCurrentAPIBaseline(ctx, root)
+	}
 	productEnvironment := map[string]string{
 		"GOFLAGS":     "-mod=vendor",
 		"GOPROXY":     "off",
@@ -85,6 +88,9 @@ func run(ctx context.Context, root, mode string) error {
 			return err
 		}
 		return checkReleaseMetadata(root)
+	}}
+	apiCompatibility := step{"public Go API compatibility", func() error {
+		return checkGoAPISurface(ctx, root)
 	}}
 	diffHygiene := step{"diff hygiene", func() error {
 		// Nested vendor is byte-reproduced below and may contain upstream
@@ -122,23 +128,24 @@ func run(ctx context.Context, root, mode string) error {
 		)
 	}}
 	steps := []step{
-		identity, diffHygiene, tests, permissionExperiment, sqliteRecoveryExperiment,
+		identity, apiCompatibility, diffHygiene, tests, permissionExperiment, sqliteRecoveryExperiment,
 		twoWorkerExperiment, compactionExperiment, gitWorkflowExperiment, telemetryExperiment,
 		planningExperiment,
 	}
 	if mode == "coverage" {
-		steps = []step{identity, diffHygiene, {"coverage", func() error {
+		steps = []step{identity, apiCompatibility, diffHygiene, {"coverage", func() error {
 			return coverage(ctx, root, productEnvironment)
 		}}}
 	}
 	if mode == "benchmark" {
-		steps = []step{identity, diffHygiene, {"kernel runtime benchmarks", func() error {
+		steps = []step{identity, apiCompatibility, diffHygiene, {"kernel runtime benchmarks", func() error {
 			return kernelRuntimeBenchmarks(ctx, root, productEnvironment)
 		}}}
 	}
 	if mode == "check" || mode == "verify" {
 		steps = []step{
 			identity,
+			apiCompatibility,
 			diffHygiene,
 			{"formatting", func() error { return checkFormatting(ctx, root) }},
 			{"module and vendor", func() error { return checkModule(ctx, root) }},
@@ -578,7 +585,7 @@ func checkIdentity(root string) error {
 	if err := checkRepositoryPortability(root); err != nil {
 		return err
 	}
-	if err := checkEngineProtocolCompatibility(root); err != nil {
+	if err := checkCompatibilityManifests(root); err != nil {
 		return err
 	}
 	return checkReleaseWorkflow(root)

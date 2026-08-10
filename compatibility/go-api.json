@@ -1,0 +1,116 @@
+{
+  "schema": "spice.agent.go-api.compatibility/v1alpha1",
+  "module": "github.com/spice-framework/spice-agent",
+  "status": "pre-v1-reviewed-not-stable",
+  "baseline": {
+    "release": "v0.1.0-preview.5",
+    "commit": "3e8fe6406171a7e7f1765311a4fa7fc3b878e425",
+    "go_version": "go1.26.5"
+  },
+  "packages": [
+    "github.com/spice-framework/spice-agent",
+    "github.com/spice-framework/spice-agent/agent",
+    "github.com/spice-framework/spice-agent/annotation/agent",
+    "github.com/spice-framework/spice-agent/annotation/agenttool",
+    "github.com/spice-framework/spice-agent/client",
+    "github.com/spice-framework/spice-agent/client/grpcclient",
+    "github.com/spice-framework/spice-agent/client/localclient",
+    "github.com/spice-framework/spice-agent/client/managed",
+    "github.com/spice-framework/spice-agent/common/v1",
+    "github.com/spice-framework/spice-agent/daemon",
+    "github.com/spice-framework/spice-agent/daemon/endpoint",
+    "github.com/spice-framework/spice-agent/daemon/grpcserver",
+    "github.com/spice-framework/spice-agent/daemon/localipc",
+    "github.com/spice-framework/spice-agent/engine/v1",
+    "github.com/spice-framework/spice-agent/event",
+    "github.com/spice-framework/spice-agent/interaction",
+    "github.com/spice-framework/spice-agent/message",
+    "github.com/spice-framework/spice-agent/model",
+    "github.com/spice-framework/spice-agent/plugin/conformance",
+    "github.com/spice-framework/spice-agent/plugin/host",
+    "github.com/spice-framework/spice-agent/plugin/host/autoconfigure",
+    "github.com/spice-framework/spice-agent/plugin/host/localendpoint",
+    "github.com/spice-framework/spice-agent/plugin/v1",
+    "github.com/spice-framework/spice-agent/process",
+    "github.com/spice-framework/spice-agent/stage",
+    "github.com/spice-framework/spice-agent/tool"
+  ],
+  "platforms": [
+    {
+      "goos": "darwin",
+      "goarch": "arm64",
+      "baseline_package_sha256": "4911815649911c1ef13cc4a6f00b5cbbef03cdd93388824c66b1646d10abe9c0",
+      "baseline_declaration_sha256": "e70ab391059d657839a3722ac9d700853d6e432c3776f17231ee04de36e712e8",
+      "current_package_sha256": "4911815649911c1ef13cc4a6f00b5cbbef03cdd93388824c66b1646d10abe9c0",
+      "current_declaration_sha256": "eea8d3b00be40ea014f2240afad64f49fbc71cda985cd36bac758ab5add8e069"
+    },
+    {
+      "goos": "linux",
+      "goarch": "amd64",
+      "baseline_package_sha256": "4911815649911c1ef13cc4a6f00b5cbbef03cdd93388824c66b1646d10abe9c0",
+      "baseline_declaration_sha256": "e70ab391059d657839a3722ac9d700853d6e432c3776f17231ee04de36e712e8",
+      "current_package_sha256": "4911815649911c1ef13cc4a6f00b5cbbef03cdd93388824c66b1646d10abe9c0",
+      "current_declaration_sha256": "eea8d3b00be40ea014f2240afad64f49fbc71cda985cd36bac758ab5add8e069"
+    },
+    {
+      "goos": "windows",
+      "goarch": "amd64",
+      "baseline_package_sha256": "4911815649911c1ef13cc4a6f00b5cbbef03cdd93388824c66b1646d10abe9c0",
+      "baseline_declaration_sha256": "a2b46e29ad086be6e6d48c235b0c6fab27a9480b64ac33de8a3f91fe122a4a72",
+      "current_package_sha256": "4911815649911c1ef13cc4a6f00b5cbbef03cdd93388824c66b1646d10abe9c0",
+      "current_declaration_sha256": "2117c792423e2186d53afa09ab852de087b806db095f769e4bc4f660e88a5ec7"
+    }
+  ],
+  "approved_breaks": [
+    {
+      "id": "SPICE-AGENT-GO-0001",
+      "transition": "v0.1.0-preview.4-to-v0.1.0-preview.5",
+      "package": "github.com/spice-framework/spice-agent/stage",
+      "symbol": "ToolDispatcher.Dispatch",
+      "kind": "interface-signature",
+      "migration": "docs/migrations/v0.1.0-preview.4-to-v0.1.0-preview.5.md"
+    },
+    {
+      "id": "SPICE-AGENT-GO-0002",
+      "transition": "v0.1.0-preview.4-to-v0.1.0-preview.5",
+      "package": "github.com/spice-framework/spice-agent/agent",
+      "symbol": "NewPlanIdentity",
+      "kind": "function-signature",
+      "migration": "docs/migrations/v0.1.0-preview.4-to-v0.1.0-preview.5.md"
+    },
+    {
+      "id": "SPICE-AGENT-GO-0003",
+      "transition": "v0.1.0-preview.4-to-v0.1.0-preview.5",
+      "package": "github.com/spice-framework/spice-agent/plugin/host/autoconfigure",
+      "symbol": "DefaultHost",
+      "kind": "function-signature",
+      "migration": "docs/migrations/v0.1.0-preview.4-to-v0.1.0-preview.5.md"
+    },
+    {
+      "id": "SPICE-AGENT-GO-0004",
+      "transition": "v0.1.0-preview.4-to-v0.1.0-preview.5",
+      "package": "github.com/spice-framework/spice-agent/agent",
+      "symbol": "EngineOptions",
+      "kind": "exported-struct-shape",
+      "migration": "docs/migrations/v0.1.0-preview.4-to-v0.1.0-preview.5.md"
+    },
+    {
+      "id": "SPICE-AGENT-GO-0005",
+      "transition": "v0.1.0-preview.5-to-next-preview",
+      "package": "github.com/spice-framework/spice-agent/plugin/host",
+      "symbol": "HostConfig.Processes",
+      "kind": "exported-field-type",
+      "migration": "docs/migrations/v0.1.0-preview.5-to-next-preview.md"
+    },
+    {
+      "id": "SPICE-AGENT-GO-0006",
+      "transition": "v0.1.0-preview.5-to-next-preview",
+      "package": "github.com/spice-framework/spice-agent/plugin/host/autoconfigure",
+      "symbol": "DefaultHost",
+      "kind": "function-signature",
+      "migration": "docs/migrations/v0.1.0-preview.5-to-next-preview.md"
+    }
+  ],
+  "v1_stable": false,
+  "external_author_proven": false
+}

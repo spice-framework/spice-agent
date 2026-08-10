@@ -13,7 +13,7 @@ Repository roadmaps link here and must not duplicate status.
 | 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, bounded recovery/health, generated distribution activation, real-process cancellation, and real `spice dev` last-known-good proof complete; simultaneous installed daemon/TUI fault-reconnect proof pending |
 | 6 — architecture proof | In progress | dependency-ordered keyless module releases, then independently attested preview distribution; [Agent preview.1/preview.2/preview.3 failure history](evidence/phase6-release-history.md) |
 | 7 — stress prototypes | Complete | permission, SQLite recovery, alternate semantic shell, and two-worker extension proven without stabilizing their APIs |
-| 8 — stabilization | In progress | source-built engine compatibility matrix plus removable deterministic compaction, guarded Git, safe telemetry projection, and advisory planning extensions proven; external authors and frozen compatibility policy remain |
+| 8 — stabilization | In progress | enforced pre-v1 API/protocol/durable/security policy plus removable deterministic compaction, guarded Git, safe telemetry projection, and advisory planning extensions proven; external authors, released N/N-1 matrices, generator freeze, and benchmark thresholds remain |
 
 Exact commits and command output are recorded only after the corresponding gate
 has run. A phase is not complete because code exists; every exit criterion in its
@@ -21,13 +21,15 @@ document must be green on Windows and Linux where required.
 
 ## Current Phase 8 boundary
 
-The first compatibility slice makes engine protocol 1.0–1.3 semantics
+The compatibility program makes engine protocol 1.0–1.3 semantics
 machine-readable and proves source-built previous (1.2) and current (1.3)
 profiles over authenticated real local processes on Linux and Windows. The
 acceptance-only 1.2 server cap is private; production continues to advertise
 the complete range. This is not a released-binary N/N-1 claim, and plugin
-generation compatibility remains a separate next slice. Exact scope and tests
-are recorded in
+generation compatibility remains independently versioned. The strict pre-v1
+policy now also records the exact 26-package Go API on three platforms, reviewed
+break migrations, durable format history, plugin/v1 history, security
+exceptions, and the still-blocked v1 criteria. Exact scope and tests are recorded in
 [`phase8-engine-protocol-compatibility.md`](evidence/phase8-engine-protocol-compatibility.md).
 
 The first optional-extension proof is the isolated `experiments/compaction`

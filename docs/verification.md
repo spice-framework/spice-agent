@@ -59,14 +59,22 @@ security, and offline-build inputs. They are excluded only from handwritten
 formatting and coverage-denominator checks because their source schemas and
 deterministic freshness are separately enforced.
 
-Every quality-gate mode also validates the exact canonical
-`engine/v1/compatibility.json` contract. Ordinary tests launch source-built
+Every quality-gate mode validates all strict canonical compatibility manifests,
+their cross-references, append-only histories, and the exact 26-package public
+Go surface. The API gate evaluates `darwin/arm64`, `linux/amd64`, and
+`windows/amd64` separately with offline `go list`; generated protocol exports
+are included and mutually exclusive platform files are never unioned. The
+read-only `go run ./internal/qualitygate -mode=api-baseline` command prints the
+current package/declaration digests for review.
+
+Ordinary tests launch source-built
 previous-semantics and current-semantics servers over the public local IPC,
 gRPC client, and server boundaries. The decisive process matrix runs on Linux
 and Windows, checks retry/ambiguity/cancellation/cleanup behavior, and is
 explicitly not evidence of released-binary N/N-1 compatibility.
 
-The same manifest locks the separate plugin/v1 breadth claim. Ordinary hosted
+The independent `plugin/v1/compatibility.json` manifest locks the plugin/v1
+breadth claim. Ordinary hosted
 tests launch the source-built Go plugin fixture, validate its public protocol
 traffic, and route its immutable leased tool plan through exact engine 1.2 and
 1.3 clients. `make verify-python` repeats that matrix with the independently

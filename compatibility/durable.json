@@ -1,0 +1,91 @@
+{
+  "schema": "spice.agent.durable.compatibility/v1alpha1",
+  "status": "pre-v1-hard-cuts-recorded",
+  "formats": [
+    {
+      "name": "event-tool-started",
+      "current": "spice.agent.tool-started/v1alpha1",
+      "package": "agent",
+      "decode": "DecodeToolStartedOccurrence"
+    },
+    {
+      "name": "event-tool-terminal",
+      "current": "spice.agent.tool-terminal/v1alpha1",
+      "package": "agent",
+      "decode": "DecodeToolTerminalOccurrence"
+    },
+    {
+      "name": "plan-identity",
+      "current": "spice-agent-plan/v3",
+      "package": "agent",
+      "decode": "NewPlanIdentity"
+    },
+    {
+      "name": "snapshot",
+      "current": "spice.agent.snapshot/v1alpha3",
+      "package": "agent",
+      "decode": "ParseSnapshot"
+    },
+    {
+      "name": "snapshot-envelope",
+      "current": "spice.agent.snapshot/v1alpha3",
+      "package": "engine/v1",
+      "decode": "ValidateSnapshotEnvelope"
+    }
+  ],
+  "event_mappings": [
+    {
+      "event": "tool_started",
+      "format": "spice.agent.tool-started/v1alpha1"
+    },
+    {
+      "event": "tool_completed",
+      "format": "spice.agent.tool-terminal/v1alpha1"
+    },
+    {
+      "event": "tool_failed",
+      "format": "spice.agent.tool-terminal/v1alpha1"
+    }
+  ],
+  "history": [
+    {
+      "format": "spice-agent-plan/v2",
+      "status": "rejected",
+      "replacement": "spice-agent-plan/v3",
+      "automatic_migration": false
+    },
+    {
+      "format": "spice.agent.snapshot/v1alpha1",
+      "status": "rejected",
+      "replacement": "spice.agent.snapshot/v1alpha3",
+      "automatic_migration": false
+    },
+    {
+      "format": "spice.agent.snapshot/v1alpha2",
+      "status": "rejected-missing-workspace-authority",
+      "replacement": "spice.agent.snapshot/v1alpha3",
+      "automatic_migration": false
+    },
+    {
+      "format": "spice.agent.snapshot/v1alpha3",
+      "status": "current",
+      "replacement": "",
+      "automatic_migration": false
+    },
+    {
+      "format": "spice.agent.tool-started/v1alpha1",
+      "status": "current",
+      "replacement": "",
+      "automatic_migration": false
+    },
+    {
+      "format": "spice.agent.tool-terminal/v1alpha1",
+      "status": "current",
+      "replacement": "",
+      "automatic_migration": false
+    }
+  ],
+  "current_and_previous_supported": false,
+  "migration_tool_available": false,
+  "v1_stable": false
+}

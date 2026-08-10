@@ -1,0 +1,37 @@
+{
+  "schema": "spice.agent.compatibility.policy/v1alpha1",
+  "module": "github.com/spice-framework/spice-agent",
+  "status": "pre-v1-enforced-not-stable",
+  "go_api": {
+    "manifest": "compatibility/go-api.json",
+    "pre_v1_deprecation_releases": 1,
+    "pre_v1_deprecation_days": 30,
+    "v1_deprecation_minor_releases": 2,
+    "v1_deprecation_days": 180,
+    "v1_removal": "next-module-major"
+  },
+  "protocols": {
+    "engine": "engine/v1/compatibility.json",
+    "plugin": "plugin/v1/compatibility.json",
+    "supported_released_generations_required": 2,
+    "support_minor_releases": 2,
+    "support_days": 180
+  },
+  "durable_state": {
+    "manifest": "compatibility/durable.json",
+    "automatic_migration": false,
+    "reinterpret_existing_version": false
+  },
+  "generated_source": {
+    "status": "blocked",
+    "required_contract": "immutable-non-development-generator-and-frozen-ownership-schema"
+  },
+  "security_exceptions": "compatibility/security-exceptions.json",
+  "v1_blockers": [
+    "external-author-proof",
+    "frozen-generated-source-contract",
+    "released-engine-n-minus-one",
+    "released-plugin-n-minus-one",
+    "stable-benchmark-regression-policy"
+  ]
+}

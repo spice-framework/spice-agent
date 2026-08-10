@@ -17,6 +17,7 @@ Spice platform's broader Spring coverage remains owned by the Spice repository.
 | task delegation/executor | experimental `worker.delegate` tool | delegates through an injected public Session to an ordinary second run; no parent/child context, scheduler, or proxy container |
 | distributed cancellation | `Session.Cancel` from `worker.delegate` | proven across authenticated current-user IPC and a second RunHost; uncertain mutation outcomes fail closed |
 | explicit planning workflow | experimental typed `planning.Planner` + `Service.Prepare`/`StartPrepared` | generated application-owned pre-start stage with durable canonical advisory content; no kernel planner, hidden model call, or policy authority |
+| Spring compatibility/deprecation policy | Agent pre-v1 compatibility manifests and migration guides | exact cross-platform Go API, durable identities, and independent engine/plugin histories are enforced without claiming v1 or JVM binary compatibility |
 
 All Phase 7 and Phase 8 experiments are removable without affecting core. Their
 completion is evidence for contract review, not an API-stability or Spring

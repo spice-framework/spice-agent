@@ -84,14 +84,17 @@ only after its contract passes and a dependency/security review is approved.
 
 ## Phase 8 ecosystem breadth
 
-Status: **in progress**. The first bounded compatibility slices commit an exact
-machine-readable engine-protocol matrix, prove source-built previous (1.2) and
+Status: **in progress**. The bounded compatibility slices commit an exact
+machine-readable policy for the 26-package cross-platform Go API, durable
+identities, engine and plugin protocol histories, generated-source readiness,
+and security exceptions. They prove source-built previous (1.2) and
 current (1.3) semantics through real authenticated local processes on Linux and
 Windows, and run independent Go and Python plugin/v1 process services through
 an immutable run-leased tool plan behind both exact engine modes. Plugin
 versioning remains independent, and the evidence deliberately makes neither a
 released-binary N/N-1 claim nor a native Python Host-launch claim. See
-[the engine compatibility evidence](evidence/phase8-engine-protocol-compatibility.md).
+[the engine compatibility evidence](evidence/phase8-engine-protocol-compatibility.md)
+and [RFC 0010](../rfc/0010-api-and-protocol-compatibility.md).
 
 The MCP experiment remains blocked before implementation. The immutable
 preview5 module predates the public verified-child launcher required to start a
@@ -165,7 +168,8 @@ plan-recommended mutation, proving the plan has no authority. See
 author able to publish, configure, debug, and test an extension without private
 APIs or core changes. `v1.0` additionally requires:
 
-1. a written Go API and protocol compatibility policy;
+1. an enforced written Go API and protocol compatibility policy (complete for
+   pre-v1 review; stability remains blocked by the criteria below);
 2. frozen generated-source ownership/source-map contracts;
 3. at least two supported protocol generations with upgrade tests;
 4. supported security response and dependency update processes;

@@ -212,3 +212,14 @@ workflow run. This commit advances only canonical release metadata, the audited
 caller pin, their quality-gate constants and stale preview.4 negatives, and
 this history. The policy match and green product base do not create, approve,
 tag, attest, or publish a release.
+
+The later annotated tag object
+`f92c391ea0fa3bcd746d2d0ce6704ecd1d558a42` resolves to candidate commit
+`3e8fe6406171a7e7f1765311a4fa7fc3b878e425`. The public Go proxy resolves the
+module at preview.5. Release workflow
+[31343998056](https://github.com/spice-framework/spice-agent/actions/runs/31343998056)
+completed candidate validation, rendering, and independent verification and is
+waiting at the protected keyless-attestation environment. There is no GitHub
+Release object for preview.5. A tag, a proxy module, a waiting protected run,
+and a GitHub Release are distinct facts and must not be collapsed into a single
+"released" claim.

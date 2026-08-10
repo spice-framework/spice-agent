@@ -1,0 +1,7 @@
+{
+  "schema": "spice.agent.security-exceptions/v1alpha1",
+  "module": "github.com/spice-framework/spice-agent",
+  "downgrade_to_withdrawn_version": "forbidden",
+  "active": [],
+  "history": []
+}

@@ -8,12 +8,14 @@ contracts, deterministic execution, events, interactions, protocols, and
 conformance support. Providers, coding tools, user interfaces, and distributions
 live in independently versioned repositories.
 
-This project is pre-1.0. See [the implementation ledger](docs/implementation/README.md)
-and [architecture](ARCHITECTURE.md) before adopting its APIs.
+This project is pre-1.0. See [the implementation ledger](docs/implementation/README.md),
+[compatibility policy](docs/compatibility.md), and [architecture](ARCHITECTURE.md)
+before adopting its APIs.
 
 ```text
 make tools-bootstrap # explicit fresh-cache dependency download
 make proto           # regenerate committed Protobuf Go with local tools
+go run ./internal/qualitygate -mode=api-baseline # inspect cross-platform public API
 make fast            # affected feedback
 make check           # broad edit loop, including protocol compatibility
 make benchmark       # bounded offline kernel runtime baseline
