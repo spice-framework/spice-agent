@@ -200,3 +200,10 @@ Independent-author and broader optional-extension proofs remain Phase 8 work;
 none of the experimental APIs are stabilized by this completion. The non-native
 parallel static extension design remains rejected history and may not be revived
 as a shortcut during experimentation.
+
+Criterion 5 is now satisfied for the kernel runtime boundary. The canonical
+budget manifest fixes exact benchmark identities, five-sample median
+aggregation, stable time/byte/allocation ceilings, 20% time and 10% allocation
+material-regression thresholds, and the evidence required to change a budget.
+`make benchmark` and `make verify` both enforce it; optional-extension and
+installed-distribution budgets remain owned by their separate evidence.

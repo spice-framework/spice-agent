@@ -177,6 +177,9 @@ func run(ctx context.Context, root, mode string) error {
 					"go", "test", "-race", "-tags=spice_acceptance", "-shuffle=on", "-count=1", "./daemon/endpoint",
 				)
 			}},
+			step{"kernel runtime budgets", func() error {
+				return kernelRuntimeBenchmarks(ctx, root, productEnvironment)
+			}},
 			step{"fuzz smoke", func() error { return fuzz(ctx, root, productEnvironment) }},
 			step{"coverage", func() error { return coverage(ctx, root, productEnvironment) }},
 			step{"offline vendor", func() error { return offline(ctx, root) }},
@@ -427,51 +430,39 @@ func kernelRuntimeBenchmarks(
 	root string,
 	environment map[string]string,
 ) error {
+	budgets, err := loadKernelRuntimeBenchmarkBudgets(root)
+	if err != nil {
+		return err
+	}
 	output, err := capture(ctx, root, environment, "go", kernelRuntimeBenchmarkArguments()...)
 	if err != nil {
 		return err
 	}
-	if err = validateKernelRuntimeBenchmarkOutput(output); err != nil {
-		return err
+	for _, budget := range budgets {
+		measurements, parseErr := parseBenchmarkMeasurements(output, budget.Name)
+		if parseErr != nil {
+			return parseErr
+		}
+		median := medianBenchmarkMeasurement(measurements)
+		fmt.Printf(
+			"    %s median: %.0f ns/op, %.0f B/op, %.0f allocs/op\n",
+			budget.Name, median.NSPerOp, median.BytesPerOp, median.AllocsPerOp,
+		)
+		if budgetErr := enforceKernelRuntimeBenchmarkBudget(budget, median); budgetErr != nil {
+			return budgetErr
+		}
 	}
 	fmt.Print(output)
 	return nil
 }
 
 func validateKernelRuntimeBenchmarkOutput(output string) error {
-	required := [...]string{
-		"BenchmarkKernelEngineConstruction",
-		"BenchmarkKernelTextRun",
-		"BenchmarkKernelToolRound",
-		"BenchmarkKernelCancellation",
-	}
-	counts := make(map[string]int, len(required))
-	for line := range strings.Lines(output) {
-		line = strings.TrimSpace(line)
-		for _, name := range required {
-			if benchmarkOutputLineMatches(line, name) {
-				counts[name]++
-			}
-		}
-	}
-	for _, name := range required {
-		if counts[name] != 5 {
-			return fmt.Errorf("kernel runtime benchmark %s produced %d samples; require 5", name, counts[name])
+	for _, budget := range expectedKernelRuntimeBudgets() {
+		if _, err := parseBenchmarkMeasurements(output, budget.Name); err != nil {
+			return err
 		}
 	}
 	return nil
-}
-
-func benchmarkOutputLineMatches(line, name string) bool {
-	if !strings.HasPrefix(line, name) || len(line) == len(name) {
-		return false
-	}
-	switch line[len(name)] {
-	case '-', ' ', '\t':
-		return true
-	default:
-		return false
-	}
 }
 
 type bootstrapRunner func(context.Context, string, ...string) error

@@ -94,8 +94,11 @@ break/migration record in the same commit. Historical digests and durable
 history cannot be rewritten.
 
 `v1.0` remains blocked on external extension authorship, released engine and
-plugin N/N-1 matrices, a frozen generated-source contract, and stable benchmark
-regression policy. Those facts cannot be satisfied by documentation alone.
+plugin N/N-1 matrices, and a frozen generated-source contract. Stable kernel
+benchmark budgets are now a canonical enforced contract: five fixed samples,
+median time/byte/allocation ceilings, 20% time and 10% allocation material
+regression thresholds, and a measured-evidence requirement for budget changes.
+The remaining facts cannot be satisfied by documentation alone.
 
 ## Deletion and migration
 

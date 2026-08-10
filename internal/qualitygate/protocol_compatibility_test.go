@@ -65,7 +65,8 @@ func TestCompatibilityManifestsFailClosed(t *testing.T) {
 		old         string
 		replacement string
 	}{
-		{name: "policy blocker removed", path: compatibilityPolicyPath, old: "    \"stable-benchmark-regression-policy\"\n", replacement: ""},
+		{name: "benchmark policy weakened", path: compatibilityPolicyPath, old: "\"status\": \"stable-enforced\"", replacement: "\"status\": \"advisory\""},
+		{name: "benchmark ceiling widened", path: benchmarkBudgetPath, old: "\"maximum_ns_per_op\": 1000000", replacement: "\"maximum_ns_per_op\": 2000000"},
 		{name: "Go API platform drift", path: goAPICompatibilityPath, old: "\"goarch\": \"arm64\"", replacement: "\"goarch\": \"amd64\""},
 		{name: "Go API digest drift", path: goAPICompatibilityPath, old: "e70ab391059d657839a3722ac9d700853d6e432c3776f17231ee04de36e712e8", replacement: strings.Repeat("a", 64)},
 		{name: "Go API approved break rewritten", path: goAPICompatibilityPath, old: "\"kind\": \"interface-signature\"", replacement: "\"kind\": \"addition\""},

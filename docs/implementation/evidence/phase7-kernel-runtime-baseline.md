@@ -12,7 +12,10 @@ independent samples with allocation reporting:
 - cooperative cancellation from an active model stream through the run
   terminal.
 
-The quality gate rejects a missing benchmark or sample. The command uses the
+The quality gate rejects a missing benchmark or sample, computes the median of
+time, bytes, and allocations independently, and rejects the stable ceilings in
+`benchmarks/budgets.json`. The same budget step is mandatory in `make verify`.
+The command uses the
 committed vendor graph with `GOPROXY=off`, `GOTOOLCHAIN=local`, and `GOWORK=off`.
 It does not contact a provider, launch a plugin, start a daemon, or include model
 latency.
@@ -41,6 +44,19 @@ Comparable runs use the same Go version, GOOS/GOARCH, CPU, power policy, command
 and clean source tree. A median time increase above 20% or steady allocation
 count increase above 10% is material and requires investigation and recorded
 rationale before release. Absolute machine-specific values are evidence, not a
-flaky per-commit pass/fail threshold. Distribution-level startup, connection,
-event-latency, and cancellation budgets remain separate installed-artifact
-proofs.
+portable regression baseline. Cross-host enforcement instead uses the reviewed
+absolute ceilings in the canonical budget manifest. A ceiling change requires
+measured evidence and reviewed rationale in the manifest and compatibility
+gate; widening only the JSON fails closed. Distribution-level startup,
+connection, event-latency, and cancellation budgets remain separate
+installed-artifact proofs.
+
+## Stable budget adoption
+
+The preview.6 candidate tree at `85ab0ecf9101de2765616af15c92d4fd333f979c`
+replayed the exact command on the original Windows/amd64 Ryzen 9 5900X host.
+Median time was 1,673 ns/op for construction, 17,186 for text, 49,053 for the
+tool round, and 20,271 for cancellation. Median bytes/allocations were
+1,664/29, 11,193/140, 27,785/383, and 12,623/160 respectively. Every path
+remained below both its original material-regression threshold and its stable
+cross-host ceiling before the budget became mandatory.

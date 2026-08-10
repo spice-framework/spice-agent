@@ -4,17 +4,19 @@ All ordinary repository commands are offline and select exactly the Go 1.26.5
 toolchain that launched the quality gate. `make fast` is the affected feedback
 loop, `make check` adds formatting, module/vendor, Protobuf, architecture, vet,
 and shuffled tests, and `make verify` adds lint/NilAway, security, race, fuzz,
-coverage, and vendor-only build proof.
+coverage, stable kernel runtime budgets, and vendor-only build proof.
 Formatting enumerates the same complete sorted Go-file set in deterministic
 bounded batches so Windows command-line limits cannot silently reduce coverage.
 
 `make benchmark` is the bounded offline runtime comparison command. It executes
 the four `BenchmarkKernel*` paths for 500 iterations and five samples on one
 logical CPU with allocation reporting. The gate fails when a benchmark or
-sample is missing; machine-specific time and allocation results are compared
-under the regression policy in
+sample is missing, computes the median of each metric independently, and rejects
+the stable time, byte, or allocation ceilings in `benchmarks/budgets.json`.
+Those same budgets run in `make verify`. Comparable machine-specific results
+remain subject to the stricter material-regression policy in
 [`phase7-kernel-runtime-baseline.md`](implementation/evidence/phase7-kernel-runtime-baseline.md),
-not enforced as noisy absolute thresholds on unrelated hosts.
+and any ceiling change requires measured evidence plus reviewed rationale.
 
 Hosted CI keeps the cross-platform proof and the expensive repository-quality
 mirror distinct. The reusable verifier remains pinned and owns Linux, macOS,

@@ -28,6 +28,7 @@ type compatibilityPolicy struct {
 	Protocols          protocolPolicy        `json:"protocols"`
 	DurableState       durablePolicy         `json:"durable_state"`
 	GeneratedSource    generatedSourcePolicy `json:"generated_source"`
+	Benchmarks         benchmarkPolicy       `json:"benchmarks"`
 	SecurityExceptions string                `json:"security_exceptions"`
 	V1Blockers         []string              `json:"v1_blockers"`
 }
@@ -58,6 +59,13 @@ type durablePolicy struct {
 type generatedSourcePolicy struct {
 	Status           string `json:"status"`
 	RequiredContract string `json:"required_contract"`
+}
+
+type benchmarkPolicy struct {
+	Manifest      string `json:"manifest"`
+	Status        string `json:"status"`
+	Aggregation   string `json:"aggregation"`
+	BudgetChanges string `json:"budget_changes"`
 }
 
 type engineProtocolCompatibility struct {
@@ -238,12 +246,23 @@ func checkCompatibilityManifests(root string) error {
 	if err := validateGoAPICompatibility(goAPI, root); err != nil {
 		return err
 	}
-	if policy.GoAPI.Manifest != goAPICompatibilityPath || policy.Protocols.Engine != engineProtocolCompatibilityPath ||
-		policy.Protocols.Plugin != pluginProtocolCompatibilityPath || policy.DurableState.Manifest != durableCompatibilityPath ||
-		policy.SecurityExceptions != securityExceptionsPath || engine.PluginCompatibilityManifest != pluginProtocolCompatibilityPath {
+	if _, err := loadKernelRuntimeBenchmarkBudgets(root); err != nil {
+		return err
+	}
+	if !compatibilityReferencesAreCanonical(policy, engine) {
 		return errors.New("compatibility manifests do not cross-reference the canonical contracts")
 	}
 	return nil
+}
+
+func compatibilityReferencesAreCanonical(policy compatibilityPolicy, engine engineProtocolCompatibility) bool {
+	return policy.GoAPI.Manifest == goAPICompatibilityPath &&
+		policy.Protocols.Engine == engineProtocolCompatibilityPath &&
+		policy.Protocols.Plugin == pluginProtocolCompatibilityPath &&
+		policy.DurableState.Manifest == durableCompatibilityPath &&
+		policy.Benchmarks.Manifest == benchmarkBudgetPath &&
+		policy.SecurityExceptions == securityExceptionsPath &&
+		engine.PluginCompatibilityManifest == pluginProtocolCompatibilityPath
 }
 
 func checkEngineProtocolCompatibility(root string) error {
@@ -255,13 +274,19 @@ func checkEngineProtocolCompatibility(root string) error {
 }
 
 func validateCompatibilityPolicy(value compatibilityPolicy) error {
-	wantBlockers := []string{"external-author-proof", "frozen-generated-source-contract", "released-engine-n-minus-one", "released-plugin-n-minus-one", "stable-benchmark-regression-policy"}
+	wantBlockers := []string{"external-author-proof", "frozen-generated-source-contract", "released-engine-n-minus-one", "released-plugin-n-minus-one"}
+	wantBenchmarks := benchmarkPolicy{
+		Manifest: benchmarkBudgetPath, Status: "stable-enforced", Aggregation: "median-of-five",
+		BudgetChanges: "measured-evidence-and-reviewed-rationale",
+	}
 	if value.Schema != "spice.agent.compatibility.policy/v1alpha1" || value.Module != modulePath || value.Status != "pre-v1-enforced-not-stable" ||
 		value.GoAPI.PreV1DeprecationReleases != 1 || value.GoAPI.PreV1DeprecationDays != 30 ||
 		value.GoAPI.V1DeprecationMinorReleases != 2 || value.GoAPI.V1DeprecationDays != 180 || value.GoAPI.V1Removal != "next-module-major" ||
 		value.Protocols.SupportedReleasedGenerationsRequired != 2 || value.Protocols.SupportMinorReleases != 2 || value.Protocols.SupportDays != 180 ||
 		value.DurableState.AutomaticMigration || value.DurableState.ReinterpretExistingVersion || value.GeneratedSource.Status != "blocked" ||
-		value.GeneratedSource.RequiredContract != "immutable-non-development-generator-and-frozen-ownership-schema" || !slices.Equal(value.V1Blockers, wantBlockers) {
+		value.GeneratedSource.RequiredContract != "immutable-non-development-generator-and-frozen-ownership-schema" ||
+		value.Benchmarks != wantBenchmarks ||
+		!slices.Equal(value.V1Blockers, wantBlockers) {
 		return errors.New("compatibility policy differs from the reviewed pre-v1 contract")
 	}
 	return nil
@@ -408,5 +433,5 @@ func sortedUnique(values []string) bool {
 }
 
 func compatibilityManifestPaths() []string {
-	return []string{compatibilityPolicyPath, durableCompatibilityPath, goAPICompatibilityPath, securityExceptionsPath, engineProtocolCompatibilityPath, pluginProtocolCompatibilityPath}
+	return []string{compatibilityPolicyPath, durableCompatibilityPath, goAPICompatibilityPath, benchmarkBudgetPath, securityExceptionsPath, engineProtocolCompatibilityPath, pluginProtocolCompatibilityPath}
 }

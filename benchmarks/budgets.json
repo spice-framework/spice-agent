@@ -1,0 +1,54 @@
+{
+  "schema": "spice.agent.benchmarks/v1",
+  "module": "github.com/spice-framework/spice-agent",
+  "go": "go1.26.5",
+  "arguments": [
+    "test",
+    "-run=^$",
+    "-bench=^BenchmarkKernel",
+    "-benchmem",
+    "-benchtime=500x",
+    "-count=5",
+    "-cpu=1",
+    "./agent"
+  ],
+  "samples": 5,
+  "aggregation": "median",
+  "material_time_increase_percent": 20,
+  "material_allocation_increase_percent": 10,
+  "budget_change_policy": "measured-evidence-and-reviewed-rationale",
+  "benchmarks": [
+    {
+      "name": "BenchmarkKernelEngineConstruction",
+      "reference_ns_per_op": 1581,
+      "maximum_ns_per_op": 50000,
+      "maximum_bytes_per_op": 4096,
+      "maximum_allocs_per_op": 64,
+      "rationale": "Bounds construction and empty shutdown well below the public-runtime millisecond budget while retaining cross-host headroom."
+    },
+    {
+      "name": "BenchmarkKernelTextRun",
+      "reference_ns_per_op": 19287,
+      "maximum_ns_per_op": 500000,
+      "maximum_bytes_per_op": 32768,
+      "maximum_allocs_per_op": 256,
+      "rationale": "Bounds a provider-neutral text run through its authoritative terminal without including provider or transport latency."
+    },
+    {
+      "name": "BenchmarkKernelToolRound",
+      "reference_ns_per_op": 52205,
+      "maximum_ns_per_op": 1000000,
+      "maximum_bytes_per_op": 65536,
+      "maximum_allocs_per_op": 768,
+      "rationale": "Bounds one compiled tool round including typed start and terminal occurrences plus model continuation."
+    },
+    {
+      "name": "BenchmarkKernelCancellation",
+      "reference_ns_per_op": 23325,
+      "maximum_ns_per_op": 500000,
+      "maximum_bytes_per_op": 32768,
+      "maximum_allocs_per_op": 320,
+      "rationale": "Bounds cooperative cancellation from an active model stream through the single authoritative run terminal."
+    }
+  ]
+}

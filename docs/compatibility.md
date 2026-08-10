@@ -59,5 +59,7 @@ documentation.
 
 The repository must still prove external extension authorship, publish and test
 two supported released generations of both protocols, freeze the generated
-source ownership contract with an immutable generator, and adopt stable
-benchmark regression thresholds. See [RFC 0010](rfc/0010-api-and-protocol-compatibility.md).
+source ownership contract with an immutable generator. Stable kernel benchmark
+ceilings and the stricter 20% time/10% allocation investigation policy are now
+machine-readable and enforced by `make verify`. See
+[RFC 0010](rfc/0010-api-and-protocol-compatibility.md).

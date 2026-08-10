@@ -26,12 +26,17 @@
     "status": "blocked",
     "required_contract": "immutable-non-development-generator-and-frozen-ownership-schema"
   },
+  "benchmarks": {
+    "manifest": "benchmarks/budgets.json",
+    "status": "stable-enforced",
+    "aggregation": "median-of-five",
+    "budget_changes": "measured-evidence-and-reviewed-rationale"
+  },
   "security_exceptions": "compatibility/security-exceptions.json",
   "v1_blockers": [
     "external-author-proof",
     "frozen-generated-source-contract",
     "released-engine-n-minus-one",
-    "released-plugin-n-minus-one",
-    "stable-benchmark-regression-policy"
+    "released-plugin-n-minus-one"
   ]
 }

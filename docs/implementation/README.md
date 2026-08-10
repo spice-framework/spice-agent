@@ -13,7 +13,7 @@ Repository roadmaps link here and must not duplicate status.
 | 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, bounded recovery/health, generated distribution activation, real-process cancellation, and real `spice dev` last-known-good proof complete; simultaneous installed daemon/TUI fault-reconnect proof pending |
 | 6 — architecture proof | In progress | dependency-ordered keyless module releases, then independently attested preview distribution; [Agent preview.1/preview.2/preview.3 failure history](evidence/phase6-release-history.md) |
 | 7 — stress prototypes | Complete | permission, SQLite recovery, alternate semantic shell, and two-worker extension proven without stabilizing their APIs |
-| 8 — stabilization | In progress | enforced pre-v1 API/protocol/durable/security policy plus removable deterministic compaction, guarded Git, safe telemetry projection, and advisory planning extensions proven; external authors, released N/N-1 matrices, generator freeze, and benchmark thresholds remain |
+| 8 — stabilization | In progress | enforced pre-v1 API/protocol/durable/security/benchmark policy plus removable deterministic compaction, guarded Git, safe telemetry projection, and advisory planning extensions proven; external authors, released N/N-1 matrices, and generator freeze remain |
 
 Exact commits and command output are recorded only after the corresponding gate
 has run. A phase is not complete because code exists; every exit criterion in its
@@ -31,6 +31,13 @@ policy now also records the exact 26-package Go API on three platforms, reviewed
 break migrations, durable format history, plugin/v1 history, security
 exceptions, and the still-blocked v1 criteria. Exact scope and tests are recorded in
 [`phase8-engine-protocol-compatibility.md`](evidence/phase8-engine-protocol-compatibility.md).
+
+The kernel runtime policy is now a canonical machine-readable contract in
+`benchmarks/budgets.json`. Both `make benchmark` and the full verifier require
+five fixed single-CPU samples, compute medians, and reject stable time, byte,
+and allocation ceilings. The 20% time and 10% allocation material-regression
+thresholds plus the measured-evidence rule for any budget change are locked by
+the compatibility validator and mutation suite.
 
 The first optional-extension proof is the isolated `experiments/compaction`
 module. It uses only the released preview5 `model.Provider` request boundary,
@@ -114,10 +121,11 @@ validated, optional execution state/retry facts remain typed, and exactly-one
 ledger tests prove no started call is left ambiguously closed. The daemon keeps
 the legacy terminal shape using a fixed safe failure problem.
 
-Core runtime comparison is now repository-owned through `make benchmark`:
+Core runtime budgets are now repository-owned through `make benchmark` and the
+full verifier:
 engine construction, a text run, one compiled tool round, and cooperative
 cancellation run offline for five bounded samples with allocation reporting.
-The initial Windows numbers and material-regression policy are recorded in
+The stable ceilings, initial Windows numbers, and material-regression policy are recorded in
 [`phase7-kernel-runtime-baseline.md`](evidence/phase7-kernel-runtime-baseline.md);
 installed daemon/client/plugin/TUI budgets remain separate Phase 6 evidence.
 
