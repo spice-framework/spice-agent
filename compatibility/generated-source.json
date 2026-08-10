@@ -1,7 +1,7 @@
 {
   "schema": "spice.agent.generated-source.compatibility/v1alpha1",
   "module": "github.com/spice-framework/spice-agent",
-  "status": "immutable-released-migrated-awaiting-clean-room",
+  "status": "immutable-released-migrated-clean-room-partial",
   "generator": {
     "module": "github.com/spice-framework/toolchain",
     "version": "v0.1.0-preview.2",
@@ -80,7 +80,8 @@
   "clean_room": {
     "manifest": "compatibility/public-authoring.json",
     "required_extensions": 3,
-    "exercised": false
+    "exercised_extensions": 1,
+    "exercised": true
   },
   "proven": false
 }

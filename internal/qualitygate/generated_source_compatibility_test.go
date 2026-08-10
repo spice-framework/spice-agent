@@ -28,14 +28,18 @@ func TestGeneratedSourceCompatibilityManifestFailsClosed(t *testing.T) {
 		{name: "generator sum", old: generatorSum, replacement: "h1:changed="},
 		{name: "schema five", old: "\"manifest_schema\": 6", replacement: "\"manifest_schema\": 5"},
 		{name: "missing target", old: "      \"module\": \"github.com/spice-framework/spice-agent\",\n      \"module_root\": \".\",", replacement: "      \"module\": \"github.com/spice-framework/spice-agent/changed\",\n      \"module_root\": \".\","},
-		{name: "false clean room exercise", old: "\"exercised\": false", replacement: "\"exercised\": true"},
+		{name: "lost clean room exercise", old: "\"exercised\": true", replacement: "\"exercised\": false"},
 		{name: "false proof", old: "\"proven\": false", replacement: "\"proven\": true"},
 		{name: "noncanonical", old: "  \"schema\"", replacement: "    \"schema\""},
 	}
 	for _, test := range manifestMutations {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			root := copyGeneratedSourceFixture(t, repository, strings.Replace(valid, test.old, test.replacement, 1))
+			mutated := strings.Replace(valid, test.old, test.replacement, 1)
+			if mutated == valid {
+				t.Fatal("manifest mutation did not apply")
+			}
+			root := copyGeneratedSourceFixture(t, repository, mutated)
 			if err := checkGeneratedSourceCompatibility(root); err == nil {
 				t.Fatal("invalid generated source compatibility manifest succeeded")
 			}

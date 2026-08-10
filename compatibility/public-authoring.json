@@ -1,7 +1,7 @@
 {
   "schema": "spice.agent.public-authoring.compatibility/v1alpha1",
   "module": "github.com/spice-framework/spice-agent",
-  "status": "required-not-proven",
+  "status": "sdk-beta-proven-phase8-pending",
   "proof_model": "clean-room-released-artifacts-only",
   "required_extensions": 3,
   "separately_versioned_modules": true,
@@ -36,6 +36,34 @@
     "package",
     "delete"
   ],
-  "evidence": [],
+  "evidence": [
+    {
+      "module": "github.com/spice-framework/spice-agent-tool-text",
+      "version": "v0.1.0-preview.1",
+      "commit": "cbc738067e9f67efd273509481488ba5eadfe1bd",
+      "tag_object": "36539996097937196711433a1e501d299b8fbe9f",
+      "profile": "compiled-tool-autoconfigure/v1alpha1-preview6",
+      "module_sum": "h1:e9qhtkySbuL/47k/dx9S9U0Y17MhI42p0pcEBrruPF4=",
+      "go_mod_sum": "h1:OEMtMFjM4RDQ7dbPqjTdIEGuvJIQsWPvq2bug66tT6M=",
+      "proxy": "https://proxy.golang.org",
+      "sumdb": "sum.golang.org",
+      "generated_manifest_schema": 6,
+      "platforms": [
+        "linux/amd64",
+        "windows/amd64"
+      ],
+      "vendor_offline": true,
+      "operations": [
+        "install",
+        "configure",
+        "debug",
+        "test",
+        "package",
+        "delete"
+      ],
+      "verification_run": "https://github.com/spice-framework/spice-agent-tool-text/actions/runs/31442525658",
+      "release": "https://github.com/spice-framework/spice-agent-tool-text/releases/tag/v0.1.0-preview.1"
+    }
+  ],
   "proven": false
 }

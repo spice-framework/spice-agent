@@ -42,12 +42,21 @@ type publicAuthoringIsolation struct {
 }
 
 type publicAuthoringEvidence struct {
-	Module          string   `json:"module"`
-	Version         string   `json:"version"`
-	Commit          string   `json:"commit"`
-	Profile         string   `json:"profile"`
-	Platforms       []string `json:"platforms"`
-	VerificationRun string   `json:"verification_run"`
+	Module                  string   `json:"module"`
+	Version                 string   `json:"version"`
+	Commit                  string   `json:"commit"`
+	TagObject               string   `json:"tag_object"`
+	Profile                 string   `json:"profile"`
+	ModuleSum               string   `json:"module_sum"`
+	GoModSum                string   `json:"go_mod_sum"`
+	Proxy                   string   `json:"proxy"`
+	SumDB                   string   `json:"sumdb"`
+	GeneratedManifestSchema int      `json:"generated_manifest_schema"`
+	Platforms               []string `json:"platforms"`
+	VendorOffline           bool     `json:"vendor_offline"`
+	Operations              []string `json:"operations"`
+	VerificationRun         string   `json:"verification_run"`
+	Release                 string   `json:"release"`
 }
 
 func checkPublicAuthoringCompatibility(root string) error {
@@ -59,19 +68,41 @@ func checkPublicAuthoringCompatibility(root string) error {
 }
 
 func validatePublicAuthoringCompatibility(value publicAuthoringCompatibility) error {
+	wantOperations := []string{"install", "configure", "debug", "test", "package", "delete"}
 	wantIsolation := publicAuthoringIsolation{
 		ReleasedArtifactsOnly: true, PublicDocumentationOnly: true, FreshModuleCache: true,
 		FreshBuildCache: true, GOWork: "off",
 	}
 	wantGenerator := publicAuthoringGenerator{Module: generatorModulePath, Version: generatorVersion, ManifestSchema: 6}
+	wantEvidence := []publicAuthoringEvidence{
+		{
+			Module: "github.com/spice-framework/spice-agent-tool-text", Version: "v0.1.0-preview.1",
+			Commit: "cbc738067e9f67efd273509481488ba5eadfe1bd", TagObject: "36539996097937196711433a1e501d299b8fbe9f",
+			Profile:   "compiled-tool-autoconfigure/v1alpha1-preview6",
+			ModuleSum: "h1:e9qhtkySbuL/47k/dx9S9U0Y17MhI42p0pcEBrruPF4=", GoModSum: "h1:OEMtMFjM4RDQ7dbPqjTdIEGuvJIQsWPvq2bug66tT6M=",
+			Proxy: "https://proxy.golang.org", SumDB: "sum.golang.org", GeneratedManifestSchema: 6,
+			Platforms: slices.Clone(value.Platforms), VendorOffline: true, Operations: slices.Clone(wantOperations),
+			VerificationRun: "https://github.com/spice-framework/spice-agent-tool-text/actions/runs/31442525658",
+			Release:         "https://github.com/spice-framework/spice-agent-tool-text/releases/tag/v0.1.0-preview.1",
+		},
+	}
 	if value.Schema != "spice.agent.public-authoring.compatibility/v1alpha1" || value.Module != modulePath ||
-		value.Status != "required-not-proven" || value.ProofModel != "clean-room-released-artifacts-only" ||
+		value.Status != "sdk-beta-proven-phase8-pending" || value.ProofModel != "clean-room-released-artifacts-only" ||
 		value.RequiredExtensions != 3 || !value.SeparatelyVersionedModules || !value.GeneratedCompositionProof ||
 		value.GeneratedSource != wantGenerator ||
 		value.Isolation != wantIsolation || !slices.Equal(value.Platforms, []string{"linux/amd64", "windows/amd64"}) ||
-		!value.VendorOffline || !slices.Equal(value.RequiredOperations, []string{"install", "configure", "debug", "test", "package", "delete"}) ||
-		len(value.Evidence) != 0 || value.Proven {
+		!value.VendorOffline || !slices.Equal(value.RequiredOperations, wantOperations) ||
+		!slices.EqualFunc(value.Evidence, wantEvidence, equalPublicAuthoringEvidence) || value.Proven {
 		return errors.New("public authoring compatibility manifest differs from the reviewed clean-room contract")
 	}
 	return nil
+}
+
+func equalPublicAuthoringEvidence(left, right publicAuthoringEvidence) bool {
+	return left.Module == right.Module && left.Version == right.Version && left.Commit == right.Commit &&
+		left.TagObject == right.TagObject && left.Profile == right.Profile && left.ModuleSum == right.ModuleSum &&
+		left.GoModSum == right.GoModSum && left.Proxy == right.Proxy && left.SumDB == right.SumDB &&
+		left.GeneratedManifestSchema == right.GeneratedManifestSchema && slices.Equal(left.Platforms, right.Platforms) &&
+		left.VendorOffline == right.VendorOffline && slices.Equal(left.Operations, right.Operations) &&
+		left.VerificationRun == right.VerificationRun && left.Release == right.Release
 }

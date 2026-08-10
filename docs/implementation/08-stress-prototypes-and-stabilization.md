@@ -151,6 +151,7 @@ plan-recommended mutation, proving the plan has no authority. See
 
 - Obtain three separately versioned clean-room compiled extensions using only
   released tools, public documentation, and public annotation/SDK contracts.
+  `spice-agent-tool-text@v0.1.0-preview.1` is the first; two remain.
 - Run both runtime-plugin languages and a second client against current and
   previous compatible protocols. The plugin-language half is complete. The
   alternate semantic shell proves the second client contract independently,
@@ -172,7 +173,8 @@ changes. Phase 8 requires three separately versioned proofs. `v1.0` additionally
 1. an enforced written Go API and protocol compatibility policy (complete for
    pre-v1 review; stability remains blocked by the criteria below);
 2. frozen generated-source ownership/source-map contracts (released schema 6
-   contract and repository migration complete; clean-room exercise pending);
+   contract and repository migration complete; one of three clean-room
+   exercises complete);
 3. at least two supported protocol generations with upgrade tests;
 4. supported security response and dependency update processes;
 5. stable benchmark thresholds and recorded regression policy;
@@ -199,7 +201,7 @@ cost when it is not imported.
 
 Status is **complete for Phase 7 experiments**. Permission, SQLite recovery,
 alternate semantic client, and two-worker extension proofs are implemented.
-Clean-room public-authoring and broader optional-extension proofs remain Phase 8 work;
+Two more clean-room public-authoring proofs and broader optional-extension proofs remain Phase 8 work;
 none of the experimental APIs are stabilized by this completion. The non-native
 parallel static extension design remains rejected history and may not be revived
 as a shortcut during experimentation.

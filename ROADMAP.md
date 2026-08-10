@@ -15,8 +15,9 @@ The canonical status and acceptance evidence live in
 Phase 8 now enforces the written pre-v1 Go API, durable-state, engine/plugin
 protocol, generated-source, and security-exception policy. The immutable
 Toolchain preview2 generator contract is released and every owned Agent target
-is migrated to schema 6. This does not freeze the APIs or claim v1: clean-room
-public-authoring and generated-source exercises plus released N/N-1 protocol
-matrices remain outstanding. Stable kernel benchmark budgets and their change
-policy are mandatory in the full verifier.
+is migrated to schema 6. The first of three clean-room public-authoring and
+generated-source exercises is released. This does not freeze the APIs or claim
+v1: two more clean-room proofs plus released N/N-1 protocol matrices remain
+outstanding. Stable kernel benchmark budgets and their change policy are
+mandatory in the full verifier.
 See the canonical ledger.

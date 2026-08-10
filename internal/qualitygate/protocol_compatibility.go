@@ -76,6 +76,8 @@ type publicAuthoringPolicy struct {
 	Manifest           string `json:"manifest"`
 	ProofModel         string `json:"proof_model"`
 	RequiredExtensions int    `json:"required_extensions"`
+	Status             string `json:"status"`
+	ProvenExtensions   int    `json:"proven_extensions"`
 }
 
 type engineProtocolCompatibility struct {
@@ -276,6 +278,20 @@ func checkCompatibilityManifests(root string) error {
 	if !compatibilityReferencesAreCanonical(policy, engine) {
 		return errors.New("compatibility manifests do not cross-reference the canonical contracts")
 	}
+	return validateCleanRoomEvidenceProgress(policy, publicAuthoring, generatedSource)
+}
+
+func validateCleanRoomEvidenceProgress(
+	policy compatibilityPolicy,
+	publicAuthoring publicAuthoringCompatibility,
+	generatedSource generatedSourceCompatibility,
+) error {
+	if policy.PublicAuthoring.Status != publicAuthoring.Status ||
+		policy.PublicAuthoring.ProvenExtensions != len(publicAuthoring.Evidence) ||
+		generatedSource.CleanRoom.ExercisedExtensions != len(publicAuthoring.Evidence) ||
+		generatedSource.CleanRoom.Exercised != (len(publicAuthoring.Evidence) > 0) {
+		return errors.New("compatibility manifests disagree on clean-room evidence progress")
+	}
 	return nil
 }
 
@@ -307,13 +323,14 @@ func validateCompatibilityPolicy(value compatibilityPolicy) error {
 	}
 	wantPublicAuthoring := publicAuthoringPolicy{
 		Manifest: publicAuthoringCompatibilityPath, ProofModel: "clean-room-released-artifacts-only", RequiredExtensions: 3,
+		Status: "sdk-beta-proven-phase8-pending", ProvenExtensions: 1,
 	}
 	if value.Schema != "spice.agent.compatibility.policy/v1alpha1" || value.Module != modulePath || value.Status != "pre-v1-enforced-not-stable" ||
 		value.GoAPI.PreV1DeprecationReleases != 1 || value.GoAPI.PreV1DeprecationDays != 30 ||
 		value.GoAPI.V1DeprecationMinorReleases != 2 || value.GoAPI.V1DeprecationDays != 180 || value.GoAPI.V1Removal != "next-module-major" ||
 		value.Protocols.SupportedReleasedGenerationsRequired != 2 || value.Protocols.SupportMinorReleases != 2 || value.Protocols.SupportDays != 180 ||
 		value.DurableState.AutomaticMigration || value.DurableState.ReinterpretExistingVersion ||
-		value.GeneratedSource.Manifest != generatedSourceCompatibilityPath || value.GeneratedSource.Status != "immutable-released-migrated-awaiting-clean-room" ||
+		value.GeneratedSource.Manifest != generatedSourceCompatibilityPath || value.GeneratedSource.Status != "immutable-released-migrated-clean-room-partial" ||
 		value.GeneratedSource.RequiredContract != "immutable-non-development-generator-and-frozen-ownership-schema" ||
 		value.Benchmarks != wantBenchmarks ||
 		value.PublicAuthoring != wantPublicAuthoring ||

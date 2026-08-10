@@ -24,7 +24,7 @@
   },
   "generated_source": {
     "manifest": "compatibility/generated-source.json",
-    "status": "immutable-released-migrated-awaiting-clean-room",
+    "status": "immutable-released-migrated-clean-room-partial",
     "required_contract": "immutable-non-development-generator-and-frozen-ownership-schema"
   },
   "benchmarks": {
@@ -36,7 +36,9 @@
   "public_authoring": {
     "manifest": "compatibility/public-authoring.json",
     "proof_model": "clean-room-released-artifacts-only",
-    "required_extensions": 3
+    "required_extensions": 3,
+    "status": "sdk-beta-proven-phase8-pending",
+    "proven_extensions": 1
   },
   "security_exceptions": "compatibility/security-exceptions.json",
   "v1_blockers": [

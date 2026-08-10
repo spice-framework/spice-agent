@@ -58,9 +58,10 @@ type generatedSourceTarget struct {
 }
 
 type generatedSourceCleanRoom struct {
-	Manifest           string `json:"manifest"`
-	RequiredExtensions int    `json:"required_extensions"`
-	Exercised          bool   `json:"exercised"`
+	Manifest            string `json:"manifest"`
+	RequiredExtensions  int    `json:"required_extensions"`
+	ExercisedExtensions int    `json:"exercised_extensions"`
+	Exercised           bool   `json:"exercised"`
 }
 
 type generatedOwnershipIdentity struct {
@@ -176,7 +177,7 @@ func readGeneratedOwnershipIdentity(root, relative string) (generatedOwnershipId
 func expectedGeneratedSourceCompatibility() generatedSourceCompatibility {
 	return generatedSourceCompatibility{
 		Schema: "spice.agent.generated-source.compatibility/v1alpha1", Module: modulePath,
-		Status: "immutable-released-migrated-awaiting-clean-room",
+		Status: "immutable-released-migrated-clean-room-partial",
 		Generator: generatedSourceGenerator{
 			Module: generatorModulePath, Version: generatorVersion, Sum: generatorSum, GoModSum: generatorGoModSum,
 			SourceCommit: "bab8bcaf7d0c6311237b34812c681c3ee6a6593b",
@@ -197,6 +198,8 @@ func expectedGeneratedSourceCompatibility() generatedSourceCompatibility {
 			{Module: modulePath + "/experiments/telemetry", ModuleRoot: "experiments/telemetry", Target: "telemetryproof", Manifest: "experiments/telemetry/.spice/telemetryproof.manifest.json"},
 			{Module: modulePath + "/experiments/two-worker", ModuleRoot: "experiments/two-worker", Target: "twoworkerproof", Manifest: "experiments/two-worker/.spice/twoworkerproof.manifest.json"},
 		},
-		CleanRoom: generatedSourceCleanRoom{Manifest: publicAuthoringCompatibilityPath, RequiredExtensions: 3},
+		CleanRoom: generatedSourceCleanRoom{
+			Manifest: publicAuthoringCompatibilityPath, RequiredExtensions: 3, ExercisedExtensions: 1, Exercised: true,
+		},
 	}
 }

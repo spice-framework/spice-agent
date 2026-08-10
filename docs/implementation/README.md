@@ -13,7 +13,7 @@ Repository roadmaps link here and must not duplicate status.
 | 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, bounded recovery/health, generated activation, real-process cancellation, one real `spice dev` last-known-good proof, and installed daemon/TUI recovery are complete; the simultaneous two-supervisor edit/reconnect proof remains |
 | 6 — architecture proof | In progress | dependency-ordered keyless module releases, then independently attested preview distribution; [Agent preview.1/preview.2/preview.3 failure history](evidence/phase6-release-history.md) |
 | 7 — stress prototypes | Complete | permission, SQLite recovery, alternate semantic shell, and two-worker extension proven without stabilizing their APIs |
-| 8 — stabilization | In progress | enforced pre-v1 API/protocol/durable/security/benchmark/public-authoring policy, immutable schema 6 generator migration, plus removable deterministic compaction, guarded Git, safe telemetry projection, and advisory planning extensions proven; clean-room public extensions/generated-source exercise and released N/N-1 matrices remain |
+| 8 — stabilization | In progress | enforced pre-v1 API/protocol/durable/security/benchmark/public-authoring policy, immutable schema 6 generator migration, plus removable deterministic compaction, guarded Git, safe telemetry projection, and advisory planning extensions proven; the first of three clean-room public extensions is released, while two more proofs and released N/N-1 matrices remain |
 
 Exact commits and command output are recorded only after the corresponding gate
 has run. A phase is not complete because code exists; every exit criterion in its
@@ -35,8 +35,9 @@ exceptions, and the still-blocked v1 criteria. Exact scope and tests are recorde
 The generated-source contract now pins released Toolchain preview2 and exact
 module sums, records ownership schema 6, and verifies all eight root/nested
 targets plus their module, sum, and vendor selections. The schema5 development
-manifests migrated without generated Go drift. Clean-room exercise remains
-pending. See
+manifests migrated without generated Go drift. The first public extension now
+exercises that released generator and schema; two clean-room exercises remain.
+See
 [`phase8-generated-source-contract.md`](evidence/phase8-generated-source-contract.md).
 
 The kernel runtime policy is now a canonical machine-readable contract in
@@ -83,6 +84,9 @@ no workspace/private/directive escape hatches, generated composition, full
 install-to-delete operations, and Windows/Linux vendor-offline verification.
 The contract is recorded in
 [`phase8-clean-room-public-authoring.md`](evidence/phase8-clean-room-public-authoring.md).
+The tagged `spice-agent-tool-text` module is the first exact evidence record and
+satisfies the SDK-beta public-authoring threshold. It does not satisfy the
+three-module Phase 8 threshold, so both clean-room v1 blockers remain.
 
 ## Current Phase 7 boundary
 
