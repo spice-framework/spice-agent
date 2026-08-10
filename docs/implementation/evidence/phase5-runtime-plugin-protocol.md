@@ -27,8 +27,11 @@ activation, generation leases, stderr ownership, or capability enforcement.
 
 Cross-language acceptance is `make verify-python`. It performs a frozen offline
 environment sync, deterministic schema regeneration, warning-strict Python unit
-and real-process tests, bytecode compilation, and the Go-owned conformance run.
+and real-process tests, bytecode compilation, the Go-owned conformance run, and
+the exact engine 1.2/1.3 breadth bridge recorded in the Phase 8 compatibility
+evidence.
 
 Exact commit and full-gate timing are appended only after the green tree is
-committed by the repository writer. Production host behavior remains pending
-Phase 5 work.
+committed by the repository writer. Production Go host behavior is proven by
+the later Phase 5 host, candidate, generation, and lifecycle evidence; this
+protocol-focused record does not claim equivalent native Python Host launch.

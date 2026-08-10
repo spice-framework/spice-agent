@@ -84,17 +84,21 @@ only after its contract passes and a dependency/security review is approved.
 
 ## Phase 8 ecosystem breadth
 
-Status: **in progress**. The first bounded compatibility slice commits an exact
-machine-readable engine-protocol matrix and proves source-built previous (1.2)
-and current (1.3) semantics through real authenticated local processes on Linux
-and Windows. It deliberately makes no released-binary N/N-1 claim. Plugin
-generation fixtures remain the next separate slice. See
+Status: **in progress**. The first bounded compatibility slices commit an exact
+machine-readable engine-protocol matrix, prove source-built previous (1.2) and
+current (1.3) semantics through real authenticated local processes on Linux and
+Windows, and run independent Go and Python plugin/v1 process services through
+an immutable run-leased tool plan behind both exact engine modes. Plugin
+versioning remains independent, and the evidence deliberately makes neither a
+released-binary N/N-1 claim nor a native Python Host-launch claim. See
 [the engine compatibility evidence](evidence/phase8-engine-protocol-compatibility.md).
 
 - Obtain three independently authored compiled extensions using only public
   annotation/SDK contracts.
 - Run both runtime-plugin languages and a second client against current and
-  previous compatible protocols.
+  previous compatible protocols. The plugin-language half is complete. The
+  alternate semantic shell proves the second client contract independently,
+  while its version-skew matrix remains a separate slice.
 - Add optional MCP, Git workflow, indexing/LSP, telemetry, compaction, planning,
   sandbox, and subagent extensions as separately versioned modules.
 - Publish scaffolding, authoring guides, protocol schemas, GoDoc, compatibility

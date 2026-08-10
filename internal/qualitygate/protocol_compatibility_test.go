@@ -21,7 +21,10 @@ func TestEngineProtocolCompatibilityManifestFailsClosed(t *testing.T) {
 		{name: "legacy retries", content: strings.Replace(valid, "\"automatic_unavailable_retries\": 0", "\"automatic_unavailable_retries\": 1", 1)},
 		{name: "missing required case", content: strings.Replace(valid, "    \"process-cleanup\"\n", "", 1)},
 		{name: "false binary proof", content: strings.Replace(valid, "\"proven\": false", "\"proven\": true", 1)},
-		{name: "plugin prematurely included", content: strings.Replace(valid, "\"plugin_protocol_next_slice\": true", "\"plugin_protocol_next_slice\": false", 1)},
+		{name: "plugin version coupled", content: strings.Replace(valid, "\"versioning\": \"independent-from-engine\"", "\"versioning\": \"engine-coupled\"", 1)},
+		{name: "missing Python breadth", content: strings.Replace(valid, "      \"python\"\n", "", 1)},
+		{name: "false Python host launch", content: strings.Replace(valid, "\"python\": \"future-pinned-native-artifact-required\"", "\"python\": \"separately-proven\"", 1)},
+		{name: "plugin breadth still pending", content: strings.Replace(valid, "\"plugin_protocol_next_slice\": false", "\"plugin_protocol_next_slice\": true", 1)},
 		{name: "noncanonical", content: strings.Replace(valid, "  \"schema\"", "    \"schema\"", 1)},
 		{name: "multiple values", content: valid + "{}\n"},
 	} {

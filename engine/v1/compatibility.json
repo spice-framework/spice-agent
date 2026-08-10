@@ -57,5 +57,29 @@
     "proven": false,
     "claim": "not-claimed"
   },
-  "plugin_protocol_next_slice": true
+  "plugin_breadth_matrix": {
+    "protocol": "spice.agent.plugin.v1",
+    "protocol_version": "1.0.0",
+    "versioning": "independent-from-engine",
+    "bridge": "real-process-plugin-v1-to-immutable-run-leased-tool-plan",
+    "engine_modes": [
+      "1.2.0",
+      "1.3.0"
+    ],
+    "languages": [
+      "go",
+      "python"
+    ],
+    "required_cases": [
+      "identical-tool-result",
+      "cancellation-terminal-events",
+      "fixture-process-loss",
+      "generation-lease-cleanup"
+    ],
+    "production_host_launch": {
+      "go": "separately-proven",
+      "python": "future-pinned-native-artifact-required"
+    }
+  },
+  "plugin_protocol_next_slice": false
 }

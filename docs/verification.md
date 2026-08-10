@@ -57,6 +57,16 @@ gRPC client, and server boundaries. The decisive process matrix runs on Linux
 and Windows, checks retry/ambiguity/cancellation/cleanup behavior, and is
 explicitly not evidence of released-binary N/N-1 compatibility.
 
+The same manifest locks the separate plugin/v1 breadth claim. Ordinary hosted
+tests launch the source-built Go plugin fixture, validate its public protocol
+traffic, and route its immutable leased tool plan through exact engine 1.2 and
+1.3 clients. `make verify-python` repeats that matrix with the independently
+implemented, frozen, offline Python fixture after checking its lock, generated
+bindings, unit suite, and bytecode compilation. Both paths prove result
+equivalence, cancellation terminals, process-loss failure, and lease cleanup;
+neither couples plugin/v1 versioning to the engine protocol or claims native
+Python `pluginhost.NewHost` launch containment.
+
 Repository identity also validates `.github/workflows/release.yml` as a
 single-job, secret-free caller of the organization keyless Go-module release
 workflow at its exact audited commit. The caller must deny permissions at the

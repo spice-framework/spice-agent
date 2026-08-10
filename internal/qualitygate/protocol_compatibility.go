@@ -21,6 +21,7 @@ type engineProtocolCompatibility struct {
 	SourceBuiltMatrix       []protocolSourceBuiltMatrixEntry `json:"source_built_matrix"`
 	RequiredCases           []string                         `json:"required_cases"`
 	ReleasedBinaryMatrix    releasedBinaryMatrix             `json:"released_binary_matrix"`
+	PluginBreadthMatrix     pluginBreadthMatrix              `json:"plugin_breadth_matrix"`
 	PluginProtocolNextSlice bool                             `json:"plugin_protocol_next_slice"`
 }
 
@@ -48,6 +49,22 @@ type protocolSourceBuiltMatrixEntry struct {
 type releasedBinaryMatrix struct {
 	Proven bool   `json:"proven"`
 	Claim  string `json:"claim"`
+}
+
+type pluginBreadthMatrix struct {
+	Protocol             string                     `json:"protocol"`
+	ProtocolVersion      string                     `json:"protocol_version"`
+	Versioning           string                     `json:"versioning"`
+	Bridge               string                     `json:"bridge"`
+	EngineModes          []string                   `json:"engine_modes"`
+	Languages            []string                   `json:"languages"`
+	RequiredCases        []string                   `json:"required_cases"`
+	ProductionHostLaunch pluginProductionHostLaunch `json:"production_host_launch"`
+}
+
+type pluginProductionHostLaunch struct {
+	Go     string `json:"go"`
+	Python string `json:"python"`
 }
 
 func expectedEngineProtocolCompatibility() engineProtocolCompatibility {
@@ -88,8 +105,26 @@ func expectedEngineProtocolCompatibility() engineProtocolCompatibility {
 			"cancellation-conflict-exact-recovery",
 			"process-cleanup",
 		},
-		ReleasedBinaryMatrix:    releasedBinaryMatrix{Proven: false, Claim: "not-claimed"},
-		PluginProtocolNextSlice: true,
+		ReleasedBinaryMatrix: releasedBinaryMatrix{Proven: false, Claim: "not-claimed"},
+		PluginBreadthMatrix: pluginBreadthMatrix{
+			Protocol:        "spice.agent.plugin.v1",
+			ProtocolVersion: "1.0.0",
+			Versioning:      "independent-from-engine",
+			Bridge:          "real-process-plugin-v1-to-immutable-run-leased-tool-plan",
+			EngineModes:     []string{"1.2.0", "1.3.0"},
+			Languages:       []string{"go", "python"},
+			RequiredCases: []string{
+				"identical-tool-result",
+				"cancellation-terminal-events",
+				"fixture-process-loss",
+				"generation-lease-cleanup",
+			},
+			ProductionHostLaunch: pluginProductionHostLaunch{
+				Go:     "separately-proven",
+				Python: "future-pinned-native-artifact-required",
+			},
+		},
+		PluginProtocolNextSlice: false,
 	}
 }
 

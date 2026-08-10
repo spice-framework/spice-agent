@@ -31,5 +31,6 @@ verify-python:
 	uv run --frozen --offline --directory $(PYTHON_FIXTURE_DIR) python -W error::ResourceWarning -m unittest discover -s tests -v
 	uv run --frozen --offline --directory $(PYTHON_FIXTURE_DIR) python -m compileall -q src tests generate_protocol.py
 	go test ./internal/pluginconformanceacceptance -run TestIndependentPythonFixturePassesPublicConformance -count=1
+	go test ./internal/pluginconformanceacceptance -run 'TestRuntimePluginLanguagesBehindExactEngineModes/python' -count=1
 
 verify-release: verify
