@@ -56,3 +56,23 @@ are rejected by their official handlers using compiler-owned canonical result
 facts. A separate ordinary `@Bean` with a concrete tool implementation is not
 implicitly assignable to `tool.Tool`; the graph fails at the exact interface
 injection boundary.
+
+## Cross-repository completion
+
+The independent provider, coding-tools, and TUI modules subsequently adopted
+the same explicit auto-configuration contract. Distribution commit
+`4cfd19a3fdd955843685c5283576ecc36d19f44c` generates the application-owned
+graph from those public modules and executes the provider → compiled named tool
+→ provider continuation. Follow-up `1dbef3daa71c7801f5f1922c665bd5785990c6d8`
+and exact provider `4beed3838dd2ff275dcab7ab867aac56f0894cef` /
+coding-tools `17cbef3b93facb643097d1a56487f8fbcbecc56f`
+commits add real HTTP cancellation, exact lifecycle terminals, and secret scans
+without changing the composition mechanism. TUI commit
+`a0d48242cd4fec6c553186fe962e4d2546fd97be` supplies its generated public
+presentation graph through the same rules.
+
+Current exact heads of all five product repositories retain green hosted CI and
+vendor-offline verification, so these historical completion commits remain
+covered by the repository foundation evidence in
+[`phase0-repository-foundation.md`](phase0-repository-foundation.md). This
+closes Phase 1 for the preview without stabilizing the pre-1.0 extension API.

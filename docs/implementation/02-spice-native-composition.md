@@ -90,10 +90,14 @@ Warm generation/check for the embedded fixture targets five seconds; generated
 application startup targets 100 ms. Exact source-to-generated-file mappings and
 selected bean reasons are retained as artifacts.
 
-Status is **in progress**. The typed Stage SPI, three canonical descriptors, and
-authorized deterministic v1alpha2 tool now exist. The committed
-`CompositionProof` target completes the embedded generated-graph slice and is
-covered by the evidence in `evidence/phase1-composition.md`. Auto-configuration
-contracts and the cross-repository compiled continuation remain pending, so
-Phase 1 is still in progress. No later repository may introduce a substitute
-static composition mechanism while this work is pending.
+Status is **complete for the preview**. The typed Stage SPI, three canonical
+descriptors, authorized deterministic v1alpha2 tool, and committed
+`CompositionProof` target cover the embedded generated graph. Provider,
+coding-tool, and TUI defaults activate only through their explicit
+`/autoconfigure` packages. Distribution commit `4cfd19a` compiles and executes
+their generated provider → named tool → provider continuation through ordinary
+Spice beans. The graph uses direct calls and contains no extension registry,
+`RuntimeGraph`, reflection lookup, or second container. Evidence is recorded in
+[`evidence/phase1-composition.md`](evidence/phase1-composition.md). Pre-1.0
+contract evolution and external-author ergonomics remain later-phase work; no
+repository may introduce a substitute static composition mechanism.

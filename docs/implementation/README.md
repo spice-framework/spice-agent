@@ -5,7 +5,7 @@ Repository roadmaps link here and must not duplicate status.
 
 | Phase | State | Exit evidence |
 | --- | --- | --- |
-| 0 — product and repositories | In progress | repository governance, exact toolchain, offline build, quality gate |
+| 0 — product and repositories | Complete for preview | five public Apache-2.0 modules, exact catalog/toolchain, cross-platform hosted gates, reproducible vendor-offline execution, and zero open vulnerable manifests |
 | 1 — Spice-native composition | Complete for preview | generated static DI, auto-configuration, cross-repository continuation |
 | 2 — deterministic kernel | Complete for preview | `841edd3`; deterministic lifecycle, interaction, snapshot, race/fuzz proof |
 | 3 — provider and coding tools | In progress | generated cross-repository continuation and opt-in live acceptance |
@@ -518,23 +518,27 @@ transport remains unchanged. This remains conformance infrastructure, not the
 digest-owning process host or activation manager. Evidence is appended to
 [`evidence/phase5-runtime-plugin-protocol.md`](evidence/phase5-runtime-plugin-protocol.md).
 
-## Current infrastructure blocker
+## Phase 0 preview completion
 
-A Windows clean-clone audit of all five repositories passed Go 1.26.5,
-`make fast`, offline vendor tests with `GOWORK=off GOPROXY=off
-GOFLAGS=-mod=vendor`, and `govulncheck`. This is not Linux or macOS evidence and
-does not close Phase 0. A separate WSL2 Linux 6.18.33.1 audit with Go 1.26.5
-linux/amd64 used fresh public clones: all five repositories passed `make fast`
-and explicit `GOWORK=off GOPROXY=off GOFLAGS=-mod=vendor go test ./...`.
-Fresh-clone full verification still needs a source-preserving dependency
-bootstrap. After cache preparation, `spice-agent` passed in 32.2s and
-`spice-agent-coding` passed in 6.7s; the other repositories exposed bootstrap
-or `go.sum` preservation gaps being corrected separately. This is not macOS
-evidence and does not close Phase 0. GitHub Actions jobs remain queued without
-starting; diagnosing organization billing/policy requires unavailable
-`admin:org` authority. Core/tools Dependabot gRPC alerts remain open and must
-not be dismissed, although their tools modules already pin v1.82.1 and local
-`govulncheck` is clean.
+The early Windows and WSL clean-clone audits exposed the bootstrap, `go.sum`,
+and hosted-runner gaps without weakening any repository gate. Those gaps are
+now closed. All five public product repositories declare their exact module
+identity, Go 1.26.0 directive and Go 1.26.5 toolchain, contain no workspace
+replacement directives, reproduce committed vendor data, and have exact-head
+hosted CI plus documentation success. The hosted matrix supplies real Windows,
+Linux, and macOS shuffled/race verification alongside vendor-offline proof.
+Private vulnerability reporting and Dependabot security updates are enabled;
+the GitHub API reports zero open Dependabot alerts for the five audited heads,
+and the repository gates report no reachable vulnerabilities.
+
+Development schema 6 retains the exact five-repository dependency graph and
+immutable module selections. The current Development, Toolchain, and
+organization-profile heads are also hosted green. Exact heads, run identifiers,
+security checks, and the limits of this claim are recorded in
+[`evidence/phase0-repository-foundation.md`](evidence/phase0-repository-foundation.md).
+This closes Phase 0 for the preview; protected releases, live provider
+acceptance, native-terminal interaction, and pre-1.0 stabilization remain owned
+by their later phases.
 
 Development catalog commit `a8990e3f` adds topological concurrent
 five-repository fast verification, an exact compatibility snapshot, and
@@ -542,12 +546,14 @@ vendor-only macOS amd64/arm64 compile proof; its `make verify` passed at 85.6%
 coverage. Follow-up `379a375` adds strict generic Go-module and distribution
 release profiles without changing the existing starter release contract; its
 `make verify` passed in 107.9 seconds at 85.2% coverage. Organization-profile
-commit `3ee0039d` records reusable workflow and Actions-queue governance. macOS
-remains compile-only: real race, UI, process, and runtime acceptance still
-requires a macOS runner.
+commit `3ee0039d` records reusable workflow and Actions-queue governance. Those
+were incremental compile and governance boundaries; the current hosted macOS
+shuffled/race jobs supersede the earlier compile-only limitation.
 
 ## Completed evidence
 
+- Current five-repository foundation and hosted security/verification matrix:
+  [`phase0-repository-foundation.md`](evidence/phase0-repository-foundation.md).
 - Organization governance/profile: `.github` `11e9470`.
 - Development catalog/workspace: `36a3bf5`; `make verify` 98s, 85.5% coverage.
 - Phase 0 catalog/governance follow-up: development `a8990e3f` (85.6% coverage,

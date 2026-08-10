@@ -77,7 +77,14 @@ contract is adopted.
 Per-repository `make fast` targets 30 seconds. Catalog fast verification runs
 independent repositories concurrently after their dependencies are green.
 
-Status is **in progress**. All five repositories, organization governance, the
-development catalog, and baseline quality gates exist. Exit remains blocked
-until every repository has real exact sibling/Spice pins where applicable,
-standalone clean-clone/offline proof, and no unresolved vulnerable manifest.
+Status is **complete for the preview**. All five public repositories have exact
+canonical module identities, immutable sibling/Spice selections where
+applicable, Go 1.26.5, committed reproducible vendor data, and no workspace
+replacement directives. Exact-head hosted Windows/Linux/macOS verification,
+vendor-offline execution, private vulnerability reporting, enabled Dependabot
+security updates, and zero open Dependabot alerts close the repository
+foundation. The schema-6 Development catalog and organization-owned reusable
+workflow semantics are independently hosted green. Exact heads, runs, and
+claim limits are recorded in
+[`evidence/phase0-repository-foundation.md`](evidence/phase0-repository-foundation.md).
+Later phase releases and product acceptance remain independent boundaries.
