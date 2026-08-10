@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "status": "experimental",
+  "module": "github.com/spice-framework/spice-agent/experiments/permission",
+  "go": "1.26.0",
+  "toolchain": "go1.26.5",
+  "core": {
+    "module": "github.com/spice-framework/spice-agent",
+    "version": "v0.1.0-preview.5",
+    "sum": "h1:rGND9DYx3pssliD1tZQOvPDOZ5GVfQLDc7VJQI3HLOM=",
+    "go_mod_sum": "h1:pbhYOeNgn4pCIhEmcdbjnFjJijY4ZSLM8ZHxaF2dxz0="
+  },
+  "spice": {
+    "version": "v0.1.0-preview.2",
+    "sum": "h1:5pYgTlUUzC/xZISetG/U6c1L/I3f8dUQSZhuo6YqxiA="
+  },
+  "generation_toolchain": {
+    "version": "v0.1.0-preview.1.0.20260806203056-d0b9ac086bd6",
+    "sum": "h1:paTYw/o/6OsbNAvOWvjicOOqWyyt2Nd3vWdoPq8+BjA="
+  },
+  "required_seams": [
+    "stage.ToolDispatchGuard",
+    "stage.ToolDispatchScope.RequestInteraction"
+  ],
+  "compiled_registry": false,
+  "runtime_network": false,
+  "replace_directives": false,
+  "promotion": "requires independent policy authors and the Phase 7 contract review",
+  "deletion": "remove experiments/permission and its root ledger evidence links"
+}

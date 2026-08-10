@@ -23,6 +23,13 @@ The prototype must prove there is no bypass around canonical dispatch,
 including retries, interactions, and plugin generations. Capability metadata
 informs policy but does not become enforcement by itself.
 
+Status: **implemented as an isolated experiment**. The nested
+`experiments/permission` module pins the public preview5 core without a
+`replace`, commits generated Spice construction and vendor contents, and owns
+its compatibility manifest, conformance tests, provisional benchmarks, and
+deletion path. It remains experimental and does not stabilize a core policy API.
+See [the permission evidence](evidence/phase7-permission-experiment.md).
+
 ### SQLite recorder/restorer
 
 Build an observer/snapshot extension that records events durably, marks crashes,
@@ -95,5 +102,7 @@ Extensions publish marginal startup, allocation, event-latency, cancellation,
 and binary-size costs. No optional extension may impose runtime or dependency
 cost when it is not imported.
 
-Status is **planned**. The non-native parallel static extension design remains
-rejected history and may not be revived as a shortcut during experimentation.
+Status is **in progress**. The permission prototype is implemented; SQLite
+recovery, alternate-client, two-worker, and independent-author proofs remain.
+The non-native parallel static extension design remains rejected history and
+may not be revived as a shortcut during experimentation.

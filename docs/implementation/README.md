@@ -12,7 +12,7 @@ Repository roadmaps link here and must not duplicate status.
 | 4 — daemon and TUI | In progress | generated daemon/TUI distribution targets and managed local composition proven; installed Windows/Linux terminal interaction pending |
 | 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, bounded recovery/health, generated distribution activation, real-process cancellation, and real `spice dev` last-known-good proof complete; simultaneous installed daemon/TUI fault-reconnect proof pending |
 | 6 — architecture proof | In progress | dependency-ordered keyless module releases, then independently attested preview distribution; [Agent preview.1/preview.2/preview.3 failure history](evidence/phase6-release-history.md) |
-| 7 — stress prototypes | In progress | generic terminal permission seam complete; external policy, SQLite, alternate UI, and two-worker experiments pending |
+| 7 — stress prototypes | In progress | permission guard experiment complete; SQLite, alternate UI, and two-worker experiments pending |
 | 8 — stabilization | Planned | external authors and frozen compatibility policy |
 
 Exact commits and command output are recorded only after the corresponding gate
@@ -29,8 +29,15 @@ Each dispatch carries immutable run, turn, exact `PlanID`, combined plan,
 workspace, and interaction authority facts. Workspace identity is now part of
 `PlanIdentity` and the deliberately incompatible v1alpha3 snapshot contract,
 so cross-workspace resume fails before leasing dynamic resources. The optional
-external permission policy remains the next isolated stress prototype. Core now
-provides its required run-owned interaction lifecycle seam: guards can request
+external permission policy is now the isolated, deletable
+`experiments/permission` module pinned to the released preview5 core with no
+`replace`. It proves generated Policy-to-guard collection injection,
+fail-closed prompt/default behavior, secret-free durable facts, retry and
+cancellation behavior, concurrency, and compiled plus activated runtime-host
+generation routes without another core API. Exact commands and boundaries are
+recorded in
+[`phase7-permission-experiment.md`](evidence/phase7-permission-experiment.md).
+Core provides its required run-owned interaction lifecycle seam: guards can request
 UI-neutral input through an unforgeable requester bound to `Run.Interact`, while
 the engine retains exactly-once interaction events, snapshot safety,
 cancellation joining, and tool/run terminal ordering.

@@ -104,5 +104,10 @@ retry by itself.
 Security tests scan generated/release artifacts for canary secrets, prove all
 tool routes hit a terminal guard, verify endpoint permissions and digest
 changes, exercise process/plugin uncertain outcomes, and audit standalone module
-graphs. The phase 7 permission prototype must use `ToolDispatchGuard` to
-intercept every executable route without another kernel change.
+graphs. The Phase 7 permission prototype now uses `ToolDispatchGuard` and the
+run-owned `RequestInteraction` capability to intercept canonical executable
+routes without another kernel change. Its durable policy facts hash correlation
+identities and exclude call arguments, schemas, descriptions, paths,
+environment, secrets, interaction responses, and recovered panic values. This
+is policy interception, not a process sandbox or a claim that arbitrary trusted
+Go code is contained.

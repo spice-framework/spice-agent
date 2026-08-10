@@ -22,13 +22,14 @@ import (
 )
 
 const (
-	requiredGoVersion     = "go1.26.5"
-	modulePath            = "github.com/spice-framework/spice-agent"
-	minimumCoverage       = 85.0
-	releaseWorkflowCommit = "a8f9cc6ffd3a2744c5cae3b52c05e6e91cbc875e"
-	verifyWorkflowCommit  = "0534fe1247f892b287f624b7abb6f2347765ab22"
-	standardGateTimeout   = 15 * time.Minute
-	verifyGateTimeout     = 30 * time.Minute
+	requiredGoVersion         = "go1.26.5"
+	modulePath                = "github.com/spice-framework/spice-agent"
+	minimumCoverage           = 85.0
+	minimumPermissionCoverage = 85.0
+	releaseWorkflowCommit     = "a8f9cc6ffd3a2744c5cae3b52c05e6e91cbc875e"
+	verifyWorkflowCommit      = "0534fe1247f892b287f624b7abb6f2347765ab22"
+	standardGateTimeout       = 15 * time.Minute
+	verifyGateTimeout         = 30 * time.Minute
 )
 
 func main() {
@@ -89,13 +90,16 @@ func run(ctx context.Context, root, mode string) error {
 	tests := step{"tests", func() error {
 		return command(ctx, root, productEnvironment, "go", "test", "-shuffle=on", "-count=1", "./...")
 	}}
+	permissionExperiment := step{"permission experiment", func() error {
+		return verifyPermissionExperiment(ctx, root, mode)
+	}}
 	acceptanceScope := step{"acceptance endpoint scope", func() error {
 		return command(
 			ctx, root, productEnvironment,
 			"go", "test", "-tags=spice_acceptance", "-shuffle=on", "-count=1", "./daemon/endpoint",
 		)
 	}}
-	steps := []step{identity, diffHygiene, tests}
+	steps := []step{identity, diffHygiene, tests, permissionExperiment}
 	if mode == "coverage" {
 		steps = []step{identity, diffHygiene, {"coverage", func() error {
 			return coverage(ctx, root, productEnvironment)
@@ -116,6 +120,7 @@ func run(ctx context.Context, root, mode string) error {
 			{"architecture", func() error { return checkArchitecture(root) }},
 			{"go vet", func() error { return command(ctx, root, productEnvironment, "go", "vet", "./...") }},
 			tests,
+			permissionExperiment,
 			acceptanceScope,
 		}
 	}
@@ -151,6 +156,91 @@ func run(ctx context.Context, root, mode string) error {
 	}
 	fmt.Println("==> all verification passed")
 	return nil
+}
+
+func verifyPermissionExperiment(ctx context.Context, root, mode string) error {
+	directory := filepath.Join(root, "experiments", "permission")
+	if _, err := os.Stat(filepath.Join(directory, "go.mod")); err != nil {
+		return fmt.Errorf("permission experiment module: %w", err)
+	}
+	environment := map[string]string{
+		"GOFLAGS":     "-mod=vendor",
+		"GOPROXY":     "off",
+		"GOTOOLCHAIN": "local",
+		"GOWORK":      "off",
+	}
+	if mode == "check" || mode == "verify" {
+		if err := command(ctx, directory, environment, "go", "mod", "tidy", "-diff"); err != nil {
+			return err
+		}
+		temporary, err := os.MkdirTemp("", "spice-agent-permission-vendor-*")
+		if err != nil {
+			return fmt.Errorf("create permission vendor comparison directory: %w", err)
+		}
+		defer func() { _ = os.RemoveAll(temporary) }()
+		candidate := filepath.Join(temporary, "vendor")
+		if err = command(ctx, directory, environment, "go", "mod", "vendor", "-o", candidate); err != nil {
+			return err
+		}
+		want, err := treeDigests(candidate)
+		if err != nil {
+			return err
+		}
+		got, err := treeDigests(filepath.Join(directory, "vendor"))
+		if err != nil {
+			return err
+		}
+		if !maps.Equal(got, want) {
+			return errors.New("permission experiment vendor differs from a fresh go mod vendor result")
+		}
+		if err = command(
+			ctx, directory, environment, "go", "tool",
+			"github.com/spice-framework/toolchain/cmd/spice", "generate", "--check",
+			"--target", "PermissionProof", ".", "./internal/composition",
+		); err != nil {
+			return err
+		}
+		if err = command(ctx, directory, environment, "go", "vet", "./..."); err != nil {
+			return err
+		}
+	}
+	if err := command(ctx, directory, environment, "go", "test", "-shuffle=on", "-count=1", "./..."); err != nil {
+		return err
+	}
+	if mode == "verify" {
+		if err := command(ctx, directory, environment, "go", "test", "-race", "-shuffle=on", "-count=1", "./..."); err != nil {
+			return err
+		}
+		output, err := capture(ctx, directory, environment, "go", "test", "-cover", ".")
+		if err != nil {
+			return err
+		}
+		return validatePermissionCoverage(output)
+	}
+	return nil
+}
+
+func validatePermissionCoverage(output string) error {
+	const marker = "coverage: "
+	for line := range strings.Lines(output) {
+		_, value, found := strings.Cut(line, marker)
+		if !found {
+			continue
+		}
+		percent, _, found := strings.Cut(value, "%")
+		if !found {
+			break
+		}
+		coverage, err := strconv.ParseFloat(strings.TrimSpace(percent), 64)
+		if err != nil {
+			return fmt.Errorf("parse permission experiment coverage: %w", err)
+		}
+		if coverage < minimumPermissionCoverage {
+			return fmt.Errorf("permission experiment coverage %.1f%% is below %.1f%%", coverage, minimumPermissionCoverage)
+		}
+		return nil
+	}
+	return errors.New("permission experiment coverage output is missing")
 }
 
 func networkAllowed(mode string) bool { return mode == "tools-bootstrap" }

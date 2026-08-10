@@ -35,6 +35,22 @@ func TestVerificationTimeoutIsModeAware(t *testing.T) {
 	}
 }
 
+func TestValidatePermissionCoverage(t *testing.T) {
+	t.Parallel()
+	if err := validatePermissionCoverage("ok\tpermission\t0.1s\tcoverage: 88.2% of statements\n"); err != nil {
+		t.Fatal(err)
+	}
+	for _, output := range []string{
+		"ok\tpermission\t0.1s\tcoverage: 84.9% of statements\n",
+		"ok\tpermission\t0.1s\n",
+		"ok\tpermission\tcoverage: bad% of statements\n",
+	} {
+		if err := validatePermissionCoverage(output); err == nil {
+			t.Fatalf("validatePermissionCoverage(%q) succeeded", output)
+		}
+	}
+}
+
 func TestKernelRuntimeBenchmarkContractIsBoundedAndFailsClosed(t *testing.T) {
 	t.Parallel()
 	wantArguments := []string{

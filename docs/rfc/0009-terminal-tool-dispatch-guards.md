@@ -88,3 +88,15 @@ panic secrecy, re-entry, retained and double continuation use, forged results,
 concurrency, requester delegation/substitution, interaction terminal ordering,
 pending-interaction snapshot refusal, cancellation join, deterministic snapshot
 round trips, strict start-to-terminal correlation, and engine-owned terminals.
+
+## External experiment evidence
+
+The deletable `experiments/permission` nested module exercises this RFC solely
+through the released preview5 API. Its generated Spice application constructs a
+normal `Policy` bean, an exact `stage.ToolDispatchGuard` bean, and the ordered
+guard collection without scanning or a registry. Conformance covers allow,
+deny, prompt, prompt failure defaults, cancellation, panic secrecy, trusted
+decorator retry, concurrency, the initial compiled host generation, and a newly
+activated runtime-host generation. The experiment receives no Broker, emits no
+engine event, performs no retry, and changes no core API. See
+[`phase7-permission-experiment.md`](../implementation/evidence/phase7-permission-experiment.md).
