@@ -9,8 +9,8 @@ Repository roadmaps link here and must not duplicate status.
 | 1 — Spice-native composition | Complete for preview | generated static DI, auto-configuration, cross-repository continuation |
 | 2 — deterministic kernel | Complete for preview | `841edd3`; deterministic lifecycle, interaction, snapshot, race/fuzz proof |
 | 3 — provider and coding tools | In progress | generated cross-repository continuation and opt-in live acceptance |
-| 4 — daemon and TUI | In progress | generated daemon/TUI distribution targets and managed local composition proven; installed Windows/Linux terminal interaction pending |
-| 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, bounded recovery/health, generated distribution activation, real-process cancellation, and real `spice dev` last-known-good proof complete; simultaneous installed daemon/TUI fault-reconnect proof pending |
+| 4 — daemon and TUI | In progress | generated targets, installed Windows/Linux daemon/Bubble Tea process recovery, and authenticated preview 2 release-byte startup are proven; native PTY/ConPTY resize and reconnect presentation remain |
+| 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, bounded recovery/health, generated activation, real-process cancellation, one real `spice dev` last-known-good proof, and installed daemon/TUI recovery are complete; the simultaneous two-supervisor edit/reconnect proof remains |
 | 6 — architecture proof | In progress | dependency-ordered keyless module releases, then independently attested preview distribution; [Agent preview.1/preview.2/preview.3 failure history](evidence/phase6-release-history.md) |
 | 7 — stress prototypes | Complete | permission, SQLite recovery, alternate semantic shell, and two-worker extension proven without stabilizing their APIs |
 | 8 — stabilization | In progress | enforced pre-v1 API/protocol/durable/security/benchmark policy plus removable deterministic compaction, guarded Git, safe telemetry projection, and advisory planning extensions proven; external authors, released N/N-1 matrices, and generator freeze remain |
@@ -161,9 +161,17 @@ lifecycle, fixed-code health, and bounded generated cleanup. Commit `73f1c4f`
 proves the real digest-pinned process, cancellation with subsequent generation
 reuse, generated daemon composition, authenticated local IPC, in-flight
 reconnect, production-limit replay, compiled/runtime tool continuation, secret
-redaction, and one real `spice dev` last-known-good/debounce workflow. The
-simultaneous installed daemon plus Bubble Tea fault/reconnect workflow remains
-pending. Detailed executable-integrity scope and evidence are recorded in
+redaction, and one real `spice dev` last-known-good/debounce workflow.
+Distribution commit `7f36894` (stabilized in the published preview 2 tree
+`c6b74c3`) subsequently proves the generated daemon and real Bubble Tea
+application as independent installed processes: an in-flight stream reconnects
+after a transport fault, the daemon is replaced between runs, and the same
+terminal process preserves prompt history and completes another run. The
+remaining developer-loop boundary is narrower: both production `spice dev`
+supervisors must run simultaneously while an invalid daemon-only edit preserves
+the attached terminal, a valid edit replaces only the daemon, and Bubble Tea
+visibly reconnects without its supervisor restarting.
+Detailed executable-integrity scope and evidence are recorded in
 [`evidence/phase5-host-security-foundation.md`](evidence/phase5-host-security-foundation.md)
 and
 [`evidence/phase5-candidate-and-remote-tools.md`](evidence/phase5-candidate-and-remote-tools.md),
@@ -174,7 +182,9 @@ recovery/health evidence in
 and auto-configuration evidence in
 [`evidence/phase5-runtime-autoconfiguration.md`](evidence/phase5-runtime-autoconfiguration.md).
 Distribution activation and developer-loop evidence is in
-[`evidence/phase5-distribution-activation-and-devloop.md`](evidence/phase5-distribution-activation-and-devloop.md).
+[`evidence/phase5-distribution-activation-and-devloop.md`](evidence/phase5-distribution-activation-and-devloop.md),
+with the later installed-process and release-byte boundary reconciled in
+[`evidence/phase4-installed-distribution.md`](evidence/phase4-installed-distribution.md).
 
 ## Phase 2 preview boundary
 
@@ -441,10 +451,14 @@ See
 [`evidence/phase4-kernel-preparation.md`](evidence/phase4-kernel-preparation.md).
 The schema is not the final Phase 4 freeze. The host, authenticated local IPC,
 managed-candidate libraries, and generated explicit-serve daemon now prove
-those repaired contracts. The distribution must still route every compiled
-coding-tool process through its injected resolver/launcher, generate the
-managed-client/TUI application, exercise one-command and explicit attach
-through installed Windows/Linux processes and terminals.
+those repaired contracts. The distribution routes every compiled coding-tool
+process through its injected resolver/launcher and generates the managed
+client/TUI application. Later evidence executes one-command and explicit attach
+through independent Windows/Linux daemon and Bubble Tea processes, recovers an
+in-flight stream, replaces the daemon while the terminal survives, and executes
+the authenticated preview 2 release bytes. Native PTY/ConPTY presentation,
+resize, and reconnect presentation remain before the final freeze. See
+[`evidence/phase4-installed-distribution.md`](evidence/phase4-installed-distribution.md).
 
 ## Phase 5.0A execution prerequisite
 

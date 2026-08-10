@@ -85,3 +85,12 @@ daemon components on a private endpoint. It does not call the installed
 requires both production `spice dev` supervisors to run simultaneously, an
 invalid daemon-only edit to preserve the attached TUI, a valid daemon-only
 replacement, and observed Bubble Tea reconnection without restarting the TUI.
+
+Subsequent distribution commit `7f36894a16768210242967431477eda3cc02c566`
+does call both installed command adapters and drives the real Bubble Tea event
+loop through its accessible renderer. The cross-platform stabilized preview 2
+tree proves transport-fault replay and daemon replacement while the same
+terminal process remains alive. That closes the installed-process gap in this
+paragraph, but not the specifically separate dual-`spice dev` supervisor edit
+workflow above or native PTY/ConPTY presentation. The exact boundary is recorded
+in [`phase4-installed-distribution.md`](phase4-installed-distribution.md).

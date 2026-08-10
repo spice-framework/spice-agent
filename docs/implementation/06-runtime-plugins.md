@@ -159,9 +159,13 @@ the active/failed generation; no partial generated tree is activated.
    **Package-main targets and independent supervisors are complete. A real
    vendored-CLI fixture proves invalid-edit diagnostics, unchanged
    last-known-good identity, deterministic debounce, graceful replacement,
-   process containment, and byte-identical source/generated restoration. The
-   simultaneous installed daemon/TUI independent-restart and Bubble Tea
-   reconnect workflow remains pending.**
+   process containment, and byte-identical source/generated restoration. A
+   later installed-process proof recovers the same Bubble Tea process across a
+   transport fault and daemon replacement. The remaining workflow must run the
+   production daemon and terminal `spice dev` supervisors simultaneously, keep
+   the terminal alive through an invalid daemon-only edit, replace only the
+   daemon after a valid edit, and observe Bubble Tea reconnect without a
+   terminal-supervisor restart.**
 
 ## Exclusions
 
@@ -201,6 +205,11 @@ management, exact run leases, graceful lifecycle, bounded recovery, and public
 health are implemented. The generated distribution Host cutover and
 explicit plugin configuration/activation, real process
 activation/cancellation acceptance, package-main development supervisors, and
-one real last-known-good developer loop are implemented. Only the simultaneous
-installed daemon/TUI fault, independent restart, and Bubble Tea reconnect proof
-remains for the Phase 5 developer-loop boundary.
+one real last-known-good developer loop are implemented. The independent
+installed daemon and Bubble Tea processes also prove in-flight transport
+recovery and daemon replacement without a terminal restart. Only the
+simultaneous production two-supervisor invalid-edit, daemon-only replacement,
+and visible Bubble Tea reconnect proof remains for the Phase 5 developer-loop
+boundary. The installed-process evidence and its native-terminal exclusion are
+recorded in
+[`evidence/phase4-installed-distribution.md`](evidence/phase4-installed-distribution.md).

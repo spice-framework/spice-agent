@@ -115,14 +115,20 @@ source ownership hashes, benchmark tables, supported OS/architecture matrix,
 protocol compatibility output, terminal transcript hashes, security scans, SBOM
 and signature verification, and known limitations.
 
-Status is **in progress**. Keyless component release callers exist, but the
-foundation and distribution release paths, exact tagged dependency graph,
-installed-platform proof, and decisive live workflow remain pending. Component
-tags may be created only in the dependency order above; no distribution tag may
-be created from partial phase evidence.
+Status is **in progress**. Keyless component and distribution prerelease paths,
+an exact tagged dependency graph, independent installed-process recovery, and
+authenticated distribution-byte startup now exist. The Agent preview 5 and
+distribution preview 4 workflows remain stopped at their separate protected
+attestation environments; that boundary requires explicit human authorization
+and is not an implicit completion step. Native PTY/ConPTY interaction, installed
+performance evidence, and the decisive final architecture release workflow also
+remain pending. Component tags may be created only in dependency order, and no
+release may be inferred from partial phase evidence.
 
 The kernel-local portion of slice 6 now has a reproducible offline command and
 recorded comparison table in
 [`phase7-kernel-runtime-baseline.md`](evidence/phase7-kernel-runtime-baseline.md).
 Installed daemon startup, connection, plugin RPC, TUI, generation, and build
-measurements remain required; the core baseline does not close slice 6 alone.
+measurements remain required; the existing installed-process correctness and
+release-byte execution proof is not a performance baseline, and the core
+baseline does not close slice 6 alone.

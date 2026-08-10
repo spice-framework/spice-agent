@@ -108,3 +108,8 @@ the daemon-to-TUI bridge. It does not prove a real process publication race,
 installed one-command startup, terminal reconnect, Ctrl-C shutdown, or the
 complete Windows/Linux distribution workflow. Those remain required before
 Phase 4 freezes.
+
+Later distribution evidence closes those process-level exclusions through the
+pipe-backed accessible Bubble Tea renderer and exact release-byte startup. It
+does not close native PTY/ConPTY presentation or resize. See
+[`phase4-installed-distribution.md`](phase4-installed-distribution.md).

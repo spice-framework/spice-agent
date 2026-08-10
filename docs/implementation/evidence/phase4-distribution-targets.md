@@ -27,3 +27,9 @@ connection, or process launch.
 This is Windows composition/build evidence, not installed-terminal acceptance.
 Real Windows and Linux terminal interaction, resize/reconnect, and release
 packaging remain required before Phase 4 freezes.
+
+Subsequent distribution work closes the independent-process, reconnect, daemon
+replacement, packaging, and authenticated release-byte startup portions of that
+boundary. Native PTY/ConPTY presentation and resize remain open. See
+[`phase4-installed-distribution.md`](phase4-installed-distribution.md) for the
+later evidence without widening the claims of this historical slice.

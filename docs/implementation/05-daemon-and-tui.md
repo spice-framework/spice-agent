@@ -263,8 +263,13 @@ pins the later TUI commit `a0d4824` and generates separate daemon and terminal
 applications at `spice-agent-coding` commit `8f92368`. Managed attach-or-start,
 explicit attach, the protocol-1.3 session bridge, injected native process
 containment, deterministic source mapping, and I/O-lazy `--check` composition
-are implemented. Real installed-terminal Windows/Linux reconnect interaction
-and release packaging remain pending. See
+are implemented. Later distribution work builds and runs both committed targets
+as independent Windows/Linux processes, drives the real Bubble Tea event loop
+through its accessible pipe renderer, recovers an in-flight stream, replaces
+the daemon between runs without restarting the terminal, and preserves prompt
+history. Preview 2 packaging and independently authenticated release-byte
+serve/attach plus managed startup are also complete. Native PTY/ConPTY
+presentation, resize, and reconnect interaction remain pending. See
 [`evidence/phase4-protocol.md`](evidence/phase4-protocol.md).
 Foundation-specific evidence is in
 [`evidence/phase4-host-foundation.md`](evidence/phase4-host-foundation.md).
@@ -299,8 +304,12 @@ Current-user scope, explicit-attach, and managed-candidate evidence is in
 
 The baseline remains intentionally provisional. The host and authenticated
 local-client libraries plus both generated distribution targets prove protocol,
-authority, IPC, explicit attach, managed startup, and owned process containment.
-Before the final Phase 4 freeze, installed Windows/Linux terminals must still
-prove one-command startup, explicit serve/attach, resize, reconnect, and clean
-shutdown. Exact distribution evidence is in
+authority, IPC, explicit attach, managed startup, owned process containment,
+installed-process stream recovery, daemon replacement with one continuing
+Bubble Tea process, and authenticated preview 2 release-byte startup/cleanup.
+Before the final Phase 4 freeze, installed Windows/Linux bytes must still prove
+native PTY/ConPTY presentation, resize, reconnect presentation, and clean
+interactive shutdown. Exact distribution evidence is in
 [`evidence/phase4-distribution-targets.md`](evidence/phase4-distribution-targets.md).
+The later installed-process and release-byte proof is in
+[`evidence/phase4-installed-distribution.md`](evidence/phase4-installed-distribution.md).
