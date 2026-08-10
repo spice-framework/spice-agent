@@ -45,7 +45,7 @@ An import-alias-only change may therefore require review, which is preferable
 to silently accepting a source-impacting change before v1.
 
 Pre-v1 breaks require an append-only record and a migration guide. The current
-ledger records preview4 to preview5 and preview5 to the next preview. After v1,
+ledger records preview4 to preview5 and preview5 to preview6. After v1,
 Go semantic import versioning applies: deprecations remain for two minor
 releases and at least 180 days, and removal occurs only in the next module
 major, except for the security process below.

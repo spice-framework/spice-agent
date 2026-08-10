@@ -96,19 +96,19 @@
     },
     {
       "id": "SPICE-AGENT-GO-0005",
-      "transition": "v0.1.0-preview.5-to-next-preview",
+      "transition": "v0.1.0-preview.5-to-v0.1.0-preview.6",
       "package": "github.com/spice-framework/spice-agent/plugin/host",
       "symbol": "HostConfig.Processes",
       "kind": "exported-field-type",
-      "migration": "docs/migrations/v0.1.0-preview.5-to-next-preview.md"
+      "migration": "docs/migrations/v0.1.0-preview.5-to-v0.1.0-preview.6.md"
     },
     {
       "id": "SPICE-AGENT-GO-0006",
-      "transition": "v0.1.0-preview.5-to-next-preview",
+      "transition": "v0.1.0-preview.5-to-v0.1.0-preview.6",
       "package": "github.com/spice-framework/spice-agent/plugin/host/autoconfigure",
       "symbol": "DefaultHost",
       "kind": "function-signature",
-      "migration": "docs/migrations/v0.1.0-preview.5-to-next-preview.md"
+      "migration": "docs/migrations/v0.1.0-preview.5-to-v0.1.0-preview.6.md"
     }
   ],
   "v1_stable": false,

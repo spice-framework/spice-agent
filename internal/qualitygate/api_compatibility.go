@@ -321,8 +321,8 @@ func validateGoAPIBreaks(approvedBreaks []goAPIApprovedBreak, root string) error
 		{ID: "SPICE-AGENT-GO-0002", Transition: "v0.1.0-preview.4-to-v0.1.0-preview.5", Package: modulePath + "/agent", Symbol: "NewPlanIdentity", Kind: "function-signature", Migration: "docs/migrations/v0.1.0-preview.4-to-v0.1.0-preview.5.md"},
 		{ID: "SPICE-AGENT-GO-0003", Transition: "v0.1.0-preview.4-to-v0.1.0-preview.5", Package: modulePath + "/plugin/host/autoconfigure", Symbol: "DefaultHost", Kind: "function-signature", Migration: "docs/migrations/v0.1.0-preview.4-to-v0.1.0-preview.5.md"},
 		{ID: "SPICE-AGENT-GO-0004", Transition: "v0.1.0-preview.4-to-v0.1.0-preview.5", Package: modulePath + "/agent", Symbol: "EngineOptions", Kind: "exported-struct-shape", Migration: "docs/migrations/v0.1.0-preview.4-to-v0.1.0-preview.5.md"},
-		{ID: "SPICE-AGENT-GO-0005", Transition: "v0.1.0-preview.5-to-next-preview", Package: modulePath + "/plugin/host", Symbol: "HostConfig.Processes", Kind: "exported-field-type", Migration: "docs/migrations/v0.1.0-preview.5-to-next-preview.md"},
-		{ID: "SPICE-AGENT-GO-0006", Transition: "v0.1.0-preview.5-to-next-preview", Package: modulePath + "/plugin/host/autoconfigure", Symbol: "DefaultHost", Kind: "function-signature", Migration: "docs/migrations/v0.1.0-preview.5-to-next-preview.md"},
+		{ID: "SPICE-AGENT-GO-0005", Transition: "v0.1.0-preview.5-to-v0.1.0-preview.6", Package: modulePath + "/plugin/host", Symbol: "HostConfig.Processes", Kind: "exported-field-type", Migration: "docs/migrations/v0.1.0-preview.5-to-v0.1.0-preview.6.md"},
+		{ID: "SPICE-AGENT-GO-0006", Transition: "v0.1.0-preview.5-to-v0.1.0-preview.6", Package: modulePath + "/plugin/host/autoconfigure", Symbol: "DefaultHost", Kind: "function-signature", Migration: "docs/migrations/v0.1.0-preview.5-to-v0.1.0-preview.6.md"},
 	}
 	if len(approvedBreaks) < len(wantBreaks) || !slices.Equal(approvedBreaks[:len(wantBreaks)], wantBreaks) {
 		return errors.New("go API compatibility manifest must retain all reviewed pre-v1 breaks")

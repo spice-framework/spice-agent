@@ -109,7 +109,7 @@ func copyCompatibilityFixture(t *testing.T, repository, root string) {
 	}
 	for _, relative := range []string{
 		"docs/migrations/v0.1.0-preview.4-to-v0.1.0-preview.5.md",
-		"docs/migrations/v0.1.0-preview.5-to-next-preview.md",
+		"docs/migrations/v0.1.0-preview.5-to-v0.1.0-preview.6.md",
 	} {
 		writeGateFile(t, root, relative, "migration fixture\n")
 	}

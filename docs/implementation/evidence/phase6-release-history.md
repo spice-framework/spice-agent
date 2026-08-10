@@ -228,7 +228,7 @@ bundle. Fresh proxy and SumDB resolution yields module sum
 `h1:rGND9DYx3pssliD1tZQOvPDOZ5GVfQLDc7VJQI3HLOM=` and go.mod sum
 `h1:pbhYOeNgn4pCIhEmcdbjnFjJijY4ZSLM8ZHxaF2dxz0=` at the tagged commit.
 
-## `v0.1.0-preview.6`: Phase 8 stabilization candidate authorization
+## `v0.1.0-preview.6`: published Phase 8 stabilization module
 
 Preview.6 authorizes the current stabilization candidate after the immutable
 preview.5 module. The candidate adds the public digest-bound
@@ -248,6 +248,10 @@ completion.
 | Reusable organization workflow | `f29b7ce16f8d220e87bfae54469057d001944b7b` |
 | Product-base CI | [31379105856](https://github.com/spice-framework/spice-agent/actions/runs/31379105856) |
 | Product-base documentation | [31379105822](https://github.com/spice-framework/spice-agent/actions/runs/31379105822) |
+| Tagged candidate | `f771caa3b150d87845417c4e26938e2a889441a6` |
+| Annotated tag object | `ee8436262fb755c4bf4897254650cd6d84e2e9fc` |
+| Successful release run | [31428824060](https://github.com/spice-framework/spice-agent/actions/runs/31428824060) |
+| Published prerelease | [`v0.1.0-preview.6`](https://github.com/spice-framework/spice-agent/releases/tag/v0.1.0-preview.6) |
 
 Both artifact-free policy authorities are clean and hosted green. Development
 authorizes the exact tuple:
@@ -271,9 +275,21 @@ and
 [31382031890](https://github.com/spice-framework/.github/actions/runs/31382031890)
 are green at the exact reusable-workflow commit.
 
-This preparation changes only canonical release metadata, the reusable caller
-identity, their strict stale-preview.5 regressions, and this history. It does
-not create or move a tag, approve either protected environment, attest or
-publish artifacts, or create a GitHub Release. Preview.5 remains at its
-immutable published tag and prerelease; preview.6 is a distinct future
-candidate and must never be used to rewrite that immutable history.
+At authorization time this preparation changed only canonical release
+metadata, the reusable caller identity, their strict stale-preview.5
+regressions, and this history. It did not create or move a tag, approve either
+protected environment, attest or publish artifacts, or create a GitHub
+Release.
+
+The later annotated tag object
+`ee8436262fb755c4bf4897254650cd6d84e2e9fc` resolves to the exact candidate
+commit `f771caa3b150d87845417c4e26938e2a889441a6`. Release workflow
+[31428824060](https://github.com/spice-framework/spice-agent/actions/runs/31428824060)
+completed candidate validation, deterministic rendering, independent
+verification, keyless attestation, provenance authentication, and protected
+publication. The non-draft GitHub prerelease contains exactly
+`checksums.txt`, `provenance.sigstore.json`, release metadata, an SPDX SBOM,
+and the source archive. The checksum file closes over exactly the three
+attested subjects. Fresh proxy and SumDB resolution yields module sum
+`h1:XJKJge+xWP/FLNoL1/rXq8z8tdu/5iEkKfmu1dTgFms=` and go.mod sum
+`h1:pbhYOeNgn4pCIhEmcdbjnFjJijY4ZSLM8ZHxaF2dxz0=` at the tagged commit.
