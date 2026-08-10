@@ -15,7 +15,7 @@ jobs:
       id-token: write
       attestations: write
       artifact-metadata: write
-    uses: spice-framework/.github/.github/workflows/go-module-release.yml@a8f9cc6ffd3a2744c5cae3b52c05e6e91cbc875e
+    uses: spice-framework/.github/.github/workflows/go-module-release.yml@f29b7ce16f8d220e87bfae54469057d001944b7b
     with:
       module: github.com/spice-framework/spice-agent
-      workflow_commit: a8f9cc6ffd3a2744c5cae3b52c05e6e91cbc875e
+      workflow_commit: f29b7ce16f8d220e87bfae54469057d001944b7b

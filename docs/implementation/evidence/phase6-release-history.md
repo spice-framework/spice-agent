@@ -223,3 +223,53 @@ waiting at the protected keyless-attestation environment. There is no GitHub
 Release object for preview.5. A tag, a proxy module, a waiting protected run,
 and a GitHub Release are distinct facts and must not be collapsed into a single
 "released" claim.
+
+## `v0.1.0-preview.6`: Phase 8 stabilization candidate authorization
+
+Preview.6 authorizes the current stabilization candidate after the immutable
+preview.5 module. The candidate adds the public digest-bound
+`process.VerifiedLauncher` and `process.ExecutableLease` boundary, source-built
+engine protocol compatibility evidence, independent Go and Python runtime
+plugin breadth, removable permission, recovery, delegation, compaction, Git,
+telemetry, and planning experiments, and the enforced pre-v1 compatibility
+history. Those experiments remain opt-in evidence; this candidate does not
+claim a v1 API freeze, a released N/N-1 binary matrix, or external-author
+completion.
+
+| Authority | Exact commit or run |
+| --- | --- |
+| Product base | `913d65c6c1abb9a6b1532576f8938029a7290e33` |
+| Development renderer policy | `c69219eb33ec50b6c5ab4a99515cb28d38975990` |
+| Toolchain independent policy | `757076c72a71382548e7a1e38d9bbe4e56968a66` |
+| Reusable organization workflow | `f29b7ce16f8d220e87bfae54469057d001944b7b` |
+| Product-base CI | [31379105856](https://github.com/spice-framework/spice-agent/actions/runs/31379105856) |
+| Product-base documentation | [31379105822](https://github.com/spice-framework/spice-agent/actions/runs/31379105822) |
+
+Both artifact-free policy authorities are clean and hosted green. Development
+authorizes the exact tuple:
+
+```text
+go-module-v1\tspice-agent\tgithub.com/spice-framework/spice-agent\tv0.1.0-preview.6
+```
+
+Toolchain independently authorizes the matching closed JSON value:
+
+```json
+{"profile":"go-module-v1","repository":"spice-agent","module":"github.com/spice-framework/spice-agent","version":"v0.1.0-preview.6","source":"https://github.com/spice-framework/spice-agent"}
+```
+
+Normalizing the Toolchain value to Development's ordered tuple produces the
+same bytes, including one trailing newline. Their SHA-256 is
+`edd2a8e2454f5d5fc6f2aa47725b8af7c74eeeaeeb98ca6dcf094146b4b62501`.
+The organization workflow verification and documentation runs
+[31382031771](https://github.com/spice-framework/.github/actions/runs/31382031771)
+and
+[31382031890](https://github.com/spice-framework/.github/actions/runs/31382031890)
+are green at the exact reusable-workflow commit.
+
+This preparation changes only canonical release metadata, the reusable caller
+identity, their strict stale-preview.5 regressions, and this history. It does
+not create or move a tag, approve either protected environment, attest or
+publish artifacts, or create a GitHub Release. Preview.5 remains at its
+existing protected-attestation boundary; preview.6 is a distinct future
+candidate and must never be used to rewrite that immutable history.

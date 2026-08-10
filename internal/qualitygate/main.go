@@ -26,7 +26,7 @@ const (
 	modulePath                = "github.com/spice-framework/spice-agent"
 	minimumCoverage           = 85.0
 	minimumExperimentCoverage = 85.0
-	releaseWorkflowCommit     = "a8f9cc6ffd3a2744c5cae3b52c05e6e91cbc875e"
+	releaseWorkflowCommit     = "f29b7ce16f8d220e87bfae54469057d001944b7b"
 	verifyWorkflowCommit      = "0534fe1247f892b287f624b7abb6f2347765ab22"
 	standardGateTimeout       = 15 * time.Minute
 	verifyGateTimeout         = 30 * time.Minute
