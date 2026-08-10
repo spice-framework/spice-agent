@@ -56,10 +56,12 @@ func (lease *ExecutableLease) materializeForLaunch(
 	defer func() {
 		if sourceOpen {
 			closeErr := source.Close()
-			resultErr = verificationFailure(
-				VerificationOperationClose,
-				errors.Join(resultErr, closeErr),
-			)
+			if closeErr != nil {
+				resultErr = verificationFailure(
+					VerificationOperationClose,
+					errors.Join(resultErr, closeErr),
+				)
+			}
 		}
 	}()
 

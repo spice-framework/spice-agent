@@ -101,7 +101,7 @@ func assertFailedMaterializationCleaned(
 	failure, ok := errors.AsType[*VerificationError](err)
 	if materialized != nil || !ok || failure.Operation() != VerificationOperationMaterialize ||
 		!errors.Is(err, cause) || err.Error() == cause.Error() {
-		t.Fatalf("failed materialization = %v, %T %v", materialized, err, err)
+		t.Fatalf("failed materialization = %p, %T %v", materialized, err, err)
 	}
 	entries, readErr := os.ReadDir(root)
 	if readErr != nil || len(entries) != 0 {
