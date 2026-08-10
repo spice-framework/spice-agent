@@ -55,6 +55,12 @@ Implement a second shell using the same UI-neutral client/session values and
 portable semantic views. It must not import Bubble Tea presentation or require
 plugin-provided executable UI.
 
+Status: **implemented as an isolated TUI-repository experiment**. Commit
+`0bacac3d5a2541abfde41fd9686b763f622f84c0` adds a standard-library semantic
+shell pinned to the released TUI module. It consumes only UI-neutral Session
+values, emits deterministic portable JSONL, imports no Bubble Tea, and remains
+deletable without a production client or compatibility freeze.
+
 ### Two-worker distributed extension
 
 Implement two cooperating workers entirely as an extension using ordinary runs,
@@ -62,6 +68,15 @@ messages, tools, and events. Success means the kernel needs no parent/child,
 subagent, swarm, or scheduler concepts. If verification across multiple
 annotation occurrences is truly required, propose a generic Spice aggregate-
 analysis RFC with non-agent use cases.
+
+Status: **implemented as an isolated core-repository experiment**. The nested
+`experiments/two-worker` module pins preview5 without a replacement. Its
+ordinary `worker.delegate` tool receives a public `client.Session`, delegates
+to a second ordinary `daemon.RunHost` over authenticated current-user local
+IPC, and proves retry identity, distributed cancellation, process cleanup,
+generated Spice injection, race/coverage, and provisional benchmarks. It adds
+no parent/child, subagent, scheduler, registry, or protocol concept. See
+[the two-worker evidence](evidence/phase7-two-worker-experiment.md).
 
 Each prototype has its own experimental module, compatibility manifest,
 conformance tests, benchmarks, and deletion path. It becomes a public repository
@@ -111,7 +126,9 @@ Extensions publish marginal startup, allocation, event-latency, cancellation,
 and binary-size costs. No optional extension may impose runtime or dependency
 cost when it is not imported.
 
-Status is **in progress**. The permission and SQLite recovery prototypes are
-implemented; alternate-client, two-worker, and independent-author proofs remain.
-The non-native parallel static extension design remains rejected history and
-may not be revived as a shortcut during experimentation.
+Status is **complete for Phase 7 experiments**. Permission, SQLite recovery,
+alternate semantic client, and two-worker extension proofs are implemented.
+Independent-author and broader optional-extension proofs remain Phase 8 work;
+none of the experimental APIs are stabilized by this completion. The non-native
+parallel static extension design remains rejected history and may not be revived
+as a shortcut during experimentation.

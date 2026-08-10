@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "status": "experimental",
+  "module": "github.com/spice-framework/spice-agent/experiments/two-worker",
+  "go": "1.26.0",
+  "toolchain": "go1.26.5",
+  "core": {
+    "module": "github.com/spice-framework/spice-agent",
+    "version": "v0.1.0-preview.5",
+    "sum": "h1:rGND9DYx3pssliD1tZQOvPDOZ5GVfQLDc7VJQI3HLOM=",
+    "go_mod_sum": "h1:pbhYOeNgn4pCIhEmcdbjnFjJijY4ZSLM8ZHxaF2dxz0="
+  },
+  "contracts": {
+    "client_session": "public preview.5",
+    "run_host": "public preview.5",
+    "engine_protocol": "1.3.0",
+    "local_transport": "current-user localipc plus endpoint.Token"
+  },
+  "tool": {
+    "name": "worker.delegate",
+    "effect": "mutating",
+    "replay": "idempotent"
+  },
+  "kernel_hierarchy": false,
+  "scheduler": false,
+  "compiled_registry": false,
+  "protocol_changes": false,
+  "replace_directives": false,
+  "promotion": "requires independent distributed-extension authors and contract review",
+  "deletion": "remove experiments/two-worker and its root ledger evidence links"
+}

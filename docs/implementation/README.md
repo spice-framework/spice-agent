@@ -12,7 +12,7 @@ Repository roadmaps link here and must not duplicate status.
 | 4 — daemon and TUI | In progress | generated daemon/TUI distribution targets and managed local composition proven; installed Windows/Linux terminal interaction pending |
 | 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, bounded recovery/health, generated distribution activation, real-process cancellation, and real `spice dev` last-known-good proof complete; simultaneous installed daemon/TUI fault-reconnect proof pending |
 | 6 — architecture proof | In progress | dependency-ordered keyless module releases, then independently attested preview distribution; [Agent preview.1/preview.2/preview.3 failure history](evidence/phase6-release-history.md) |
-| 7 — stress prototypes | In progress | permission and SQLite recovery experiments complete; alternate UI and two-worker experiments pending |
+| 7 — stress prototypes | Complete | permission, SQLite recovery, alternate semantic shell, and two-worker extension proven without stabilizing their APIs |
 | 8 — stabilization | Planned | external authors and frozen compatibility policy |
 
 Exact commits and command output are recorded only after the corresponding gate
@@ -50,6 +50,17 @@ immutable branch lineage, generated Spice construction, process-kill tests,
 coverage, and offline vendor are owned entirely by the deletable experiment.
 It does not claim transparent daemon restart. Exact evidence is in
 [`phase7-sqlite-recovery-experiment.md`](evidence/phase7-sqlite-recovery-experiment.md).
+
+The alternate-client proof is complete in the TUI repository at
+`0bacac3d5a2541abfde41fd9686b763f622f84c0`: its removable semantic shell
+consumes only released UI-neutral Session values and emits deterministic JSONL
+without Bubble Tea, transport ownership, or executable plugin UI. The isolated
+`experiments/two-worker` module completes the distributed-extension proof using
+one ordinary `worker.delegate` tool, an injected public `client.Session`, and a
+second ordinary `daemon.RunHost` over authenticated current-user local IPC.
+There is no kernel hierarchy, scheduler, compiled registry, or protocol change.
+Exact core evidence is in
+[`phase7-two-worker-experiment.md`](evidence/phase7-two-worker-experiment.md).
 
 The kernel now durably records each `ToolStarted` occurrence with typed,
 bounded, secret-free definition and exact plan/workspace facts. Corrupt,

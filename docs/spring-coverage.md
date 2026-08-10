@@ -13,7 +13,10 @@ Spice platform's broader Spring coverage remains owned by the Spice repository.
 | JVM/process sandboxing | no direct equivalent | explicitly not claimed; interception and capability metadata do not contain arbitrary Go code |
 | durable event listener | experimental SQLite required observer | proves synchronous commit-before-ack with exact typed occurrence correlation; persistence remains opt-in |
 | restart/checkpoint state | experimental SQLite checkpoint/restorer | explicit safe snapshot return and immutable branch lineage; no transparent context or daemon restart |
+| alternate application client | TUI semantic-shell experiment at `0bacac3` | consumes released UI-neutral Session values and portable views without Bubble Tea or executable plugin UI |
+| task delegation/executor | experimental `worker.delegate` tool | delegates through an injected public Session to an ordinary second run; no parent/child context, scheduler, or proxy container |
+| distributed cancellation | `Session.Cancel` from `worker.delegate` | proven across authenticated current-user IPC and a second RunHost; uncertain mutation outcomes fail closed |
 
-The permission and SQLite recovery experiments are removable without affecting
-core. An alternate client and a two-worker distributed extension remain the
-next Phase 7 proofs before any API stabilization claim.
+All four Phase 7 experiments are removable without affecting core. Their
+completion is evidence for contract review, not an API-stability or Spring
+runtime-equivalence claim.
