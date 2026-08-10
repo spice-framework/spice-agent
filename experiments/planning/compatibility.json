@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "status": "experimental",
+  "module": "github.com/spice-framework/spice-agent/experiments/planning",
+  "go": "1.26.0",
+  "toolchain": "go1.26.5",
+  "dependencies": {
+    "spice": {
+      "version": "v0.1.0-preview.2",
+      "sum": "h1:5pYgTlUUzC/xZISetG/U6c1L/I3f8dUQSZhuo6YqxiA=",
+      "go_mod_sum": "h1:dBZV5UZcbY6pzhfGNtvAwQIJ8YsFna+jf1SAlmukJfk="
+    },
+    "spice_agent": {
+      "version": "v0.1.0-preview.5",
+      "sum": "h1:rGND9DYx3pssliD1tZQOvPDOZ5GVfQLDc7VJQI3HLOM=",
+      "go_mod_sum": "h1:pbhYOeNgn4pCIhEmcdbjnFjJijY4ZSLM8ZHxaF2dxz0="
+    }
+  },
+  "contract": {
+    "version": "spice.agent.planning/advisory-v1",
+    "delivery": "dedicated-initial-user-text-part",
+    "review_boundary": "prepare-then-start-prepared",
+    "maximum_steps": 64,
+    "maximum_dependencies": 16,
+    "maximum_text_bytes": 4096,
+    "maximum_plan_bytes": 65536,
+    "canonical_json": true,
+    "sha256_identity": true,
+    "snapshot_durable": true,
+    "resume_replans": false,
+    "tool_authority": false,
+    "guard_authority": false,
+    "hidden_operations": false,
+    "model_assisted": false,
+    "daemon_integration": false
+  },
+  "replace_directives": false,
+  "promotion": "blocked until a real application and independently authored planner prove the contract",
+  "deletion": "remove the nested module and planning activation, regenerate the application, and remove the root quality step"
+}

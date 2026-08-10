@@ -153,6 +153,29 @@ func TestValidateTelemetryCoverageAndDeterministicFuzzBudget(t *testing.T) {
 	}
 }
 
+func TestValidatePlanningCoverageAndDeterministicFuzzBudget(t *testing.T) {
+	t.Parallel()
+	if err := validatePlanningCoverage("ok\tplanning\tcoverage: 86.0% of statements\n"); err != nil {
+		t.Fatal(err)
+	}
+	for _, output := range []string{
+		"ok\tplanning\tcoverage: 84.9% of statements\n",
+		"ok\tplanning\n",
+		"ok\tplanning\tcoverage: invalid% of statements\n",
+	} {
+		if err := validatePlanningCoverage(output); err == nil {
+			t.Fatalf("validatePlanningCoverage(%q) succeeded", output)
+		}
+	}
+	want := []string{"test", "-run=^$", "-fuzz=^FuzzParsePlan$", "-fuzztime=100x", "."}
+	if got := planningFuzzArguments(); !slices.Equal(got, want) {
+		t.Fatalf("planning fuzz arguments = %q", got)
+	}
+	if strings.Contains(strings.Join(planningFuzzArguments(), " "), "1s") {
+		t.Fatal("planning fuzz smoke uses a wall-clock duration")
+	}
+}
+
 func TestKernelRuntimeBenchmarkContractIsBoundedAndFailsClosed(t *testing.T) {
 	t.Parallel()
 	wantArguments := []string{
@@ -458,6 +481,8 @@ func TestBootstrapUsesCopiedModuleGraphAndPreservesSource(t *testing.T) {
 	writeGateFile(t, root, "experiments/git-workflow/go.sum", "example.com/process v1.0.0 h1:test\n")
 	writeGateFile(t, root, "experiments/telemetry/go.mod", "module example.com/product/experiments/telemetry\n\ngo 1.26.0\n")
 	writeGateFile(t, root, "experiments/telemetry/go.sum", "example.com/telemetry v1.0.0 h1:test\n")
+	writeGateFile(t, root, "experiments/planning/go.mod", "module example.com/product/experiments/planning\n\ngo 1.26.0\n")
+	writeGateFile(t, root, "experiments/planning/go.sum", "example.com/planning v1.0.0 h1:test\n")
 
 	var directories []string
 	err := bootstrapDependencies(
@@ -488,6 +513,7 @@ func TestBootstrapUsesCopiedModuleGraphAndPreservesSource(t *testing.T) {
 		filepath.Join(root, "experiments", "compaction"),
 		filepath.Join(root, "experiments", "git-workflow"),
 		filepath.Join(root, "experiments", "telemetry"),
+		filepath.Join(root, "experiments", "planning"),
 	}) {
 		t.Fatalf("bootstrap directories = %q", directories)
 	}

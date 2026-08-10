@@ -33,11 +33,13 @@ arguments, preventing corpus discovery or minimization near a time boundary
 from turning a successful smoke run into a deadline failure.
 
 Every ordinary gate also enters the isolated permission, SQLite recovery,
-two-worker, and compaction modules with `GOWORK=off`, `GOPROXY=off`, and
+two-worker, compaction, Git workflow, telemetry, and planning modules with `GOWORK=off`, `GOPROXY=off`, and
 `-mod=vendor`. Check and verify modes reproduce each nested vendor tree, verify
 its generated Spice target, run vet and shuffled tests, and verify additionally
 runs race plus an 85% handwritten package coverage floor. The compaction proof
-also runs its exact `FuzzCompact` target for 100 deterministic executions.
+also runs its exact `FuzzCompact` target, Git runs `FuzzDecodeCommitArguments`,
+telemetry runs `FuzzTranslateEnvelope`, and planning runs `FuzzParsePlan`, each
+for 100 deterministic executions.
 
 A fresh machine runs `make tools-bootstrap` once. This is the sole
 network-authorized quality-gate mode. It copies each `go.mod`/`go.sum` pair to a

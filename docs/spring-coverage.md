@@ -16,7 +16,8 @@ Spice platform's broader Spring coverage remains owned by the Spice repository.
 | alternate application client | TUI semantic-shell experiment at `0bacac3` | consumes released UI-neutral Session values and portable views without Bubble Tea or executable plugin UI |
 | task delegation/executor | experimental `worker.delegate` tool | delegates through an injected public Session to an ordinary second run; no parent/child context, scheduler, or proxy container |
 | distributed cancellation | `Session.Cancel` from `worker.delegate` | proven across authenticated current-user IPC and a second RunHost; uncertain mutation outcomes fail closed |
+| explicit planning workflow | experimental typed `planning.Planner` + `Service.Prepare`/`StartPrepared` | generated application-owned pre-start stage with durable canonical advisory content; no kernel planner, hidden model call, or policy authority |
 
-All four Phase 7 experiments are removable without affecting core. Their
+All Phase 7 and Phase 8 experiments are removable without affecting core. Their
 completion is evidence for contract review, not an API-stability or Spring
 runtime-equivalence claim.

@@ -135,6 +135,17 @@ exporter-neutral diagnostic projection, not durable history, OpenTelemetry, or
 distributed trace continuity. See
 [the telemetry evidence](evidence/phase8-telemetry-experiment.md).
 
+The deterministic planning proof is complete as the removable
+`experiments/planning` nested module. It injects an application-owned named
+typed planner stage, separates inspectable preparation from explicit worker
+start, and appends one bounded canonical JSON plan to ordinary initial user
+history. SHA-256 identities bind the definition, original message, producer,
+goal, and ordered backward-only steps. Suspended and terminal snapshots preserve
+the exact bytes; same-identity resume does not replan, while a different planner
+semantic identity fails before execution. A real terminal guard still denies a
+plan-recommended mutation, proving the plan has no authority. See
+[the planning evidence](evidence/phase8-planning-experiment.md).
+
 - Obtain three independently authored compiled extensions using only public
   annotation/SDK contracts.
 - Run both runtime-plugin languages and a second client against current and

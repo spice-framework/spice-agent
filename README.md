@@ -114,6 +114,12 @@ decoders; it is explicitly not durable history, distributed tracing, or an
 OpenTelemetry implementation. A caller-owned local JSONL exporter performs no
 path discovery or network I/O.
 
+The removable `experiments/planning` module proves an explicit application-owned
+`Prepare` then `StartPrepared` workflow. A generated typed planner stage emits
+bounded canonical advisory JSON whose SHA-256 identity and exact bytes enter
+ordinary user history and snapshots. Plans never grant tool, guard, interaction,
+or dispatch authority, and resume never reruns planning.
+
 ## Release contract
 
 `spice-release.json` is inert, canonical metadata for the centrally authorized
