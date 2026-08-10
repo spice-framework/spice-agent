@@ -449,6 +449,9 @@ func checkIdentity(root string) error {
 	if err := checkRepositoryPortability(root); err != nil {
 		return err
 	}
+	if err := checkEngineProtocolCompatibility(root); err != nil {
+		return err
+	}
 	return checkReleaseWorkflow(root)
 }
 

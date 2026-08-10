@@ -270,6 +270,16 @@ The available current-user and candidate evidence is recorded in
 The distribution process launcher, daemon/TUI attachment, and real
 cross-platform terminal acceptance remain required before the Phase 4 freeze.
 
+Phase 8 now records the implemented compatibility semantics in the strict
+machine-readable [`engine/v1/compatibility.json`](../../engine/v1/compatibility.json)
+manifest. A source-built real-process matrix proves the previous 1.2 profile,
+current 1.3 profile, explicit typed downgrade, legacy ambiguity, exact replay,
+cancellation recovery, authentication refusal, and cleanup on Linux and
+Windows. The 1.2 server cap is a private acceptance seam; production always
+advertises 1.0–1.3. This evidence does not execute a previously released binary
+and therefore makes no released-binary N/N-1 claim. See
+[`phase8-engine-protocol-compatibility.md`](../implementation/evidence/phase8-engine-protocol-compatibility.md).
+
 The pre-host contract repair resolves interaction prompt discovery, reconnect
 ownership CAS, remote suspend/resume, imported run identity, and atomic replay
 bounds in the provisional schema. The host slice must still prove those

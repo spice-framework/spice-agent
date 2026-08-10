@@ -12,3 +12,6 @@ The canonical status and acceptance evidence live in
 7. Contract stress prototypes.
 8. Pre-1.0 stabilization and optional ecosystem breadth.
 
+Phase 8 has begun with the strict source-built engine-protocol compatibility
+matrix. External-author proofs, plugin-generation compatibility, optional
+extensions, and any API freeze remain outstanding; see the canonical ledger.

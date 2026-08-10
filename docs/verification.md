@@ -50,6 +50,13 @@ security, and offline-build inputs. They are excluded only from handwritten
 formatting and coverage-denominator checks because their source schemas and
 deterministic freshness are separately enforced.
 
+Every quality-gate mode also validates the exact canonical
+`engine/v1/compatibility.json` contract. Ordinary tests launch source-built
+previous-semantics and current-semantics servers over the public local IPC,
+gRPC client, and server boundaries. The decisive process matrix runs on Linux
+and Windows, checks retry/ambiguity/cancellation/cleanup behavior, and is
+explicitly not evidence of released-binary N/N-1 compatibility.
+
 Repository identity also validates `.github/workflows/release.yml` as a
 single-job, secret-free caller of the organization keyless Go-module release
 workflow at its exact audited commit. The caller must deny permissions at the

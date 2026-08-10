@@ -300,6 +300,7 @@ func TestNewServerRejectsInvalidBoundaries(t *testing.T) {
 	valid := serverDependencies{
 		root: root, token: endpointTokenFixture(t, 11), host: host, sessions: sessions,
 		build: build, capabilities: []string{"events"}, maximumSessions: 1,
+		protocolRange: commonv1.SupportedProtocolRange(),
 	}
 	for name, mutate := range map[string]func(*serverDependencies){
 		"nil root":       func(value *serverDependencies) { value.root = nil },
@@ -307,6 +308,18 @@ func TestNewServerRejectsInvalidBoundaries(t *testing.T) {
 		"zero build":     func(value *serverDependencies) { value.build = client.Build{} },
 		"duplicate caps": func(value *serverDependencies) { value.capabilities = []string{"events", "events"} },
 		"zero capacity":  func(value *serverDependencies) { value.maximumSessions = 0 },
+		"future protocol": func(value *serverDependencies) {
+			value.protocolRange = &commonv1.ProtocolRange{
+				Minimum: &commonv1.ProtocolVersion{Major: 1},
+				Maximum: &commonv1.ProtocolVersion{Major: 1, Minor: commonv1.ProtocolMinor + 1},
+			}
+		},
+		"truncated minimum": func(value *serverDependencies) {
+			value.protocolRange = &commonv1.ProtocolRange{
+				Minimum: &commonv1.ProtocolVersion{Major: 1, Minor: 1},
+				Maximum: &commonv1.ProtocolVersion{Major: 1, Minor: 2},
+			}
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -334,6 +347,29 @@ func TestNewServerRejectsInvalidBoundaries(t *testing.T) {
 	huge.host = &grpcFixtureHost{description: hugeDescription, health: hugeHealth}
 	if server, createErr := newServer(huge); createErr == nil || server != nil {
 		t.Fatalf("oversized platform limit server = %#v, %v", server, createErr)
+	}
+}
+
+func TestServerProtocolRangeDefaultsToProductionAndAllowsPrivatePrefix(t *testing.T) {
+	t.Parallel()
+	production, err := validatedServerProtocolRange(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if production.GetMinimum().GetMinor() != commonv1.ProtocolMinimumMinor ||
+		production.GetMaximum().GetMinor() != commonv1.ProtocolMinor {
+		t.Fatalf("production protocol range = %#v", production)
+	}
+	prefix, err := validatedServerProtocolRange(&commonv1.ProtocolRange{
+		Minimum: &commonv1.ProtocolVersion{Major: 1},
+		Maximum: &commonv1.ProtocolVersion{Major: 1, Minor: 2},
+	})
+	if err != nil || prefix.GetMaximum().GetMinor() != 2 {
+		t.Fatalf("protocol prefix = %#v, %v", prefix, err)
+	}
+	prefix.Maximum.Minor = 0
+	if production.GetMaximum().GetMinor() != commonv1.ProtocolMinor {
+		t.Fatal("validated protocol ranges share mutable storage")
 	}
 }
 
