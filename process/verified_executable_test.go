@@ -176,6 +176,87 @@ func TestVerifiedLauncherFunctionPreservesArguments(t *testing.T) {
 	}
 }
 
+func TestMaterializedExecutableLifecycleAndFormatting(t *testing.T) {
+	t.Parallel()
+	path, digest := writeVerifiedTestExecutable(t, []byte("materialized executable content"))
+	lease, err := agentprocess.VerifyExecutable(t.Context(), path, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = lease.Close() }()
+	materialized, err := lease.MaterializeForLaunch(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	materializedPath := materialized.Path()
+	materializedDirectory := filepath.Dir(materializedPath)
+	if materializedPath == path || !filepath.IsAbs(materializedPath) {
+		t.Fatalf("materialized path = %q", materializedPath)
+	}
+	if err = materialized.Recheck(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" {
+		fileInfo, statErr := os.Stat(materializedPath)
+		directoryInfo, directoryErr := os.Stat(materializedDirectory)
+		if statErr != nil || directoryErr != nil || fileInfo.Mode().Perm() != 0o500 ||
+			directoryInfo.Mode().Perm() != 0o700 {
+			t.Fatalf("private modes = %v, %v; errors = %v, %v", fileInfo, directoryInfo, statErr, directoryErr)
+		}
+	}
+	for _, rendered := range []string{
+		fmt.Sprint(materialized), fmt.Sprintf("%#v", materialized),
+		fmt.Sprintf("%+v", materialized), materialized.LogValue().String(),
+	} {
+		if !strings.Contains(rendered, "[REDACTED]") || strings.Contains(rendered, materializedPath) {
+			t.Fatalf("unsafe materialized formatting = %q", rendered)
+		}
+	}
+	encoded, err := json.Marshal(materialized)
+	if err != nil || strings.Contains(string(encoded), materializedPath) {
+		t.Fatalf("unsafe materialized JSON = %q, %v", encoded, err)
+	}
+	if err = materialized.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err = materialized.Close(); err != nil {
+		t.Fatalf("idempotent close: %v", err)
+	}
+	if materialized.Path() != "" || materialized.Recheck(t.Context()) == nil {
+		t.Fatal("closed materialization remained usable")
+	}
+	if _, err = os.Stat(materializedPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("materialized file remains: %v", err)
+	}
+	if _, err = os.Stat(materializedDirectory); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("materialized directory remains: %v", err)
+	}
+	var absent *agentprocess.MaterializedExecutable
+	if absent.Path() != "" || absent.Close() != nil || absent.Recheck(t.Context()) == nil ||
+		absent.LogValue().Kind() != slog.KindString {
+		t.Fatal("nil materialization boundary was unsafe")
+	}
+}
+
+func TestMaterializationRejectsCancellationBeforeFilesystemMutation(t *testing.T) {
+	t.Parallel()
+	path, digest := writeVerifiedTestExecutable(t, []byte("materialization cancellation"))
+	lease, err := agentprocess.VerifyExecutable(t.Context(), path, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = lease.Close() }()
+	ctx, cancel := context.WithCancelCause(context.Background())
+	privateCause := errors.New("private materialization cancellation")
+	cancel(privateCause)
+	materialized, materializeErr := lease.MaterializeForLaunch(ctx)
+	failure, ok := errors.AsType[*agentprocess.VerificationError](materializeErr)
+	if materialized != nil || !ok || failure.Operation() != agentprocess.VerificationOperationMaterialize ||
+		!errors.Is(materializeErr, privateCause) || strings.Contains(materializeErr.Error(), privateCause.Error()) {
+		t.Fatalf("canceled materialization = %v, %T %v", materialized, materializeErr, materializeErr)
+	}
+}
+
 func TestExecutableLeaseOperationsAreConcurrencySafe(t *testing.T) {
 	t.Parallel()
 	path, digest := writeVerifiedTestExecutable(t, bytes.Repeat([]byte("lease"), 1024))

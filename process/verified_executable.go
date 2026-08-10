@@ -22,13 +22,14 @@ var (
 type VerificationOperation string
 
 const (
-	VerificationOperationValidate  VerificationOperation = "validate"
-	VerificationOperationOpen      VerificationOperation = "open"
-	VerificationOperationInspect   VerificationOperation = "inspect"
-	VerificationOperationHash      VerificationOperation = "hash"
-	VerificationOperationDuplicate VerificationOperation = "duplicate"
-	VerificationOperationRecheck   VerificationOperation = "recheck"
-	VerificationOperationClose     VerificationOperation = "close"
+	VerificationOperationValidate    VerificationOperation = "validate"
+	VerificationOperationOpen        VerificationOperation = "open"
+	VerificationOperationInspect     VerificationOperation = "inspect"
+	VerificationOperationHash        VerificationOperation = "hash"
+	VerificationOperationDuplicate   VerificationOperation = "duplicate"
+	VerificationOperationMaterialize VerificationOperation = "materialize"
+	VerificationOperationRecheck     VerificationOperation = "recheck"
+	VerificationOperationClose       VerificationOperation = "close"
 )
 
 // VerificationError preserves cancellation and platform error identity for
@@ -272,7 +273,8 @@ func verificationFailure(operation VerificationOperation, cause error) error {
 func validVerificationOperation(operation VerificationOperation) bool {
 	switch operation {
 	case VerificationOperationValidate, VerificationOperationOpen, VerificationOperationInspect,
-		VerificationOperationHash, VerificationOperationDuplicate, VerificationOperationRecheck,
+		VerificationOperationHash, VerificationOperationDuplicate, VerificationOperationMaterialize,
+		VerificationOperationRecheck,
 		VerificationOperationClose:
 		return true
 	default:

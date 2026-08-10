@@ -19,12 +19,15 @@ Configuration includes a canonical absolute executable path, expected SHA-256,
 plugin name, startup/call/drain bounds, and approved capabilities. The host opens
 and digest-verifies the exact executable object before allocating a launch
 identity, secret, or endpoint, and retains that lease until process containment
-is proved. Its injected `process.VerifiedLauncher` has no pathname-only fallback:
-Unix launches use a duplicate of the verified descriptor, while Windows launch
-uses the non-sharing lease plus a recheck after suspended creation and before
-resume. The host performs another identity/digest recheck after ownership
-transfer and before readiness as defense-in-depth. PATH lookup and ambient
-directory scanning are forbidden.
+is proved. Its injected `process.VerifiedLauncher` has no pathname-only
+fallback: Linux launches use a duplicate of the verified descriptor; Darwin
+launches a digest-reverified private snapshot written only from that descriptor
+in a new mode-0700 process-owned directory; and Windows launch uses the
+non-sharing lease plus a recheck after suspended creation and before resume.
+Both Darwin leases remain live until containment, then exact nonrecursive
+cleanup removes the snapshot. The host performs another identity/digest
+recheck after ownership transfer and before readiness as defense-in-depth. PATH
+lookup and ambient directory scanning are forbidden.
 
 `Initialize` exchanges protocol/build identity, a sorted immutable manifest,
 tool definitions, feature capabilities, negotiated limits, a 128-bit launch

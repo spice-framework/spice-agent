@@ -37,12 +37,20 @@ This slice connects the pinned-executable security foundation to the frozen
 
 ## Security and ownership limits
 
-The verified-launch contract requires an exact descriptor-backed image on Unix
-or the held Windows non-sharing handle with suspended pre-resume recheck. Core
-tests prove a pathname replacement never selects the executed image. The
+The verified-launch contract requires an exact descriptor-backed image on
+Linux, a digest-reverified private materialization from that descriptor on
+Darwin, or the held Windows non-sharing handle with suspended pre-resume
+recheck. Core tests prove a pathname replacement never selects the executed image. The
 post-launch recheck remains defense-in-depth and still rejects a candidate when
 its configured path has drifted. Native distribution adapters must separately
 prove process containment and the platform launch implementation.
+
+Darwin materialization creates a random mode-0700 directory, writes only a
+duplicate of the verified file object, synchronizes and closes the writer, and
+reverifies the expected digest before execution. The snapshot and original
+leases remain live until containment, and cleanup removes only the exact file
+and empty directory. This protects against other users and pathname races; it
+is not a boundary against a malicious process already running as the host user.
 
 Plugins remain trusted native processes. Capability declarations are validated
 against explicit configuration but are not a sandbox or permission policy.

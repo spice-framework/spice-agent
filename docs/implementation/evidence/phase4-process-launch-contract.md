@@ -36,18 +36,23 @@ leaf without following a final symlink/reparse point, proves a regular
 executable file, hashes that open object with cancellation, and holds its
 platform identity. `ExecutableLease.ValidateSpec` prevents path substitution in
 the immutable process intent; `DuplicateForLaunch` supplies a caller-owned
-exact descriptor to trusted Unix launchers, while `Recheck` supports the
-Windows suspended-create/pre-resume boundary and post-launch defense. There is
-no adapter from ordinary `Launcher`, so security-sensitive consumers fail at
+exact descriptor to trusted Linux launchers. `MaterializeForLaunch` supports
+Darwin without reopening the configured pathname: it creates a random
+mode-0700 directory, copies only from the verified duplicate, syncs and closes
+the writer, verifies the expected digest again, and returns a second lease that
+owns exact nonrecursive cleanup. `Recheck` supports the Windows
+suspended-create/pre-resume boundary and post-launch defense. There is no
+adapter from ordinary `Launcher`, so security-sensitive consumers fail at
 construction instead of falling back.
 
 ## Verification scope
 
 Tests cover immutable lookup/spec copies, name/relative/absolute requests,
 environment/capability ordering, redaction, canonical digest parsing,
-verification cancellation, duplicate/close boundaries, symlink/reparse
-rejection, mutation/identity drift, and real Windows plus Linux substitution
-attempts in which only the leased image executes,
+verification cancellation, duplicate/materialization/close boundaries,
+partial-failure and cancellation cleanup, symlink/reparse rejection,
+mutation/identity drift, and real Windows, Linux, and hosted Darwin
+substitution attempts in which only the leased image executes,
 required streams and capabilities, malformed and oversized values, exit-code
 boundaries, launch-context independence, root/join separation, retryable and
 terminal containment failures, and dependency direction. Fuzz targets exercise

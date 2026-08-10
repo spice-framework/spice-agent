@@ -261,12 +261,17 @@ Digest-sensitive children use the separate fail-closed boundary. Public
 `SHA256` and `ExecutableLease` values open, inspect, hash, and retain one exact
 platform file identity before launch. `VerifiedLauncher` accepts that lease and
 has no pathname-only fallback. It must validate the immutable `Spec` against
-the lease and prevent path substitution from selecting another image: Unix
-implementations execute a duplicated lease descriptor, while Windows
-implementations retain the non-sharing handle and recheck a suspended child
-before resume. The caller keeps the lease through successful containment
-`Wait`. Core deliberately contains no executable-resolution or `os/exec`
-implementation and makes no universal containment or sandbox claim.
+the lease and prevent path substitution from selecting another image. Linux
+implementations execute a duplicated lease descriptor. Darwin, which rejects
+descriptor paths for executable launch, uses `MaterializeForLaunch` to copy
+only from that descriptor into a fresh mode-0700 process-owned directory, sync
+and close the writer, reverify the exact digest, and retain the snapshot lease
+through containment. Windows implementations retain the non-sharing handle and
+recheck a suspended child before resume. The caller keeps every lease through
+successful containment `Wait`. Core deliberately contains no executable
+resolution or `os/exec` implementation and makes no universal containment or
+sandbox claim. The Darwin private directory excludes other users, not a
+malicious process already running with the host's own identity.
 
 `client/managed` owns attach-or-start policy rather than process construction.
 Only the exact unwrapped absence sentinel authorizes the serialized

@@ -43,17 +43,25 @@ truncation metadata; formatting and serialization expose metadata only.
 
 ## Verified-launch boundary
 
-The public lease supplies a duplicated exact descriptor for Unix native launch.
-Windows' held non-sharing handle prevents ordinary mutation/replacement, and a
-native implementation must create suspended, recheck, then resume. Real test
-executables prove that replacing the Unix path still runs only the leased image
-and that Windows replacement is denied before the verified image runs. macOS
-uses `/dev/fd/3`; the repository requires its hosted real-process job to pass
-before claiming that platform complete.
+The public lease supplies a duplicated exact descriptor for Linux native
+launch. Darwin does not execute `/dev/fd` descriptors; its explicit
+`MaterializeForLaunch` boundary instead creates a random mode-0700
+process-owned directory, writes only from the verified duplicate, syncs and
+closes the writer, verifies the exact digest again, and retains the private
+snapshot lease through child containment. Cleanup removes only the exact file
+and empty directory and fails closed on unexpected contents. Windows' held
+non-sharing handle prevents ordinary mutation/replacement, and a native
+implementation must create suspended, recheck, then resume. Real test
+executables prove that replacing the Linux or Darwin source path still runs
+only the leased image and that Windows replacement is denied before the
+verified image runs. Hosted macOS execution is mandatory evidence rather than
+a cross-compile inference.
 
 This is executable-image integrity, not a sandbox or an execution-closure pin.
 Dynamic loaders, DLLs/shared libraries, shebang interpreters, argument-named
-files, and malicious same-user in-place Unix mutation remain outside the claim.
+files, and malicious same-user mutation remain outside the claim. A Darwin
+private directory excludes other users but cannot defend against another
+process that already has the host user's authority.
 
 ## Verification scope
 
@@ -64,7 +72,8 @@ later stdout contamination, close and cancellation races, huge concurrent
 output, bounded stderr, saturating accounting, immutable configuration,
 environment and capability normalization, timeout and limit boundaries,
 format redaction, digest mismatch, cancellation, directory rejection, Unix
-symbolic-link/permission/mutation/replacement and descriptor-execution cases,
+symbolic-link/permission/mutation/replacement, descriptor execution, private
+materialization, partial-failure cleanup, and cancellation cases,
 and Windows reparse-point/write-sharing and substitution behavior. The
 repository architecture gate also forbids the host core from importing daemon,
 client, engine, internal fixture, provider-facing kernel packages, or

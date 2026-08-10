@@ -46,9 +46,12 @@ bootstrap/readiness framing is shared by fixtures and production; immutable
 executable configuration has no interpreter arguments or ambient environment;
 and a held, platform-identified file is digest-verified before launch. The Host
 requires `process.VerifiedLauncher` with no pathname-only fallback. A compliant
-Unix launcher executes a duplicate of the verified descriptor; a compliant
-Windows launcher retains the non-sharing handle and rechecks after suspended
-creation but before resume. Host still identity/digest-rechecks immediately
+Linux launcher executes a duplicate of the verified descriptor. Darwin first
+materializes only that descriptor into a new mode-0700 process-owned directory,
+syncs and closes the writer, reverifies the expected digest, and retains both
+leases until containment. A compliant Windows launcher retains the non-sharing
+handle and rechecks after suspended creation but before resume. Host still
+identity/digest-rechecks immediately
 after ownership transfer as defense-in-depth before readiness or
 authentication. Bounded stdout readiness and stderr drains never reflect
 child-controlled content.

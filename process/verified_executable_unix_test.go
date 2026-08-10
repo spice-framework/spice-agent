@@ -105,16 +105,30 @@ func startDescriptorBacked(
 	if err := lease.ValidateSpec(spec); err != nil {
 		return err
 	}
+	if runtime.GOOS == "darwin" {
+		materialized, err := lease.MaterializeForLaunch(ctx)
+		if err != nil {
+			return err
+		}
+		defer materialized.Close()                                                    //nolint:errcheck // The launch result remains authoritative.
+		command := exec.CommandContext(ctx, materialized.Path(), spec.Arguments()...) // #nosec G204 -- private digest-reverified path.
+		command.Args[0] = spec.Executable()
+		command.Dir = spec.WorkingDirectory()
+		command.Env = spec.Environment()
+		command.Stdin = spec.Stdin()
+		command.Stdout = spec.Stdout()
+		command.Stderr = spec.Stderr()
+		if err = materialized.Recheck(ctx); err != nil {
+			return err
+		}
+		return command.Run()
+	}
 	file, err := lease.DuplicateForLaunch()
 	if err != nil {
 		return err
 	}
-	defer file.Close() //nolint:errcheck // The launch result remains authoritative.
-	path := "/proc/self/fd/3"
-	if runtime.GOOS == "darwin" {
-		path = "/dev/fd/3"
-	}
-	command := exec.Command(path, spec.Arguments()...) // #nosec G204 -- fixed descriptor path selects the verified file object.
+	defer file.Close()                                                          //nolint:errcheck // The launch result remains authoritative.
+	command := exec.CommandContext(ctx, "/proc/self/fd/3", spec.Arguments()...) // #nosec G204 -- fixed descriptor path selects the verified file object.
 	command.Args[0] = spec.Executable()
 	command.ExtraFiles = []*os.File{file}
 	command.Dir = spec.WorkingDirectory()

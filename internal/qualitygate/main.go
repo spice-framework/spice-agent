@@ -1083,6 +1083,13 @@ func checkToolDispatchBoundary(root string) error {
 			"func (lease *ExecutableLease) DuplicateForLaunch(",
 			"func (lease *ExecutableLease) Recheck(",
 		}},
+		{name: "process/materialized_executable.go", fragments: []string{
+			"func (lease *ExecutableLease) MaterializeForLaunch(",
+			"os.MkdirTemp(parent, materializedExecutableDirectoryPattern)",
+			"destination.Sync()",
+			"VerifyExecutable(ctx, path, lease.Digest())",
+			"cleanupMaterializedExecutable(path, directory)",
+		}},
 		{name: "plugin/host/digest.go", fragments: []string{
 			"type SHA256 = process.SHA256",
 			"process.VerifyExecutable(ctx, executable.Path(), executable.SHA256())",

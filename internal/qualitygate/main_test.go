@@ -634,6 +634,13 @@ func TestToolDispatchBoundaryFailsClosed(t *testing.T) {
 // func (lease *ExecutableLease) DuplicateForLaunch(
 // func (lease *ExecutableLease) Recheck(
 `,
+		"process/materialized_executable.go": `package process
+// func (lease *ExecutableLease) MaterializeForLaunch(
+// os.MkdirTemp(parent, materializedExecutableDirectoryPattern)
+// destination.Sync()
+// VerifyExecutable(ctx, path, lease.Digest())
+// cleanupMaterializedExecutable(path, directory)
+`,
 		"plugin/host/digest.go": `package pluginhost
 // type SHA256 = process.SHA256
 // process.VerifyExecutable(ctx, executable.Path(), executable.SHA256())
@@ -702,6 +709,10 @@ func TestToolDispatchBoundaryFailsClosed(t *testing.T) {
 	writeGateFile(t, root, "plugin/host/launcher.go", "package pluginhost\n// processes process.Launcher\n")
 	if err := checkToolDispatchBoundary(root); err == nil || !strings.Contains(err.Error(), "VerifiedLauncher") {
 		t.Fatalf("unsafe pathname launcher boundary = %v", err)
+	}
+	writeGateFile(t, root, "process/materialized_executable.go", "package process\n")
+	if err := checkToolDispatchBoundary(root); err == nil || !strings.Contains(err.Error(), "MaterializeForLaunch") {
+		t.Fatalf("missing Darwin private materialization boundary = %v", err)
 	}
 }
 
