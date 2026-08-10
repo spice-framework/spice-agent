@@ -1,5 +1,5 @@
 {
-  "schema": 5,
+  "schema": 6,
   "target": {
     "id": "compositionproof",
     "layout": "generated-package",
@@ -8,9 +8,9 @@
     "output_dir": "internal/spicegen/compositionproof",
     "manifest_path": ".spice/compositionproof.manifest.json"
   },
-  "generator_version": "0.1.0-dev",
+  "generator_version": "v0.1.0-preview.2",
   "go_format_line": "1.26",
-  "input_sha256": "sha256:6a0878bc0e60f7fd02ef9e4d50c08218b022d574aaa829666c13aad365c943d4",
+  "input_sha256": "sha256:03e44fc7bf97a733607a912007e462387973718773e12bdfa641bcc2baab1a71",
   "files": [
     {
       "path": "internal/spicegen/compositionproof/sources/internal_/compositionfixture/application_spice_gen.go",

@@ -31,4 +31,5 @@ context and before the public clean-room boundary was frozen.
 
 The proof remains pending until all three evidence records exist. Removing the
 impossible external-human requirement does not mark any proof complete and does
-not weaken the remaining generated-source or released-protocol blockers.
+not weaken the remaining generated-source exercise or released-protocol
+blockers.

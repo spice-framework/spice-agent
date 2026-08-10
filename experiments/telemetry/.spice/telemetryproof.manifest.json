@@ -1,5 +1,5 @@
 {
-  "schema": 5,
+  "schema": 6,
   "target": {
     "id": "telemetryproof",
     "layout": "generated-package",
@@ -8,9 +8,9 @@
     "output_dir": "internal/spicegen/telemetryproof",
     "manifest_path": ".spice/telemetryproof.manifest.json"
   },
-  "generator_version": "0.1.0-dev",
+  "generator_version": "v0.1.0-preview.2",
   "go_format_line": "1.26",
-  "input_sha256": "sha256:f9430a52947689b33ec09a2cf19c8e18453f902d6ab37f2f1450b73671522b48",
+  "input_sha256": "sha256:10407aed2b0039ebf9e3eb20475ca3f15bc8339715c0da7755bec50bf290baee",
   "files": [
     {
       "path": "internal/spicegen/telemetryproof/sources/internal_/composition/application_spice_gen.go",

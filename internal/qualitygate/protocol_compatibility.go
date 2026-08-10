@@ -16,6 +16,7 @@ const (
 	compatibilityPolicyPath          = "compatibility/policy.json"
 	durableCompatibilityPath         = "compatibility/durable.json"
 	engineProtocolCompatibilityPath  = "engine/v1/compatibility.json"
+	generatedSourceCompatibilityPath = "compatibility/generated-source.json"
 	pluginProtocolCompatibilityPath  = "plugin/v1/compatibility.json"
 	publicAuthoringCompatibilityPath = "compatibility/public-authoring.json"
 	securityExceptionsPath           = "compatibility/security-exceptions.json"
@@ -59,6 +60,7 @@ type durablePolicy struct {
 }
 
 type generatedSourcePolicy struct {
+	Manifest         string `json:"manifest"`
 	Status           string `json:"status"`
 	RequiredContract string `json:"required_contract"`
 }
@@ -236,6 +238,10 @@ func checkCompatibilityManifests(root string) error {
 	if err != nil {
 		return err
 	}
+	generatedSource, _, err := readCanonicalJSON[generatedSourceCompatibility](root, generatedSourceCompatibilityPath)
+	if err != nil {
+		return err
+	}
 	goAPI, _, err := readCanonicalJSON[goAPICompatibility](root, goAPICompatibilityPath)
 	if err != nil {
 		return err
@@ -258,6 +264,9 @@ func checkCompatibilityManifests(root string) error {
 	if err := validatePublicAuthoringCompatibility(publicAuthoring); err != nil {
 		return err
 	}
+	if err := validateGeneratedSourceCompatibility(root, generatedSource); err != nil {
+		return err
+	}
 	if err := validateGoAPICompatibility(goAPI, root); err != nil {
 		return err
 	}
@@ -275,6 +284,7 @@ func compatibilityReferencesAreCanonical(policy compatibilityPolicy, engine engi
 		policy.Protocols.Engine == engineProtocolCompatibilityPath &&
 		policy.Protocols.Plugin == pluginProtocolCompatibilityPath &&
 		policy.DurableState.Manifest == durableCompatibilityPath &&
+		policy.GeneratedSource.Manifest == generatedSourceCompatibilityPath &&
 		policy.Benchmarks.Manifest == benchmarkBudgetPath &&
 		policy.PublicAuthoring.Manifest == publicAuthoringCompatibilityPath &&
 		policy.SecurityExceptions == securityExceptionsPath &&
@@ -290,7 +300,7 @@ func checkEngineProtocolCompatibility(root string) error {
 }
 
 func validateCompatibilityPolicy(value compatibilityPolicy) error {
-	wantBlockers := []string{"clean-room-public-authoring-proof", "frozen-generated-source-contract", "released-engine-n-minus-one", "released-plugin-n-minus-one"}
+	wantBlockers := []string{"clean-room-public-authoring-proof", "clean-room-generated-source-exercise", "released-engine-n-minus-one", "released-plugin-n-minus-one"}
 	wantBenchmarks := benchmarkPolicy{
 		Manifest: benchmarkBudgetPath, Status: "stable-enforced", Aggregation: "median-of-five",
 		BudgetChanges: "measured-evidence-and-reviewed-rationale",
@@ -302,7 +312,8 @@ func validateCompatibilityPolicy(value compatibilityPolicy) error {
 		value.GoAPI.PreV1DeprecationReleases != 1 || value.GoAPI.PreV1DeprecationDays != 30 ||
 		value.GoAPI.V1DeprecationMinorReleases != 2 || value.GoAPI.V1DeprecationDays != 180 || value.GoAPI.V1Removal != "next-module-major" ||
 		value.Protocols.SupportedReleasedGenerationsRequired != 2 || value.Protocols.SupportMinorReleases != 2 || value.Protocols.SupportDays != 180 ||
-		value.DurableState.AutomaticMigration || value.DurableState.ReinterpretExistingVersion || value.GeneratedSource.Status != "blocked" ||
+		value.DurableState.AutomaticMigration || value.DurableState.ReinterpretExistingVersion ||
+		value.GeneratedSource.Manifest != generatedSourceCompatibilityPath || value.GeneratedSource.Status != "immutable-released-migrated-awaiting-clean-room" ||
 		value.GeneratedSource.RequiredContract != "immutable-non-development-generator-and-frozen-ownership-schema" ||
 		value.Benchmarks != wantBenchmarks ||
 		value.PublicAuthoring != wantPublicAuthoring ||
@@ -453,5 +464,5 @@ func sortedUnique(values []string) bool {
 }
 
 func compatibilityManifestPaths() []string {
-	return []string{compatibilityPolicyPath, durableCompatibilityPath, goAPICompatibilityPath, benchmarkBudgetPath, publicAuthoringCompatibilityPath, securityExceptionsPath, engineProtocolCompatibilityPath, pluginProtocolCompatibilityPath}
+	return []string{compatibilityPolicyPath, durableCompatibilityPath, generatedSourceCompatibilityPath, goAPICompatibilityPath, benchmarkBudgetPath, publicAuthoringCompatibilityPath, securityExceptionsPath, engineProtocolCompatibilityPath, pluginProtocolCompatibilityPath}
 }

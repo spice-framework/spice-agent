@@ -25,6 +25,8 @@ func TestPublicAuthoringCompatibilityManifestFailsClosed(t *testing.T) {
 		{name: "valid", content: valid},
 		{name: "unknown field", content: strings.Replace(valid, "  \"module\":", "  \"unknown\": true,\n  \"module\":", 1)},
 		{name: "one extension", content: strings.Replace(valid, "\"required_extensions\": 3", "\"required_extensions\": 1", 1)},
+		{name: "development generator", content: strings.Replace(valid, "\"version\": \"v0.1.0-preview.2\"", "\"version\": \"0.1.0-dev\"", 1)},
+		{name: "stale ownership schema", content: strings.Replace(valid, "\"manifest_schema\": 6", "\"manifest_schema\": 5", 1)},
 		{name: "inherited module cache", content: strings.Replace(valid, "\"fresh_module_cache\": true", "\"fresh_module_cache\": false", 1)},
 		{name: "workspace mode", content: strings.Replace(valid, "\"gowork\": \"off\"", "\"gowork\": \"auto\"", 1)},
 		{name: "replace escape", content: strings.Replace(valid, "\"replace_directives\": false", "\"replace_directives\": true", 1)},

@@ -4,8 +4,8 @@ github.com/spice-framework/spice v0.1.0-preview.2 h1:5pYgTlUUzC/xZISetG/U6c1L/I3
 github.com/spice-framework/spice v0.1.0-preview.2/go.mod h1:dBZV5UZcbY6pzhfGNtvAwQIJ8YsFna+jf1SAlmukJfk=
 github.com/spice-framework/spice-agent v0.1.0-preview.5 h1:rGND9DYx3pssliD1tZQOvPDOZ5GVfQLDc7VJQI3HLOM=
 github.com/spice-framework/spice-agent v0.1.0-preview.5/go.mod h1:pbhYOeNgn4pCIhEmcdbjnFjJijY4ZSLM8ZHxaF2dxz0=
-github.com/spice-framework/toolchain v0.1.0-preview.1.0.20260806203056-d0b9ac086bd6 h1:paTYw/o/6OsbNAvOWvjicOOqWyyt2Nd3vWdoPq8+BjA=
-github.com/spice-framework/toolchain v0.1.0-preview.1.0.20260806203056-d0b9ac086bd6/go.mod h1:5qwAMEFRzVhJTTD96xwQXMYFlUYwBWlwNNeOhZqqPeg=
+github.com/spice-framework/toolchain v0.1.0-preview.2 h1:Hv/Ur+Uc3cG00jVCo/R5zINZ1w33jH0O6/ekeNOrFyk=
+github.com/spice-framework/toolchain v0.1.0-preview.2/go.mod h1:LZ04RGO793x7rSetV5T8xZnGvXjbI8u6WCyzdwN2wOI=
 golang.org/x/mod v0.38.0 h1:MECBjubtXD7yj4HrhIUcywNaGeNVUdfVnxmPajOk4yk=
 golang.org/x/mod v0.38.0/go.mod h1:V6Xz0pq8TQ3dGqVQ1FVHuelZpAL0uNhSkk9ogYP3c40=
 golang.org/x/sync v0.22.0 h1:SZjpbeLmrCk4xhRSZFNZW5gFUeCeFgjekvI/+gfScek=

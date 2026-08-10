@@ -1,5 +1,5 @@
 {
-  "schema": 5,
+  "schema": 6,
   "target": {
     "id": "twoworkerproof",
     "layout": "generated-package",
@@ -8,9 +8,9 @@
     "output_dir": "internal/spicegen/twoworkerproof",
     "manifest_path": ".spice/twoworkerproof.manifest.json"
   },
-  "generator_version": "0.1.0-dev",
+  "generator_version": "v0.1.0-preview.2",
   "go_format_line": "1.26",
-  "input_sha256": "sha256:7e64f7bfdadc83d1f8663d3235eac359c06ab209a949267858c011b119f88426",
+  "input_sha256": "sha256:2927c94892e023048de2757430a52ae388931649e87053926ad26bcee9b03593",
   "files": [
     {
       "path": "internal/spicegen/twoworkerproof/sources/internal_/composition/application_spice_gen.go",

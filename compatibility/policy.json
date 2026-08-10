@@ -23,7 +23,8 @@
     "reinterpret_existing_version": false
   },
   "generated_source": {
-    "status": "blocked",
+    "manifest": "compatibility/generated-source.json",
+    "status": "immutable-released-migrated-awaiting-clean-room",
     "required_contract": "immutable-non-development-generator-and-frozen-ownership-schema"
   },
   "benchmarks": {
@@ -40,7 +41,7 @@
   "security_exceptions": "compatibility/security-exceptions.json",
   "v1_blockers": [
     "clean-room-public-authoring-proof",
-    "frozen-generated-source-contract",
+    "clean-room-generated-source-exercise",
     "released-engine-n-minus-one",
     "released-plugin-n-minus-one"
   ]

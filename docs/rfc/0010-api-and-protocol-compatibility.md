@@ -72,10 +72,14 @@ the current snapshot and plan hard cuts are recorded explicitly.
 
 ### Generated source
 
-Generated ownership and source maps remain deterministic and verified, but the
-generator still identifies itself as a development build. The contract is not
-frozen until an immutable non-development generator and ownership schema are
-released and exercised through the clean-room public-authoring contract.
+Toolchain `v0.1.0-preview.2` is the immutable non-development generator. Its
+module sums, source commit, schema 6 ownership rules, migration range, path
+policy, manual-edit behavior, and determinism are locked by
+`compatibility/generated-source.json`. Every root and nested Agent target is
+migrated from schema 5/`0.1.0-dev` to that contract. The remaining acceptance
+boundary is exercising the same released generator through the clean-room
+public-authoring contract; repository-context experiments do not substitute for
+that proof.
 
 ### Security exceptions
 
@@ -93,8 +97,8 @@ Intentional API work updates the current platform digests and appends a reviewed
 break/migration record in the same commit. Historical digests and durable
 history cannot be rewritten.
 
-`v1.0` remains blocked on external extension authorship, released engine and
-plugin N/N-1 matrices, and a frozen generated-source contract. Stable kernel
+`v1.0` remains blocked on clean-room public authoring and generated-source
+exercise plus released engine and plugin N/N-1 matrices. Stable kernel
 benchmark budgets are now a canonical enforced contract: five fixed samples,
 median time/byte/allocation ceilings, 20% time and 10% allocation material
 regression thresholds, and a measured-evidence requirement for budget changes.

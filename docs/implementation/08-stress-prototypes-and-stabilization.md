@@ -171,7 +171,8 @@ changes. Phase 8 requires three separately versioned proofs. `v1.0` additionally
 
 1. an enforced written Go API and protocol compatibility policy (complete for
    pre-v1 review; stability remains blocked by the criteria below);
-2. frozen generated-source ownership/source-map contracts;
+2. frozen generated-source ownership/source-map contracts (released schema 6
+   contract and repository migration complete; clean-room exercise pending);
 3. at least two supported protocol generations with upgrade tests;
 4. supported security response and dependency update processes;
 5. stable benchmark thresholds and recorded regression policy;

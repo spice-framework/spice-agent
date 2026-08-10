@@ -1,0 +1,86 @@
+{
+  "schema": "spice.agent.generated-source.compatibility/v1alpha1",
+  "module": "github.com/spice-framework/spice-agent",
+  "status": "immutable-released-migrated-awaiting-clean-room",
+  "generator": {
+    "module": "github.com/spice-framework/toolchain",
+    "version": "v0.1.0-preview.2",
+    "sum": "h1:Hv/Ur+Uc3cG00jVCo/R5zINZ1w33jH0O6/ekeNOrFyk=",
+    "go_mod_sum": "h1:LZ04RGO793x7rSetV5T8xZnGvXjbI8u6WCyzdwN2wOI=",
+    "source_commit": "bab8bcaf7d0c6311237b34812c681c3ee6a6593b"
+  },
+  "contract": {
+    "manifest_schema": 6,
+    "go_format_line": "1.26",
+    "analysis_build_tag": "spice_generate",
+    "accepted_input_schemas": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "generated_ownership": "manifest-only",
+    "manual_edit_policy": "reject",
+    "stale_file_policy": "remove-only-when-owned-hash-matches",
+    "path_policy": "module-relative-forward-slash-case-fold-unique",
+    "determinism": "same-input-same-bytes"
+  },
+  "targets": [
+    {
+      "module": "github.com/spice-framework/spice-agent",
+      "module_root": ".",
+      "target": "compositionproof",
+      "manifest": ".spice/compositionproof.manifest.json"
+    },
+    {
+      "module": "github.com/spice-framework/spice-agent/experiments/compaction",
+      "module_root": "experiments/compaction",
+      "target": "compactionproof",
+      "manifest": "experiments/compaction/.spice/compactionproof.manifest.json"
+    },
+    {
+      "module": "github.com/spice-framework/spice-agent/experiments/git-workflow",
+      "module_root": "experiments/git-workflow",
+      "target": "gitworkflowproof",
+      "manifest": "experiments/git-workflow/.spice/gitworkflowproof.manifest.json"
+    },
+    {
+      "module": "github.com/spice-framework/spice-agent/experiments/permission",
+      "module_root": "experiments/permission",
+      "target": "permissionproof",
+      "manifest": "experiments/permission/.spice/permissionproof.manifest.json"
+    },
+    {
+      "module": "github.com/spice-framework/spice-agent/experiments/planning",
+      "module_root": "experiments/planning",
+      "target": "planningproof",
+      "manifest": "experiments/planning/.spice/planningproof.manifest.json"
+    },
+    {
+      "module": "github.com/spice-framework/spice-agent/experiments/sqlite-recovery",
+      "module_root": "experiments/sqlite-recovery",
+      "target": "sqliterecoveryproof",
+      "manifest": "experiments/sqlite-recovery/.spice/sqliterecoveryproof.manifest.json"
+    },
+    {
+      "module": "github.com/spice-framework/spice-agent/experiments/telemetry",
+      "module_root": "experiments/telemetry",
+      "target": "telemetryproof",
+      "manifest": "experiments/telemetry/.spice/telemetryproof.manifest.json"
+    },
+    {
+      "module": "github.com/spice-framework/spice-agent/experiments/two-worker",
+      "module_root": "experiments/two-worker",
+      "target": "twoworkerproof",
+      "manifest": "experiments/two-worker/.spice/twoworkerproof.manifest.json"
+    }
+  ],
+  "clean_room": {
+    "manifest": "compatibility/public-authoring.json",
+    "required_extensions": 3,
+    "exercised": false
+  },
+  "proven": false
+}

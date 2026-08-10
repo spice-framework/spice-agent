@@ -15,8 +15,8 @@
     "sum": "h1:5pYgTlUUzC/xZISetG/U6c1L/I3f8dUQSZhuo6YqxiA="
   },
   "generation_toolchain": {
-    "version": "v0.1.0-preview.1.0.20260806203056-d0b9ac086bd6",
-    "sum": "h1:paTYw/o/6OsbNAvOWvjicOOqWyyt2Nd3vWdoPq8+BjA="
+    "version": "v0.1.0-preview.2",
+    "sum": "h1:Hv/Ur+Uc3cG00jVCo/R5zINZ1w33jH0O6/ekeNOrFyk="
   },
   "required_seams": [
     "stage.ToolDispatchGuard",
@@ -25,6 +25,6 @@
   "compiled_registry": false,
   "runtime_network": false,
   "replace_directives": false,
-  "promotion": "requires independent policy authors and the Phase 7 contract review",
+  "promotion": "requires clean-room public policy implementations and the Phase 7 contract review",
   "deletion": "remove experiments/permission and its root ledger evidence links"
 }

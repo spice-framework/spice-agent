@@ -16,7 +16,7 @@ require (
 )
 
 require (
-	github.com/spice-framework/toolchain v0.1.0-preview.1.0.20260806203056-d0b9ac086bd6 // indirect
+	github.com/spice-framework/toolchain v0.1.0-preview.2 // indirect
 	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect

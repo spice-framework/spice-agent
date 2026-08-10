@@ -13,12 +13,19 @@ type publicAuthoringCompatibility struct {
 	RequiredExtensions         int                       `json:"required_extensions"`
 	SeparatelyVersionedModules bool                      `json:"separately_versioned_modules"`
 	GeneratedCompositionProof  bool                      `json:"generated_composition_proof"`
+	GeneratedSource            publicAuthoringGenerator  `json:"generated_source"`
 	Isolation                  publicAuthoringIsolation  `json:"isolation"`
 	Platforms                  []string                  `json:"platforms"`
 	VendorOffline              bool                      `json:"vendor_offline"`
 	RequiredOperations         []string                  `json:"required_operations"`
 	Evidence                   []publicAuthoringEvidence `json:"evidence"`
 	Proven                     bool                      `json:"proven"`
+}
+
+type publicAuthoringGenerator struct {
+	Module         string `json:"module"`
+	Version        string `json:"version"`
+	ManifestSchema int    `json:"manifest_schema"`
 }
 
 type publicAuthoringIsolation struct {
@@ -56,9 +63,11 @@ func validatePublicAuthoringCompatibility(value publicAuthoringCompatibility) er
 		ReleasedArtifactsOnly: true, PublicDocumentationOnly: true, FreshModuleCache: true,
 		FreshBuildCache: true, GOWork: "off",
 	}
+	wantGenerator := publicAuthoringGenerator{Module: generatorModulePath, Version: generatorVersion, ManifestSchema: 6}
 	if value.Schema != "spice.agent.public-authoring.compatibility/v1alpha1" || value.Module != modulePath ||
 		value.Status != "required-not-proven" || value.ProofModel != "clean-room-released-artifacts-only" ||
 		value.RequiredExtensions != 3 || !value.SeparatelyVersionedModules || !value.GeneratedCompositionProof ||
+		value.GeneratedSource != wantGenerator ||
 		value.Isolation != wantIsolation || !slices.Equal(value.Platforms, []string{"linux/amd64", "windows/amd64"}) ||
 		!value.VendorOffline || !slices.Equal(value.RequiredOperations, []string{"install", "configure", "debug", "test", "package", "delete"}) ||
 		len(value.Evidence) != 0 || value.Proven {

@@ -15,7 +15,7 @@ require (
 	github.com/spice-framework/spice-agent v0.1.0-preview.5
 )
 
-require github.com/spice-framework/toolchain v0.1.0-preview.1.0.20260806203056-d0b9ac086bd6 // indirect
+require github.com/spice-framework/toolchain v0.1.0-preview.2 // indirect
 
 require (
 	github.com/ncruces/go-sqlite3-wasm/v3 v3.2.35304 // indirect

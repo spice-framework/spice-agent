@@ -1,5 +1,5 @@
 {
-  "schema": 5,
+  "schema": 6,
   "target": {
     "id": "permissionproof",
     "layout": "generated-package",
@@ -8,9 +8,9 @@
     "output_dir": "internal/spicegen/permissionproof",
     "manifest_path": ".spice/permissionproof.manifest.json"
   },
-  "generator_version": "0.1.0-dev",
+  "generator_version": "v0.1.0-preview.2",
   "go_format_line": "1.26",
-  "input_sha256": "sha256:427b451ff6584f44d092ff69575074c7879cc8603f46577f2cf4a737d33fe9a5",
+  "input_sha256": "sha256:3257747cf184702d87fd48fa45c8d5d8391ff16a3e61c36b8c8d5f85bdd8be33",
   "files": [
     {
       "path": "internal/spicegen/permissionproof/sources/internal_/composition/application_spice_gen.go",
