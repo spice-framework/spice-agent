@@ -344,6 +344,8 @@ func TestBootstrapUsesCopiedModuleGraphAndPreservesSource(t *testing.T) {
 	writeGateFile(t, root, "go.sum", "example.com/dependency v1.0.0 h1:test\n")
 	writeGateFile(t, root, "tools/go.mod", "module example.com/product/tools\n\ngo 1.26.0\n")
 	writeGateFile(t, root, "tools/go.sum", "example.com/tool v1.0.0 h1:test\n")
+	writeGateFile(t, root, "experiments/permission/go.mod", "module example.com/product/experiments/permission\n\ngo 1.26.0\n")
+	writeGateFile(t, root, "experiments/permission/go.sum", "example.com/policy v1.0.0 h1:test\n")
 
 	var directories []string
 	err := bootstrapDependencies(
@@ -365,7 +367,11 @@ func TestBootstrapUsesCopiedModuleGraphAndPreservesSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(directories, []string{root, filepath.Join(root, "tools")}) {
+	if !slices.Equal(directories, []string{
+		root,
+		filepath.Join(root, "tools"),
+		filepath.Join(root, "experiments", "permission"),
+	}) {
 		t.Fatalf("bootstrap directories = %q", directories)
 	}
 }

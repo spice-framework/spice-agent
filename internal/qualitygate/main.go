@@ -340,6 +340,7 @@ func bootstrapDependencies(
 	graphs := []moduleGraph{
 		{directory: root},
 		{directory: filepath.Join(root, "tools"), optional: true},
+		{directory: filepath.Join(root, "experiments", "permission"), optional: true},
 	}
 	for _, graph := range graphs {
 		if err := bootstrapModuleGraph(ctx, graph, runner); err != nil {
