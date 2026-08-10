@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "status": "experimental",
+  "module": "github.com/spice-framework/spice-agent/experiments/git-workflow",
+  "go": "1.26.0",
+  "toolchain": "go1.26.5",
+  "dependencies": {
+    "spice": {
+      "version": "v0.1.0-preview.2",
+      "sum": "h1:5pYgTlUUzC/xZISetG/U6c1L/I3f8dUQSZhuo6YqxiA=",
+      "go_mod_sum": "h1:dBZV5UZcbY6pzhfGNtvAwQIJ8YsFna+jf1SAlmukJfk="
+    },
+    "spice_agent": {
+      "version": "v0.1.0-preview.5",
+      "sum": "h1:rGND9DYx3pssliD1tZQOvPDOZ5GVfQLDc7VJQI3HLOM=",
+      "go_mod_sum": "h1:pbhYOeNgn4pCIhEmcdbjnFjJijY4ZSLM8ZHxaF2dxz0="
+    },
+    "x_sys": {
+      "version": "v0.47.0",
+      "sum": "h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=",
+      "go_mod_sum": "h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw="
+    }
+  },
+  "contract": {
+    "version": "spice.agent.git-workflow/v1alpha1",
+    "operations": ["git.inspect", "git.commit_staged"],
+    "authority": "run-owned-interaction+deterministic-token+staged-digest",
+    "commit_scope": "staged-index-only",
+    "trusted_executable": "absolute-path+held-identity+pre-post-sha256",
+    "atomic_verified_child": false,
+    "network_operations": false,
+    "repository_mutation_helpers": false,
+    "hooks": false,
+    "signing": false,
+    "credentials": false,
+    "arbitrary_arguments": false,
+    "post_launch_mutation_failure": "execution-uncertain+retry-never"
+  },
+  "replace_directives": false,
+  "promotion": "blocked until an immutable Agent release exposes VerifiedLauncher and the runner migrates without behavior drift",
+  "deletion": "remove experiments/git-workflow and its root ledger evidence links"
+}

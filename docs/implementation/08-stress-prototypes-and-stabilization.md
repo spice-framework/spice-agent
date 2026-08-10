@@ -110,6 +110,19 @@ snapshot identity. Generated Spice construction, fuzz/race/coverage, security,
 benchmark, compatibility, and deletion evidence are owned by the experiment.
 See [the compaction evidence](evidence/phase8-compaction-experiment.md).
 
+The guarded Git workflow proof is complete as the removable
+`experiments/git-workflow` nested module. It pins preview5 without a replacement
+and contributes only fixed `git.inspect` and interaction-guarded
+`git.commit_staged` tools through generated Spice injection. Authority binds the
+exact staged index and run plan; hooks, signing, credentials, arbitrary
+arguments, repository mutation helpers, and network Git operations are absent.
+Executable/repository/config identities, bounded output, cancellation,
+uncertainty, and real Windows/Unix process-tree containment are proven. Because
+preview5 lacks the later generic atomic verified-child seam, strict held-
+identity plus pre/post SHA-256 checks are explicitly experimental and promotion
+is blocked until a released Agent version supplies `VerifiedLauncher`. See
+[the Git workflow evidence](evidence/phase8-git-workflow-experiment.md).
+
 - Obtain three independently authored compiled extensions using only public
   annotation/SDK contracts.
 - Run both runtime-plugin languages and a second client against current and

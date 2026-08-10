@@ -106,6 +106,9 @@ func run(ctx context.Context, root, mode string) error {
 	compactionExperiment := step{"compaction experiment", func() error {
 		return verifyCompactionExperiment(ctx, root, mode)
 	}}
+	gitWorkflowExperiment := step{"Git workflow experiment", func() error {
+		return verifyGitWorkflowExperiment(ctx, root, mode)
+	}}
 	acceptanceScope := step{"acceptance endpoint scope", func() error {
 		return command(
 			ctx, root, productEnvironment,
@@ -114,7 +117,7 @@ func run(ctx context.Context, root, mode string) error {
 	}}
 	steps := []step{
 		identity, diffHygiene, tests, permissionExperiment, sqliteRecoveryExperiment,
-		twoWorkerExperiment, compactionExperiment,
+		twoWorkerExperiment, compactionExperiment, gitWorkflowExperiment,
 	}
 	if mode == "coverage" {
 		steps = []step{identity, diffHygiene, {"coverage", func() error {
@@ -140,6 +143,7 @@ func run(ctx context.Context, root, mode string) error {
 			sqliteRecoveryExperiment,
 			twoWorkerExperiment,
 			compactionExperiment,
+			gitWorkflowExperiment,
 			acceptanceScope,
 		}
 	}
@@ -209,6 +213,28 @@ func verifyCompactionExperiment(ctx context.Context, root, mode string) error {
 
 func compactionFuzzArguments() []string {
 	return []string{"test", "-run=^$", "-fuzz=^FuzzCompact$", "-fuzztime=100x", "."}
+}
+
+func verifyGitWorkflowExperiment(ctx context.Context, root, mode string) error {
+	if err := verifyNestedExperiment(
+		ctx, root, mode, "git-workflow", "GitWorkflowProof",
+	); err != nil {
+		return err
+	}
+	if mode != "verify" {
+		return nil
+	}
+	environment := map[string]string{
+		"GOFLAGS": "-mod=vendor", "GOPROXY": "off", "GOTOOLCHAIN": "local", "GOWORK": "off",
+	}
+	return command(
+		ctx, filepath.Join(root, "experiments", "git-workflow"), environment,
+		"go", gitWorkflowFuzzArguments()...,
+	)
+}
+
+func gitWorkflowFuzzArguments() []string {
+	return []string{"test", "-run=^$", "-fuzz=^FuzzDecodeCommitArguments$", "-fuzztime=100x", "."}
 }
 
 func verifyNestedExperiment(ctx context.Context, root, mode, name, target string) error {
@@ -287,6 +313,10 @@ func validateTwoWorkerCoverage(output string) error {
 
 func validateCompactionCoverage(output string) error {
 	return validateExperimentCoverage("compaction", output)
+}
+
+func validateGitWorkflowCoverage(output string) error {
+	return validateExperimentCoverage("Git workflow", output)
 }
 
 func validateExperimentCoverage(name, output string) error {
@@ -416,6 +446,7 @@ func bootstrapDependencies(
 		{directory: filepath.Join(root, "experiments", "sqlite-recovery"), optional: true},
 		{directory: filepath.Join(root, "experiments", "two-worker"), optional: true},
 		{directory: filepath.Join(root, "experiments", "compaction"), optional: true},
+		{directory: filepath.Join(root, "experiments", "git-workflow"), optional: true},
 	}
 	for _, graph := range graphs {
 		if err := bootstrapModuleGraph(ctx, graph, runner); err != nil {

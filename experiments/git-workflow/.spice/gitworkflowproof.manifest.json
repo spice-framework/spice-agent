@@ -1,0 +1,340 @@
+{
+  "schema": 5,
+  "target": {
+    "id": "gitworkflowproof",
+    "layout": "generated-package",
+    "module": "github.com/spice-framework/spice-agent/experiments/git-workflow",
+    "package": "github.com/spice-framework/spice-agent/experiments/git-workflow/internal/spicegen/gitworkflowproof",
+    "output_dir": "internal/spicegen/gitworkflowproof",
+    "manifest_path": ".spice/gitworkflowproof.manifest.json"
+  },
+  "generator_version": "0.1.0-dev",
+  "go_format_line": "1.26",
+  "input_sha256": "sha256:845df4145f3f46158061a949a2d3bd693efc44c88258fc561927d35da3586554",
+  "files": [
+    {
+      "path": "internal/spicegen/gitworkflowproof/sources/internal_/composition/application_spice_gen.go",
+      "sha256": "sha256:cfb611b4ef3d276dc226c638ba635265e3d519d11e6a8cfcec8684ebeaa01b5d",
+      "role": "source-unit",
+      "primary_source": {
+        "path": "internal/composition/application.go",
+        "line": 7,
+        "column": 4,
+        "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|16:GitWorkflowProof"
+      },
+      "mappings": [
+        {
+          "kind": "application-target",
+          "contribution": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|16:GitWorkflowProof",
+          "source": {
+            "path": "internal/composition/application.go",
+            "line": 7,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|16:GitWorkflowProof"
+          },
+          "generated": {
+            "start_line": 8,
+            "start_column": 4,
+            "end_line": 8,
+            "end_column": 46
+          }
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/gitworkflowproof/sources/internal_/composition/proof_spice_gen.go",
+      "sha256": "sha256:1e7e88962321503870770f51b0a7951fc505b45c32dd2b39b6b543d9162ac1c2",
+      "role": "source-unit",
+      "primary_source": {
+        "path": "internal/composition/proof.go",
+        "line": 34,
+        "column": 4,
+        "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|15:NewProofBackend"
+      },
+      "mappings": [
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|15:NewProofBackend",
+          "source": {
+            "path": "internal/composition/proof.go",
+            "line": 34,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|15:NewProofBackend"
+          },
+          "generated": {
+            "start_line": 23,
+            "start_column": 4,
+            "end_line": 23,
+            "end_column": 32
+          }
+        },
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|18:NewProofCommitTool",
+          "source": {
+            "path": "internal/composition/proof.go",
+            "line": 51,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|18:NewProofCommitTool"
+          },
+          "generated": {
+            "start_line": 30,
+            "start_column": 4,
+            "end_line": 30,
+            "end_column": 38
+          }
+        },
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|19:NewProofCommitGuard",
+          "source": {
+            "path": "internal/composition/proof.go",
+            "line": 61,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|19:NewProofCommitGuard"
+          },
+          "generated": {
+            "start_line": 41,
+            "start_column": 4,
+            "end_line": 41,
+            "end_column": 36
+          }
+        },
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|19:NewProofInspectTool",
+          "source": {
+            "path": "internal/composition/proof.go",
+            "line": 44,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|19:NewProofInspectTool"
+          },
+          "generated": {
+            "start_line": 52,
+            "start_column": 4,
+            "end_line": 52,
+            "end_column": 32
+          }
+        },
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|22:NewProofAuthorityStore",
+          "source": {
+            "path": "internal/composition/proof.go",
+            "line": 39,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|22:NewProofAuthorityStore"
+          },
+          "generated": {
+            "start_line": 63,
+            "start_column": 4,
+            "end_line": 63,
+            "end_column": 39
+          }
+        },
+        {
+          "kind": "provider-construction",
+          "contribution": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|8:NewProof",
+          "source": {
+            "path": "internal/composition/proof.go",
+            "line": 71,
+            "column": 4,
+            "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|8:NewProof"
+          },
+          "generated": {
+            "start_line": 70,
+            "start_column": 4,
+            "end_line": 70,
+            "end_column": 27
+          }
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/gitworkflowproof/spice_assembly_gen.go",
+      "sha256": "sha256:b04b0970c314644016dc4c810694b7aaaf2fa49001c8f339ed436d21b01654a8",
+      "role": "target-assembly",
+      "related_sources": [
+        {
+          "path": "internal/composition/application.go",
+          "line": 7,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|16:GitWorkflowProof"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 34,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|15:NewProofBackend"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 39,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|22:NewProofAuthorityStore"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 44,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|19:NewProofInspectTool"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 51,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|18:NewProofCommitTool"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 61,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|19:NewProofCommitGuard"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 71,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|8:NewProof"
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/gitworkflowproof/spice_command_gen.go",
+      "sha256": "sha256:2afaeb2f943191295594a8584a6f2412f3de75279b790db1b9767d7b82d93096",
+      "role": "target-command",
+      "related_sources": [
+        {
+          "path": "internal/composition/application.go",
+          "line": 7,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|16:GitWorkflowProof"
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/gitworkflowproof/spice_configuration_gen.go",
+      "sha256": "sha256:99802b022ee243ea84e9e518162c373f49b3753d04f5d1d9c415efa53302e8a4",
+      "role": "target-configuration",
+      "related_sources": [
+        {
+          "path": "internal/composition/application.go",
+          "line": 7,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|16:GitWorkflowProof"
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/gitworkflowproof/spice_contracts_gen.go",
+      "sha256": "sha256:79310bc496a2e891e07a5f9e45d89e0e916ffe2fb502325548a13106c15bb663",
+      "role": "target-contracts",
+      "related_sources": [
+        {
+          "path": "internal/composition/application.go",
+          "line": 7,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|16:GitWorkflowProof"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 34,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|15:NewProofBackend"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 39,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|22:NewProofAuthorityStore"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 44,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|19:NewProofInspectTool"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 51,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|18:NewProofCommitTool"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 61,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|19:NewProofCommitGuard"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 71,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|8:NewProof"
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/gitworkflowproof/spice_lifecycle_gen.go",
+      "sha256": "sha256:0184facdc6475b5fa879631e6537990f88ac70adf9bd61e191d1506f959f3508",
+      "role": "target-lifecycle",
+      "related_sources": [
+        {
+          "path": "internal/composition/application.go",
+          "line": 7,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|16:GitWorkflowProof"
+        }
+      ]
+    },
+    {
+      "path": "internal/spicegen/gitworkflowproof/spice_providers_gen.go",
+      "sha256": "sha256:bac293a9a1ebbbf298ec9e6af75fded1d2b2e7910d6bde9eaacf8bd69a68168c",
+      "role": "target-providers",
+      "related_sources": [
+        {
+          "path": "internal/composition/application.go",
+          "line": 7,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|16:GitWorkflowProof"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 34,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|15:NewProofBackend"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 39,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|22:NewProofAuthorityStore"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 44,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|19:NewProofInspectTool"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 51,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|18:NewProofCommitTool"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 61,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|19:NewProofCommitGuard"
+        },
+        {
+          "path": "internal/composition/proof.go",
+          "line": 71,
+          "column": 4,
+          "symbol": "spice:symbol:v1|function|84:github.com/spice-framework/spice-agent/experiments/git-workflow/internal/composition|0:|8:NewProof"
+        }
+      ]
+    }
+  ]
+}

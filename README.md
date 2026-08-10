@@ -101,6 +101,12 @@ context extraction as an explicit application-owned `model.Provider` wrapper;
 it never changes authoritative history, events, or snapshots and never performs
 hidden model, tool, process, network, or interaction calls.
 
+The removable `experiments/git-workflow` module similarly proves fixed Git
+inspection and explicitly authorized staged-index commit through generated tool
+and guard injection. It excludes arbitrary Git/network/repository mutation
+operations and documents preview5's non-atomic executable verification as a
+promotion blocker rather than hiding or duplicating a future core seam.
+
 ## Release contract
 
 `spice-release.json` is inert, canonical metadata for the centrally authorized
