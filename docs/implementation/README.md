@@ -13,7 +13,7 @@ Repository roadmaps link here and must not duplicate status.
 | 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, bounded recovery/health, generated distribution activation, real-process cancellation, and real `spice dev` last-known-good proof complete; simultaneous installed daemon/TUI fault-reconnect proof pending |
 | 6 — architecture proof | In progress | dependency-ordered keyless module releases, then independently attested preview distribution; [Agent preview.1/preview.2/preview.3 failure history](evidence/phase6-release-history.md) |
 | 7 — stress prototypes | Complete | permission, SQLite recovery, alternate semantic shell, and two-worker extension proven without stabilizing their APIs |
-| 8 — stabilization | In progress | source-built engine compatibility matrix plus removable deterministic compaction and guarded Git extensions proven; external authors and frozen compatibility policy remain |
+| 8 — stabilization | In progress | source-built engine compatibility matrix plus removable deterministic compaction, guarded Git, and safe telemetry projection extensions proven; external authors and frozen compatibility policy remain |
 
 Exact commits and command output are recorded only after the corresponding gate
 has run. A phase is not complete because code exists; every exit criterion in its
@@ -44,6 +44,13 @@ staged-index commit, proves deterministic authority and process containment,
 and records the preview5 pathname-race limitation rather than duplicating the
 unreleased verified-child seam. Exact scope is in
 [`phase8-git-workflow-experiment.md`](evidence/phase8-git-workflow-experiment.md).
+
+The isolated `experiments/telemetry` module proves a single-mailbox,
+single-consumer, best-effort secret-safe projection with exact drop accounting,
+HMAC pseudonyms, typed tool occurrence decoding, deterministic local JSONL,
+and generated engine-before-mailbox cleanup. It deliberately does not claim
+OpenTelemetry or distributed trace continuity. Exact scope is in
+[`phase8-telemetry-experiment.md`](evidence/phase8-telemetry-experiment.md).
 
 ## Current Phase 7 boundary
 

@@ -107,6 +107,13 @@ and guard injection. It excludes arbitrary Git/network/repository mutation
 operations and documents preview5's non-atomic executable verification as a
 promotion blocker rather than hiding or duplicating a future core seam.
 
+The removable `experiments/telemetry` module proves a bounded best-effort,
+secret-safe event projection through one generated mailbox and consumer. It
+uses process-local HMAC correlation and only the public typed tool occurrence
+decoders; it is explicitly not durable history, distributed tracing, or an
+OpenTelemetry implementation. A caller-owned local JSONL exporter performs no
+path discovery or network I/O.
+
 ## Release contract
 
 `spice-release.json` is inert, canonical metadata for the centrally authorized

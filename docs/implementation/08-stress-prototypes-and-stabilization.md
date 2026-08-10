@@ -123,6 +123,18 @@ identity plus pre/post SHA-256 checks are explicitly experimental and promotion
 is blocked until a released Agent version supplies `VerifiedLauncher`. See
 [the Git workflow evidence](evidence/phase8-git-workflow-experiment.md).
 
+The best-effort telemetry projection proof is complete as the removable
+`experiments/telemetry` nested module. It pins preview5 without a replacement,
+uses one Agent-owned bounded mailbox and one consumer, emits only immutable
+closed-schema values, and never exports generic event payloads. Process-local
+HMAC pseudonyms and the public typed tool occurrence decoders provide safe run
+and tool correlation; slow exporters produce exact accounted drops without
+backpressure or retry. Generated construction proves real engine shutdown
+precedes mailbox close, accepted-event drain, and exporter shutdown. This is an
+exporter-neutral diagnostic projection, not durable history, OpenTelemetry, or
+distributed trace continuity. See
+[the telemetry evidence](evidence/phase8-telemetry-experiment.md).
+
 - Obtain three independently authored compiled extensions using only public
   annotation/SDK contracts.
 - Run both runtime-plugin languages and a second client against current and

@@ -130,6 +130,29 @@ func TestValidateGitWorkflowCoverageAndDeterministicFuzzBudget(t *testing.T) {
 	}
 }
 
+func TestValidateTelemetryCoverageAndDeterministicFuzzBudget(t *testing.T) {
+	t.Parallel()
+	if err := validateTelemetryCoverage("ok\ttelemetry\tcoverage: 86.2% of statements\n"); err != nil {
+		t.Fatal(err)
+	}
+	for _, output := range []string{
+		"ok\ttelemetry\tcoverage: 84.9% of statements\n",
+		"ok\ttelemetry\n",
+		"ok\ttelemetry\tcoverage: invalid% of statements\n",
+	} {
+		if err := validateTelemetryCoverage(output); err == nil {
+			t.Fatalf("validateTelemetryCoverage(%q) succeeded", output)
+		}
+	}
+	want := []string{"test", "-run=^$", "-fuzz=^FuzzTranslateEnvelope$", "-fuzztime=100x", "."}
+	if got := telemetryFuzzArguments(); !slices.Equal(got, want) {
+		t.Fatalf("telemetry fuzz arguments = %q", got)
+	}
+	if strings.Contains(strings.Join(telemetryFuzzArguments(), " "), "1s") {
+		t.Fatal("telemetry fuzz smoke uses a wall-clock duration")
+	}
+}
+
 func TestKernelRuntimeBenchmarkContractIsBoundedAndFailsClosed(t *testing.T) {
 	t.Parallel()
 	wantArguments := []string{
@@ -433,6 +456,8 @@ func TestBootstrapUsesCopiedModuleGraphAndPreservesSource(t *testing.T) {
 	writeGateFile(t, root, "experiments/compaction/go.sum", "example.com/model v1.0.0 h1:test\n")
 	writeGateFile(t, root, "experiments/git-workflow/go.mod", "module example.com/product/experiments/git-workflow\n\ngo 1.26.0\n")
 	writeGateFile(t, root, "experiments/git-workflow/go.sum", "example.com/process v1.0.0 h1:test\n")
+	writeGateFile(t, root, "experiments/telemetry/go.mod", "module example.com/product/experiments/telemetry\n\ngo 1.26.0\n")
+	writeGateFile(t, root, "experiments/telemetry/go.sum", "example.com/telemetry v1.0.0 h1:test\n")
 
 	var directories []string
 	err := bootstrapDependencies(
@@ -462,6 +487,7 @@ func TestBootstrapUsesCopiedModuleGraphAndPreservesSource(t *testing.T) {
 		filepath.Join(root, "experiments", "two-worker"),
 		filepath.Join(root, "experiments", "compaction"),
 		filepath.Join(root, "experiments", "git-workflow"),
+		filepath.Join(root, "experiments", "telemetry"),
 	}) {
 		t.Fatalf("bootstrap directories = %q", directories)
 	}
