@@ -40,6 +40,15 @@ strict versioned secret-free start and terminal occurrences, so the recorder can
 distinguish a correlated close from a crash-interrupted open operation without
 parsing private maps or persisting free-form tool errors.
 
+Status: **implemented as an isolated experiment**. The nested
+`experiments/sqlite-recovery` module pins preview5 and ncruces SQLite without a
+`replace`, commits a STRICT WAL schema, vendor, generated Spice construction,
+compatibility locks, real process-crash/WAL conformance, conservative recovery,
+branch lineage, fuzz/race coverage, and provisional benchmarks. It returns safe
+snapshots for explicit embedded application handling and deliberately does not
+implement transparent daemon restart. See
+[the SQLite recovery evidence](evidence/phase7-sqlite-recovery-experiment.md).
+
 ### Alternate client and rich companion
 
 Implement a second shell using the same UI-neutral client/session values and
@@ -102,7 +111,7 @@ Extensions publish marginal startup, allocation, event-latency, cancellation,
 and binary-size costs. No optional extension may impose runtime or dependency
 cost when it is not imported.
 
-Status is **in progress**. The permission prototype is implemented; SQLite
-recovery, alternate-client, two-worker, and independent-author proofs remain.
+Status is **in progress**. The permission and SQLite recovery prototypes are
+implemented; alternate-client, two-worker, and independent-author proofs remain.
 The non-native parallel static extension design remains rejected history and
 may not be revived as a shortcut during experimentation.

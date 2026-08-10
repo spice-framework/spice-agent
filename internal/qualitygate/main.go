@@ -22,14 +22,15 @@ import (
 )
 
 const (
-	requiredGoVersion         = "go1.26.5"
-	modulePath                = "github.com/spice-framework/spice-agent"
-	minimumCoverage           = 85.0
-	minimumPermissionCoverage = 85.0
-	releaseWorkflowCommit     = "a8f9cc6ffd3a2744c5cae3b52c05e6e91cbc875e"
-	verifyWorkflowCommit      = "0534fe1247f892b287f624b7abb6f2347765ab22"
-	standardGateTimeout       = 15 * time.Minute
-	verifyGateTimeout         = 30 * time.Minute
+	requiredGoVersion             = "go1.26.5"
+	modulePath                    = "github.com/spice-framework/spice-agent"
+	minimumCoverage               = 85.0
+	minimumPermissionCoverage     = 85.0
+	minimumSQLiteRecoveryCoverage = 85.0
+	releaseWorkflowCommit         = "a8f9cc6ffd3a2744c5cae3b52c05e6e91cbc875e"
+	verifyWorkflowCommit          = "0534fe1247f892b287f624b7abb6f2347765ab22"
+	standardGateTimeout           = 15 * time.Minute
+	verifyGateTimeout             = 30 * time.Minute
 )
 
 func main() {
@@ -86,12 +87,19 @@ func run(ctx context.Context, root, mode string) error {
 		}
 		return checkReleaseMetadata(root)
 	}}
-	diffHygiene := step{"diff hygiene", func() error { return command(ctx, root, nil, "git", "diff", "--check", "HEAD", "--") }}
+	diffHygiene := step{"diff hygiene", func() error {
+		// Nested vendor is byte-reproduced below and may contain upstream
+		// whitespace that this repository must not hand-edit.
+		return command(ctx, root, nil, "git", "diff", "--check", "HEAD", "--", ".", ":(exclude)experiments/*/vendor/**")
+	}}
 	tests := step{"tests", func() error {
 		return command(ctx, root, productEnvironment, "go", "test", "-shuffle=on", "-count=1", "./...")
 	}}
 	permissionExperiment := step{"permission experiment", func() error {
 		return verifyPermissionExperiment(ctx, root, mode)
+	}}
+	sqliteRecoveryExperiment := step{"SQLite recovery experiment", func() error {
+		return verifySQLiteRecoveryExperiment(ctx, root, mode)
 	}}
 	acceptanceScope := step{"acceptance endpoint scope", func() error {
 		return command(
@@ -99,7 +107,7 @@ func run(ctx context.Context, root, mode string) error {
 			"go", "test", "-tags=spice_acceptance", "-shuffle=on", "-count=1", "./daemon/endpoint",
 		)
 	}}
-	steps := []step{identity, diffHygiene, tests, permissionExperiment}
+	steps := []step{identity, diffHygiene, tests, permissionExperiment, sqliteRecoveryExperiment}
 	if mode == "coverage" {
 		steps = []step{identity, diffHygiene, {"coverage", func() error {
 			return coverage(ctx, root, productEnvironment)
@@ -121,6 +129,7 @@ func run(ctx context.Context, root, mode string) error {
 			{"go vet", func() error { return command(ctx, root, productEnvironment, "go", "vet", "./...") }},
 			tests,
 			permissionExperiment,
+			sqliteRecoveryExperiment,
 			acceptanceScope,
 		}
 	}
@@ -159,9 +168,17 @@ func run(ctx context.Context, root, mode string) error {
 }
 
 func verifyPermissionExperiment(ctx context.Context, root, mode string) error {
-	directory := filepath.Join(root, "experiments", "permission")
+	return verifyNestedExperiment(ctx, root, mode, "permission", "PermissionProof", minimumPermissionCoverage)
+}
+
+func verifySQLiteRecoveryExperiment(ctx context.Context, root, mode string) error {
+	return verifyNestedExperiment(ctx, root, mode, "sqlite-recovery", "SQLiteRecoveryProof", minimumSQLiteRecoveryCoverage)
+}
+
+func verifyNestedExperiment(ctx context.Context, root, mode, name, target string, minimum float64) error {
+	directory := filepath.Join(root, "experiments", name)
 	if _, err := os.Stat(filepath.Join(directory, "go.mod")); err != nil {
-		return fmt.Errorf("permission experiment module: %w", err)
+		return fmt.Errorf("%s experiment module: %w", name, err)
 	}
 	environment := map[string]string{
 		"GOFLAGS":     "-mod=vendor",
@@ -173,9 +190,9 @@ func verifyPermissionExperiment(ctx context.Context, root, mode string) error {
 		if err := command(ctx, directory, environment, "go", "mod", "tidy", "-diff"); err != nil {
 			return err
 		}
-		temporary, err := os.MkdirTemp("", "spice-agent-permission-vendor-*")
+		temporary, err := os.MkdirTemp("", "spice-agent-"+name+"-vendor-*")
 		if err != nil {
-			return fmt.Errorf("create permission vendor comparison directory: %w", err)
+			return fmt.Errorf("create %s vendor comparison directory: %w", name, err)
 		}
 		defer func() { _ = os.RemoveAll(temporary) }()
 		candidate := filepath.Join(temporary, "vendor")
@@ -191,12 +208,12 @@ func verifyPermissionExperiment(ctx context.Context, root, mode string) error {
 			return err
 		}
 		if !maps.Equal(got, want) {
-			return errors.New("permission experiment vendor differs from a fresh go mod vendor result")
+			return fmt.Errorf("%s experiment vendor differs from a fresh go mod vendor result", name)
 		}
 		if err = command(
 			ctx, directory, environment, "go", "tool",
 			"github.com/spice-framework/toolchain/cmd/spice", "generate", "--check",
-			"--target", "PermissionProof", ".", "./internal/composition",
+			"--target", target, ".", "./internal/composition",
 		); err != nil {
 			return err
 		}
@@ -215,12 +232,20 @@ func verifyPermissionExperiment(ctx context.Context, root, mode string) error {
 		if err != nil {
 			return err
 		}
-		return validatePermissionCoverage(output)
+		return validateExperimentCoverage(name, output, minimum)
 	}
 	return nil
 }
 
 func validatePermissionCoverage(output string) error {
+	return validateExperimentCoverage("permission", output, minimumPermissionCoverage)
+}
+
+func validateSQLiteRecoveryCoverage(output string) error {
+	return validateExperimentCoverage("SQLite recovery", output, minimumSQLiteRecoveryCoverage)
+}
+
+func validateExperimentCoverage(name, output string, minimum float64) error {
 	const marker = "coverage: "
 	for line := range strings.Lines(output) {
 		_, value, found := strings.Cut(line, marker)
@@ -233,14 +258,14 @@ func validatePermissionCoverage(output string) error {
 		}
 		coverage, err := strconv.ParseFloat(strings.TrimSpace(percent), 64)
 		if err != nil {
-			return fmt.Errorf("parse permission experiment coverage: %w", err)
+			return fmt.Errorf("parse %s experiment coverage: %w", name, err)
 		}
-		if coverage < minimumPermissionCoverage {
-			return fmt.Errorf("permission experiment coverage %.1f%% is below %.1f%%", coverage, minimumPermissionCoverage)
+		if coverage < minimum {
+			return fmt.Errorf("%s experiment coverage %.1f%% is below %.1f%%", name, coverage, minimum)
 		}
 		return nil
 	}
-	return errors.New("permission experiment coverage output is missing")
+	return fmt.Errorf("%s experiment coverage output is missing", name)
 }
 
 func networkAllowed(mode string) bool { return mode == "tools-bootstrap" }
@@ -341,6 +366,7 @@ func bootstrapDependencies(
 		{directory: root},
 		{directory: filepath.Join(root, "tools"), optional: true},
 		{directory: filepath.Join(root, "experiments", "permission"), optional: true},
+		{directory: filepath.Join(root, "experiments", "sqlite-recovery"), optional: true},
 	}
 	for _, graph := range graphs {
 		if err := bootstrapModuleGraph(ctx, graph, runner); err != nil {

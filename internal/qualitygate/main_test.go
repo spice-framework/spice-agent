@@ -51,6 +51,22 @@ func TestValidatePermissionCoverage(t *testing.T) {
 	}
 }
 
+func TestValidateSQLiteRecoveryCoverage(t *testing.T) {
+	t.Parallel()
+	if err := validateSQLiteRecoveryCoverage("ok\tsqliterecovery\tcoverage: 85.4% of statements\n"); err != nil {
+		t.Fatal(err)
+	}
+	for _, output := range []string{
+		"ok\tsqliterecovery\tcoverage: 84.9% of statements\n",
+		"ok\tsqliterecovery\n",
+		"ok\tsqliterecovery\tcoverage: invalid% of statements\n",
+	} {
+		if err := validateSQLiteRecoveryCoverage(output); err == nil {
+			t.Fatalf("validateSQLiteRecoveryCoverage(%q) succeeded", output)
+		}
+	}
+}
+
 func TestKernelRuntimeBenchmarkContractIsBoundedAndFailsClosed(t *testing.T) {
 	t.Parallel()
 	wantArguments := []string{
@@ -346,6 +362,8 @@ func TestBootstrapUsesCopiedModuleGraphAndPreservesSource(t *testing.T) {
 	writeGateFile(t, root, "tools/go.sum", "example.com/tool v1.0.0 h1:test\n")
 	writeGateFile(t, root, "experiments/permission/go.mod", "module example.com/product/experiments/permission\n\ngo 1.26.0\n")
 	writeGateFile(t, root, "experiments/permission/go.sum", "example.com/policy v1.0.0 h1:test\n")
+	writeGateFile(t, root, "experiments/sqlite-recovery/go.mod", "module example.com/product/experiments/sqlite-recovery\n\ngo 1.26.0\n")
+	writeGateFile(t, root, "experiments/sqlite-recovery/go.sum", "example.com/sqlite v1.0.0 h1:test\n")
 
 	var directories []string
 	err := bootstrapDependencies(
@@ -371,6 +389,7 @@ func TestBootstrapUsesCopiedModuleGraphAndPreservesSource(t *testing.T) {
 		root,
 		filepath.Join(root, "tools"),
 		filepath.Join(root, "experiments", "permission"),
+		filepath.Join(root, "experiments", "sqlite-recovery"),
 	}) {
 		t.Fatalf("bootstrap directories = %q", directories)
 	}

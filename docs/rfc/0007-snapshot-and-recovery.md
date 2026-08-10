@@ -1,7 +1,8 @@
 # RFC 0007: Snapshot and Recovery
 
 **Status:** accepted for the preview in-memory contract; durable SQLite recovery
-remains a Phase 7 stress proof. A snapshot contains validated
+is proven by a deletable Phase 7 experiment and is not a stabilized core policy.
+A snapshot contains validated
 provider-neutral run state and the last event sequence; it excludes clients,
 secrets, functions, processes, and mutable registries. Import validates schema,
 identity, monotonic sequence, and terminal state. Uncertain mutating operations

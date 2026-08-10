@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "status": "experimental",
+  "module": "github.com/spice-framework/spice-agent/experiments/sqlite-recovery",
+  "go": "1.26.0",
+  "toolchain": "go1.26.5",
+  "core": {
+    "module": "github.com/spice-framework/spice-agent",
+    "version": "v0.1.0-preview.5",
+    "sum": "h1:rGND9DYx3pssliD1tZQOvPDOZ5GVfQLDc7VJQI3HLOM=",
+    "go_mod_sum": "h1:pbhYOeNgn4pCIhEmcdbjnFjJijY4ZSLM8ZHxaF2dxz0="
+  },
+  "sqlite": {
+    "module": "github.com/ncruces/go-sqlite3",
+    "version": "v0.35.3",
+    "sum": "h1:Ei07Zv1qfV/vyXzelhFsyS5Oh9TArBZHsmFk14Xv3GY=",
+    "go_mod_sum": "h1:i1rhym/NIiB5xeEfzbN+e24Y+i7NGUpf7C2xZ3Dpwks="
+  },
+  "contracts": {
+    "snapshot": "spice.agent.snapshot/v1alpha3",
+    "tool_started": "spice.agent.tool-started/v1alpha1",
+    "tool_terminal": "spice.agent.tool-terminal/v1alpha1"
+  },
+  "schema_version": 1,
+  "application_id": "0x53504147",
+  "transparent_daemon_restart": false,
+  "runtime_network": false,
+  "replace_directives": false,
+  "promotion": "requires recorder/restorer adoption evidence and the Phase 7 contract review",
+  "deletion": "remove experiments/sqlite-recovery and its root ledger evidence links"
+}
