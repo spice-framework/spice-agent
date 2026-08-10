@@ -85,7 +85,9 @@ installed daemon/client/plugin/TUI budgets remain separate Phase 6 evidence.
 The initial tool-only protocol and independent Go/Python conformance processes
 are complete. The production host now has its public private-stdin bootstrap,
 exact stdout readiness contract, immutable pinned executable configuration,
-held platform file-identity/digest lease, immediate recheck contract, bounded
+held platform file-identity/digest lease, fail-closed public
+`process.VerifiedLauncher` contract with no pathname fallback, immediate
+defense-in-depth recheck, bounded
 non-reflecting stdout/stderr monitors, current-user local endpoint allocation,
 authenticated candidate launch, and fail-closed remote tool translation. A
 complete immutable desired plugin `Set` feeds an atomic host that publishes one
@@ -112,8 +114,7 @@ reuse, generated daemon composition, authenticated local IPC, in-flight
 reconnect, production-limit replay, compiled/runtime tool continuation, secret
 redaction, and one real `spice dev` last-known-good/debounce workflow. The
 simultaneous installed daemon plus Bubble Tea fault/reconnect workflow remains
-pending. Detailed evidence and the
-pathname-to-exec limitation are recorded in
+pending. Detailed executable-integrity scope and evidence are recorded in
 [`evidence/phase5-host-security-foundation.md`](evidence/phase5-host-security-foundation.md)
 and
 [`evidence/phase5-candidate-and-remote-tools.md`](evidence/phase5-candidate-and-remote-tools.md),

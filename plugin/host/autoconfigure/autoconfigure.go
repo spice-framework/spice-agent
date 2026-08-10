@@ -47,7 +47,7 @@ func DefaultHost(
 	guards []stage.ToolDispatchGuard,
 	decorators []stage.ToolDispatchDecorator,
 	restart pluginhost.RestartPolicy,
-	launcher process.Launcher,
+	launcher process.VerifiedLauncher,
 	endpoints pluginhost.LocalEndpointFactory,
 ) (*pluginhost.Host, lifecycle.Cleanup, error) {
 	host, err := pluginhost.NewHost(pluginhost.HostConfig{

@@ -45,6 +45,9 @@ func TestCandidateLauncherAuthenticatesAndOwnsSuccessfulCandidate(t *testing.T) 
 	if candidate.pluginBuild() == nil || candidate.selectedProtocol() == nil || candidate.negotiatedLimits() == nil {
 		t.Fatal("negotiated candidate metadata is incomplete")
 	}
+	if harness.lease != candidate.lease {
+		t.Fatal("verified launcher did not receive the candidate-owned executable lease")
+	}
 	if len(candidate.launchIdentity()) != pluginv1.LaunchIDBytes ||
 		len(harness.launchIdentity) != pluginv1.LaunchIDBytes*2 ||
 		harness.launchIdentity != strings.ToLower(harness.launchIdentity) {
@@ -68,11 +71,32 @@ func TestCandidateLauncherAuthenticatesAndOwnsSuccessfulCandidate(t *testing.T) 
 	if err = candidate.cleanup(context.Background()); err != nil {
 		t.Fatal(err)
 	}
+	if duplicate, duplicateErr := harness.lease.DuplicateForLaunch(); duplicateErr == nil || duplicate != nil {
+		t.Fatalf("candidate cleanup did not close executable lease: %v, %v", duplicate, duplicateErr)
+	}
 	if !harness.endpoint.isClosed() || !harness.process.wasKilled() || !harness.process.wasWaited() {
 		t.Fatal("candidate cleanup did not release all owned resources")
 	}
 	if err = candidate.cleanup(context.Background()); err != nil {
 		t.Fatalf("idempotent cleanup: %v", err)
+	}
+}
+
+func TestCandidateVerificationPrecedesEntropyEndpointAndProcessOwnership(t *testing.T) {
+	t.Parallel()
+	harness := newCandidateHarness(t)
+	executable := testExecutable(t, "unused", nil)
+	if err := os.WriteFile(executable.Path(), []byte("digest drift"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	launcher := testCandidateLauncher(t, harness, failingEntropyReader{})
+	candidate, err := launcher.launch(context.Background(), executable)
+	var failure *launchError
+	if candidate != nil || !errors.As(err, &failure) || failure.phaseName() != launchPhaseVerify {
+		t.Fatalf("verification failure = %v, %T %v", candidate, err, err)
+	}
+	if harness.launchIdentity != "" || harness.launchSpec().Executable() != "" || harness.lease != nil {
+		t.Fatal("failed verification acquired entropy, endpoint, process, or lease ownership")
 	}
 }
 
@@ -430,6 +454,7 @@ type candidateHarness struct {
 
 	mu      sync.Mutex
 	spec    process.Spec
+	lease   *process.ExecutableLease
 	secret  []byte
 	process *testProcess
 }
@@ -454,9 +479,17 @@ func (harness *candidateHarness) Open(_ context.Context, launchIdentity string) 
 	return harness.endpoint, harness.endpointError
 }
 
-func (harness *candidateHarness) Start(_ context.Context, spec process.Spec) (process.Process, error) {
+func (harness *candidateHarness) StartVerified(
+	_ context.Context,
+	lease *process.ExecutableLease,
+	spec process.Spec,
+) (process.Process, error) {
+	if err := lease.ValidateSpec(spec); err != nil {
+		return nil, err
+	}
 	harness.mu.Lock()
 	harness.spec = spec.Clone()
+	harness.lease = lease
 	harness.mu.Unlock()
 	if harness.nilProcess {
 		return nil, nil //nolint:nilnil // Deliberately exercise an invalid Launcher result.
@@ -495,6 +528,12 @@ func (harness *candidateHarness) Start(_ context.Context, spec process.Spec) (pr
 	}
 	_, _ = io.WriteString(spec.Stdout(), pluginv1.ReadinessRecord)
 	return harness.process, nil
+}
+
+type failingEntropyReader struct{}
+
+func (failingEntropyReader) Read([]byte) (int, error) {
+	return 0, errors.New("entropy must not be read before executable verification")
 }
 
 func (harness *candidateHarness) launchSpec() process.Spec {

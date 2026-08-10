@@ -114,7 +114,7 @@ func TestDefaultHostRejectsMissingMandatoryDependencies(t *testing.T) {
 		identity   *pluginv1.BuildIdentity
 		dispatcher stage.ToolDispatcher
 		restart    pluginhost.RestartPolicy
-		launcher   process.Launcher
+		launcher   process.VerifiedLauncher
 		endpoints  pluginhost.LocalEndpointFactory
 	}{
 		"identity":   {nil, dispatcher, pluginhost.RestartPolicy{}, launcher, endpoints},
@@ -195,8 +195,12 @@ func TestDefaultToolPlanSourceRejectsNilHost(t *testing.T) {
 	}
 }
 
-func inertLauncher() process.Launcher {
-	return process.LauncherFunc(func(context.Context, process.Spec) (process.Process, error) {
+func inertLauncher() process.VerifiedLauncher {
+	return process.VerifiedLauncherFunc(func(
+		context.Context,
+		*process.ExecutableLease,
+		process.Spec,
+	) (process.Process, error) {
 		return nil, errors.New("inert launcher must not be called while leasing the compiled generation")
 	})
 }

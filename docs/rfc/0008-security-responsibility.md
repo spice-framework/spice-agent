@@ -71,7 +71,9 @@ never format the recovered value.
 Daemon endpoints and tokens are current-user only. This reduces accidental
 cross-user access but does not protect against malicious code already executing
 as the same user. Remote listen is absent. Plugin paths are absolute and digest
-pinned with random per-launch secrets; candidates validate before activation.
+pinned with random per-launch secrets. The Host requires a verified-executable
+lease launcher, never a pathname-only fallback, and retains the lease until
+containment before activation.
 
 ## Supply chain
 

@@ -32,7 +32,7 @@ type HostConfig struct {
 	Compiled     stage.ToolDispatcher
 	Guards       []stage.ToolDispatchGuard
 	Decorators   []stage.ToolDispatchDecorator
-	Processes    process.Launcher
+	Processes    process.VerifiedLauncher
 	Endpoints    LocalEndpointFactory
 	Restart      RestartPolicy
 }

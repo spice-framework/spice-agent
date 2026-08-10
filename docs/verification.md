@@ -5,6 +5,8 @@ toolchain that launched the quality gate. `make fast` is the affected feedback
 loop, `make check` adds formatting, module/vendor, Protobuf, architecture, vet,
 and shuffled tests, and `make verify` adds lint/NilAway, security, race, fuzz,
 coverage, and vendor-only build proof.
+Formatting enumerates the same complete sorted Go-file set in deterministic
+bounded batches so Windows command-line limits cannot silently reduce coverage.
 
 `make benchmark` is the bounded offline runtime comparison command. It executes
 the four `BenchmarkKernel*` paths for 500 iterations and five samples on one

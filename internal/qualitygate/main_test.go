@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -496,6 +497,7 @@ func TestProcessFuzzContractsRemainInTheReleaseGate(t *testing.T) {
 		{"./process", "FuzzSpecValidation"},
 		{"./process", "FuzzExitedOutcome"},
 		{"./process", "FuzzLookupValidation"},
+		{"./process", "FuzzSHA256"},
 	} {
 		if seen[target] != 1 {
 			t.Fatalf("fuzz target %#v occurs %d times", target, seen[target])
@@ -527,6 +529,7 @@ func TestFuzzSmokeUsesDeterministicExecutionBudgetForEveryTarget(t *testing.T) {
 		{"./process", "FuzzSpecValidation"},
 		{"./process", "FuzzExitedOutcome"},
 		{"./process", "FuzzLookupValidation"},
+		{"./process", "FuzzSHA256"},
 		{"./agent", "FuzzParseSnapshot"},
 		{"./agent", "FuzzDecodeToolStartedOccurrence"},
 		{"./agent", "FuzzDecodeToolTerminalOccurrence"},
@@ -616,9 +619,36 @@ func TestToolDispatchBoundaryFailsClosed(t *testing.T) {
 // Name   string ` + "`json:\"name\"`" + `
 `,
 		"plugin/host/host.go": `package pluginhost
+// Processes    process.VerifiedLauncher
 // stage.SnapshotToolDispatcher(config.Compiled)
 // stage.ApplyToolDispatchPipeline(base, guards, decorators)
 // stage.ApplyToolDispatchPipeline(merged, host.guards, host.decorators)
+`,
+		"process/verified_launcher.go": `package process
+// type VerifiedLauncher interface
+// StartVerified(context.Context, *ExecutableLease, Spec) (Process, error)
+`,
+		"process/verified_executable.go": `package process
+// func VerifyExecutable(
+// func (lease *ExecutableLease) ValidateSpec(
+// func (lease *ExecutableLease) DuplicateForLaunch(
+// func (lease *ExecutableLease) Recheck(
+`,
+		"plugin/host/digest.go": `package pluginhost
+// type SHA256 = process.SHA256
+// process.VerifyExecutable(ctx, executable.Path(), executable.SHA256())
+`,
+		"plugin/host/launcher.go": `package pluginhost
+// processes process.VerifiedLauncher
+// launcher.processes.StartVerified(ctx, candidate.lease, spec)
+// recheckVerifiedExecutable(ctx, candidate.lease)
+`,
+		"plugin/host/candidate.go": `package pluginhost
+// lease      *process.ExecutableLease
+// closeVerifiedExecutable(candidate.lease)
+`,
+		"plugin/host/autoconfigure/autoconfigure.go": `package autoconfigure
+// launcher process.VerifiedLauncher
 `,
 		"stage/dispatch_guard.go": `package stage
 // type ToolDispatchScope struct
@@ -654,13 +684,56 @@ func TestToolDispatchBoundaryFailsClosed(t *testing.T) {
 	writeGateFile(t, root, "agent/prepared_execution.go", `package agent
 // run.requester = &runInteractionRequester{run: run}
 `)
-	writeGateFile(t, root, "plugin/host/host.go", "package pluginhost\n// stage.SnapshotToolDispatcher(config.Compiled)\n")
+	writeGateFile(t, root, "plugin/host/host.go", "package pluginhost\n// Processes    process.VerifiedLauncher\n// stage.SnapshotToolDispatcher(config.Compiled)\n")
 	if err := checkToolDispatchBoundary(root); err == nil || !strings.Contains(err.Error(), "ApplyToolDispatchPipeline") {
 		t.Fatalf("missing host pipeline = %v", err)
 	}
+	writeGateFile(t, root, "plugin/host/host.go", `package pluginhost
+// Processes    process.VerifiedLauncher
+// stage.SnapshotToolDispatcher(config.Compiled)
+// stage.ApplyToolDispatchPipeline(base, guards, decorators)
+// stage.ApplyToolDispatchPipeline(merged, host.guards, host.decorators)
+`)
 	writeGateFile(t, root, "other/bypass.go", "package other\nfunc x() { ApplyToolDispatchDecorators(nil, nil) }\n")
 	if err := checkArchitecture(root); err == nil || !strings.Contains(err.Error(), "bypasses terminal") {
 		t.Fatalf("decorator-only composition = %v", err)
+	}
+	writeGateFile(t, root, "other/bypass.go", "package other\n")
+	writeGateFile(t, root, "plugin/host/launcher.go", "package pluginhost\n// processes process.Launcher\n")
+	if err := checkToolDispatchBoundary(root); err == nil || !strings.Contains(err.Error(), "VerifiedLauncher") {
+		t.Fatalf("unsafe pathname launcher boundary = %v", err)
+	}
+}
+
+func TestFormattingBatchesPreserveEveryFileWithinWindowsCommandBounds(t *testing.T) {
+	t.Parallel()
+	files := make([]string, 0, 1000)
+	for index := range 1000 {
+		files = append(files, filepath.Join(
+			strings.Repeat("long-directory-", 8),
+			fmt.Sprintf("source-%04d.go", index),
+		))
+	}
+	batches := formattingBatches(files)
+	var flattened []string
+	for _, batch := range batches {
+		if len(batch) == 0 || len(batch) > maximumFormattingBatchFiles {
+			t.Fatalf("formatting batch file count = %d", len(batch))
+		}
+		bytes := len("-l")
+		for _, file := range batch {
+			bytes += len(file) + 3
+		}
+		if bytes > maximumFormattingBatchBytes {
+			t.Fatalf("formatting batch bytes = %d", bytes)
+		}
+		flattened = append(flattened, batch...)
+	}
+	if !slices.Equal(flattened, files) {
+		t.Fatal("formatting batches omitted, duplicated, or reordered files")
+	}
+	if batches := formattingBatches(nil); len(batches) != 0 {
+		t.Fatalf("empty formatting batches = %#v", batches)
 	}
 }
 

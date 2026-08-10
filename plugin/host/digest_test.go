@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/spice-framework/spice-agent/process"
 )
 
 func TestVerifiedExecutableLifecycle(t *testing.T) {
@@ -36,7 +38,7 @@ func TestVerifiedExecutableLifecycle(t *testing.T) {
 
 func TestNilVerifiedExecutableRecheckIsSafe(t *testing.T) {
 	t.Parallel()
-	var lease *verifiedExecutable
+	var lease *process.ExecutableLease
 	if err := lease.Recheck(context.Background()); err == nil {
 		t.Fatal("expected nil lease rejection")
 	}

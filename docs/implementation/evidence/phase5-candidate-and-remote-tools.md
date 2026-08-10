@@ -13,7 +13,9 @@ This slice connects the pinned-executable security foundation to the frozen
   launch identity, challenge, and 256-bit secret material, sends only the
   bounded public bootstrap record through clearable stdin, and starts with no
   arguments or ambient environment.
-- The executable identity and digest are rechecked immediately after process
+- Host can start only through `process.VerifiedLauncher`; it passes the retained
+  exact executable lease with no ordinary pathname-launch fallback. The
+  executable identity and digest are rechecked immediately after process
   ownership transfers. Exact stdout readiness precedes an endpoint-only gRPC
   connection with retries disabled and negotiated message bounds.
 - Authenticated initialization validates the complete transcript, exact
@@ -35,11 +37,12 @@ This slice connects the pinned-executable security foundation to the frozen
 
 ## Security and ownership limits
 
-The process-launch contract still accepts a pathname, so no portable Go API can
-atomically execute the already-open verified file on every supported platform.
-The held file-identity lease plus immediate post-launch recheck detects a path
-swap and fails the candidate; it does not claim to make that operating-system
-race impossible.
+The verified-launch contract requires an exact descriptor-backed image on Unix
+or the held Windows non-sharing handle with suspended pre-resume recheck. Core
+tests prove a pathname replacement never selects the executed image. The
+post-launch recheck remains defense-in-depth and still rejects a candidate when
+its configured path has drifted. Native distribution adapters must separately
+prove process containment and the platform launch implementation.
 
 Plugins remain trusted native processes. Capability declarations are validated
 against explicit configuration but are not a sandbox or permission policy.

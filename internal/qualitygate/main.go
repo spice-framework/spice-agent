@@ -643,15 +643,43 @@ func checkFormatting(ctx context.Context, root string) error {
 		if pathErr != nil {
 			return pathErr
 		}
-		output, runErr := capture(ctx, root, nil, executable, append([]string{"-l"}, files...)...)
-		if runErr != nil {
-			return runErr
-		}
-		if strings.TrimSpace(output) != "" {
-			return fmt.Errorf("%s requires formatting: %s", name, strings.Join(strings.Fields(output), ", "))
+		for _, batch := range formattingBatches(files) {
+			output, runErr := capture(ctx, root, nil, executable, append([]string{"-l"}, batch...)...)
+			if runErr != nil {
+				return runErr
+			}
+			if strings.TrimSpace(output) != "" {
+				return fmt.Errorf("%s requires formatting: %s", name, strings.Join(strings.Fields(output), ", "))
+			}
 		}
 	}
 	return nil
+}
+
+const (
+	maximumFormattingBatchFiles = 128
+	maximumFormattingBatchBytes = 12 << 10
+)
+
+func formattingBatches(files []string) [][]string {
+	result := make([][]string, 0, (len(files)+maximumFormattingBatchFiles-1)/maximumFormattingBatchFiles)
+	current := make([]string, 0, min(len(files), maximumFormattingBatchFiles))
+	currentBytes := len("-l")
+	for _, file := range files {
+		fileBytes := len(file) + 3 // argument separator plus a conservative pair of quotes.
+		if len(current) > 0 && (len(current) == maximumFormattingBatchFiles ||
+			currentBytes+fileBytes > maximumFormattingBatchBytes) {
+			result = append(result, current)
+			current = make([]string, 0, min(len(files), maximumFormattingBatchFiles))
+			currentBytes = len("-l")
+		}
+		current = append(current, file)
+		currentBytes += fileBytes
+	}
+	if len(current) > 0 {
+		result = append(result, current)
+	}
+	return result
 }
 
 func goFiles(root string) ([]string, error) {
@@ -869,6 +897,7 @@ func fuzzTargets() []fuzzTarget {
 		{"./process", "FuzzSpecValidation"},
 		{"./process", "FuzzExitedOutcome"},
 		{"./process", "FuzzLookupValidation"},
+		{"./process", "FuzzSHA256"},
 		{"./agent", "FuzzParseSnapshot"},
 		{"./agent", "FuzzDecodeToolStartedOccurrence"},
 		{"./agent", "FuzzDecodeToolTerminalOccurrence"},
@@ -984,6 +1013,8 @@ func checkArchitecture(root string) error {
 				`"` + modulePath + `/internal/`,
 				`"` + modulePath + `/message`,
 				`"` + modulePath + `/model`,
+				`"golang.org/x/sys/unix"`,
+				`"golang.org/x/sys/windows"`,
 			} {
 				if bytes.Contains(content, []byte(forbiddenImport)) {
 					return fmt.Errorf("plugin host file %s imports forbidden package %s", relative, forbiddenImport)
@@ -1037,9 +1068,36 @@ func checkToolDispatchBoundary(root string) error {
 			"Name   string `json:\"name\"`",
 		}},
 		{name: "plugin/host/host.go", fragments: []string{
+			"Processes    process.VerifiedLauncher",
 			"stage.SnapshotToolDispatcher(config.Compiled)",
 			"stage.ApplyToolDispatchPipeline(base, guards, decorators)",
 			"stage.ApplyToolDispatchPipeline(merged, host.guards, host.decorators)",
+		}},
+		{name: "process/verified_launcher.go", fragments: []string{
+			"type VerifiedLauncher interface",
+			"StartVerified(context.Context, *ExecutableLease, Spec) (Process, error)",
+		}},
+		{name: "process/verified_executable.go", fragments: []string{
+			"func VerifyExecutable(",
+			"func (lease *ExecutableLease) ValidateSpec(",
+			"func (lease *ExecutableLease) DuplicateForLaunch(",
+			"func (lease *ExecutableLease) Recheck(",
+		}},
+		{name: "plugin/host/digest.go", fragments: []string{
+			"type SHA256 = process.SHA256",
+			"process.VerifyExecutable(ctx, executable.Path(), executable.SHA256())",
+		}},
+		{name: "plugin/host/launcher.go", fragments: []string{
+			"processes process.VerifiedLauncher",
+			"launcher.processes.StartVerified(ctx, candidate.lease, spec)",
+			"recheckVerifiedExecutable(ctx, candidate.lease)",
+		}},
+		{name: "plugin/host/candidate.go", fragments: []string{
+			"lease      *process.ExecutableLease",
+			"closeVerifiedExecutable(candidate.lease)",
+		}},
+		{name: "plugin/host/autoconfigure/autoconfigure.go", fragments: []string{
+			"launcher process.VerifiedLauncher",
 		}},
 		{name: "stage/dispatch_guard.go", fragments: []string{
 			"type ToolDispatchScope struct",

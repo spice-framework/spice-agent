@@ -17,9 +17,14 @@ providers, or native UI code.
 
 Configuration includes a canonical absolute executable path, expected SHA-256,
 plugin name, startup/call/drain bounds, and approved capabilities. The host opens
-the verified file, detects path/digest drift as far as the operating system
-permits, launches with a random single-use handshake secret, and bounds stderr.
-PATH lookup and ambient directory scanning are forbidden.
+and digest-verifies the exact executable object before allocating a launch
+identity, secret, or endpoint, and retains that lease until process containment
+is proved. Its injected `process.VerifiedLauncher` has no pathname-only fallback:
+Unix launches use a duplicate of the verified descriptor, while Windows launch
+uses the non-sharing lease plus a recheck after suspended creation and before
+resume. The host performs another identity/digest recheck after ownership
+transfer and before readiness as defense-in-depth. PATH lookup and ambient
+directory scanning are forbidden.
 
 `Initialize` exchanges protocol/build identity, a sorted immutable manifest,
 tool definitions, feature capabilities, negotiated limits, a 128-bit launch
@@ -197,6 +202,11 @@ Digest pinning provides provenance/change detection, not sandboxing. The process
 runs with the daemon user's privileges unless a later launcher/policy extension
 provides real isolation. Capability declarations are mandatory metadata but not
 security theater: help/status must state whether an enforcing decorator exists.
+The pin covers the selected executable file, not its dynamic loader, shared
+libraries, DLLs, shebang interpreter, network dependencies, or mutable files
+named by arguments. A malicious process already running as the daemon user is
+outside the local trust boundary; Unix cannot portably freeze same-user in-place
+mutation of an open inode.
 
 ## Wire-freeze acceptance
 

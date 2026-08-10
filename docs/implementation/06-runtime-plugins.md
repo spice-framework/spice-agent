@@ -44,11 +44,14 @@ choice does not change the production named-pipe transport.
 The first production-host security foundation is also implemented. Public
 bootstrap/readiness framing is shared by fixtures and production; immutable
 executable configuration has no interpreter arguments or ambient environment;
-and a held, platform-identified file is digest-verified before launch and must
-be identity/digest-rechecked immediately afterward. Bounded stdout readiness
-and stderr drains never reflect child-controlled content. The pathname-based
-`process.Launcher` cannot universally eliminate the verify-to-exec race, so the
-post-launch check detects it and activation fails closed.
+and a held, platform-identified file is digest-verified before launch. The Host
+requires `process.VerifiedLauncher` with no pathname-only fallback. A compliant
+Unix launcher executes a duplicate of the verified descriptor; a compliant
+Windows launcher retains the non-sharing handle and rechecks after suspended
+creation but before resume. Host still identity/digest-rechecks immediately
+after ownership transfer as defense-in-depth before readiness or
+authentication. Bounded stdout readiness and stderr drains never reflect
+child-controlled content.
 
 The host now also derives caller-owned current-user local endpoints without
 listening or discovery, launches one authenticated candidate with exact private
@@ -100,6 +103,9 @@ and auto-configuration evidence in
 - One host process and one local gRPC connection exist per plugin generation.
 - Configuration names an absolute executable path and pinned SHA-256 digest.
   Relative paths, PATH lookup, digest drift, and ambient plugin discovery fail.
+- Candidate construction verifies before generating launch secrets or opening
+  an endpoint, and the retained executable lease closes only after process
+  containment has been proved.
 - Every launch receives a cryptographically random handshake secret. Candidate
   manifest, protocol, digest, identity, capabilities, and bounds are verified
   before it may serve a future run.
@@ -132,9 +138,10 @@ the active/failed generation; no partial generated tree is activated.
 ## Implementation slices
 
 1. Freeze `plugin/v1` with Buf lint/breaking checks. **Complete.**
-2. Implement manifest/digest verification and the fallback direct launcher.
-   **Complete through authenticated candidate launch and manifest validation;
-   public fallback source composition remains in slice 4.**
+2. Implement manifest/digest verification and verified native-launch seam.
+   **Complete in core through the public lease, fail-closed Host boundary,
+   authenticated candidate launch, and manifest validation. Distribution
+   adapters must pass the public platform conformance before repinning.**
 3. Add generation manager, candidate handshake, atomic activation, leases,
    bounded stderr, restart policy, drain, and cleanup. **Complete in core,
    including bounded whole-set recovery and public health.**
@@ -162,7 +169,9 @@ or trigger hidden downloads/installations.
 
 ## Verification
 
-- Tests cover wrong digest, path swap, handshake secret, old/new protocol,
+- Tests cover wrong digest, path swap where the substituted image never runs,
+  verification-before-secret/endpoint ownership, lease-until-containment,
+  handshake secret, old/new protocol,
   malformed/oversized messages, stdout contamination, bounded stderr, timeout,
   cancellation, and process-tree cleanup.
 - Crash scenarios include handshake, call, activation, drain, and shutdown.

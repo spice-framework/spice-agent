@@ -20,10 +20,12 @@ Immediately before launch, the host opens the leaf executable without
 following a Unix symbolic link or Windows reparse point, proves it is a regular
 executable file, hashes it with cancellation, and retains the file identity and
 open descriptor/handle. Windows denies ordinary write and delete sharing while
-the lease is live. Unix requires at least one execute bit. Immediately after a
-successful `process.Launcher.Start`, the later launch slice must reopen the
-path, compare platform file identity, and compare the complete digest before a
-candidate can authenticate or activate.
+the lease is live. Unix requires at least one execute bit. The generic values
+now live in public package `process`; `pluginhost.SHA256` remains a compatible
+alias. Host requires `process.VerifiedLauncher`, passes the exact candidate-owned
+lease, and offers no ordinary `Launcher` fallback. Immediately after ownership
+transfer it still reopens the path, compares platform identity, and hashes the
+complete file before a candidate can become ready, authenticate, or activate.
 
 The public `plugin/v1` bootstrap contract now provides one bounded,
 newline-terminated deterministic JSON record carrying the local address and a
@@ -39,15 +41,19 @@ after readiness as fatal contamination. The stderr sink always drains while
 retaining at most a fixed 64 KiB internal prefix plus saturating byte-count and
 truncation metadata; formatting and serialization expose metadata only.
 
-## Security limit
+## Verified-launch boundary
 
-The injected provider-neutral `process.Launcher` accepts a pathname rather than
-an already verified executable handle. The host can detect pathname replacement
-with the held identity and immediate post-launch recheck, but no portable
-implementation can prove the pathname-to-exec interval race never occurred.
-This limitation is explicit and fail-closed before activation. Eliminating it
-would require a separately reviewed process-launch contract that executes an
-already opened image on every supported operating system.
+The public lease supplies a duplicated exact descriptor for Unix native launch.
+Windows' held non-sharing handle prevents ordinary mutation/replacement, and a
+native implementation must create suspended, recheck, then resume. Real test
+executables prove that replacing the Unix path still runs only the leased image
+and that Windows replacement is denied before the verified image runs. macOS
+uses `/dev/fd/3`; the repository requires its hosted real-process job to pass
+before claiming that platform complete.
+
+This is executable-image integrity, not a sandbox or an execution-closure pin.
+Dynamic loaders, DLLs/shared libraries, shebang interpreters, argument-named
+files, and malicious same-user in-place Unix mutation remain outside the claim.
 
 ## Verification scope
 
@@ -58,10 +64,12 @@ later stdout contamination, close and cancellation races, huge concurrent
 output, bounded stderr, saturating accounting, immutable configuration,
 environment and capability normalization, timeout and limit boundaries,
 format redaction, digest mismatch, cancellation, directory rejection, Unix
-symbolic-link/permission/mutation/replacement cases, and Windows
-reparse-point/write-sharing behavior. The repository architecture gate also
-forbids the host core from importing daemon, client, engine, internal fixture,
-or provider-facing kernel packages.
+symbolic-link/permission/mutation/replacement and descriptor-execution cases,
+and Windows reparse-point/write-sharing and substitution behavior. The
+repository architecture gate also forbids the host core from importing daemon,
+client, engine, internal fixture, provider-facing kernel packages, or
+platform-specific verifier dependencies; it locks the exact
+`VerifiedLauncher` Host/autoconfiguration boundary.
 
 Exact commit, gate timing, coverage, and platform evidence are recorded after
 the repository-owned full verification gate passes on the committed tree.
