@@ -98,13 +98,24 @@ func TestLeaseReleaseContextBoundsBlockingCallbackWithOneOutcome(t *testing.T) {
 		<-block
 		return nil
 	})
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
-	defer cancel()
-	first := lease.ReleaseContext(ctx)
+	ctx, cancel := context.WithCancel(t.Context())
+	outcome := make(chan error, 1)
+	go func() { outcome <- lease.ReleaseContext(ctx) }()
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("release callback did not start")
+	}
+	cancel()
+	var first error
+	select {
+	case first = <-outcome:
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancelled release did not return")
+	}
 	if first == nil || !strings.Contains(first.Error(), "did not complete") || calls.Load() != 1 {
 		t.Fatalf("bounded release = %d, %v", calls.Load(), first)
 	}
-	<-started
 	close(block)
 	second := lease.Release()
 	if second == nil || second.Error() != first.Error() || calls.Load() != 1 {
