@@ -93,6 +93,23 @@ versioning remains independent, and the evidence deliberately makes neither a
 released-binary N/N-1 claim nor a native Python Host-launch claim. See
 [the engine compatibility evidence](evidence/phase8-engine-protocol-compatibility.md).
 
+The MCP experiment remains blocked before implementation. The immutable
+preview5 module predates the public verified-child launcher required to start a
+digest-pinned MCP server without a pathname race. The experiment will not use a
+pseudo-version, `replace`, workspace source, duplicated launcher, or an
+interpreter fallback; it resumes only after an immutable Agent release contains
+that generic seam.
+
+The first optional-extension proof is also complete as the removable
+`experiments/compaction` nested module. It pins released preview5 without a
+replacement and implements deterministic local complete-round extraction as an
+explicit application-owned `model.Provider` wrapper. The delegate alone owns
+the one model operation; authoritative engine history, events, and snapshots
+remain unmodified, and exact semantic options feed the application's portable
+snapshot identity. Generated Spice construction, fuzz/race/coverage, security,
+benchmark, compatibility, and deletion evidence are owned by the experiment.
+See [the compaction evidence](evidence/phase8-compaction-experiment.md).
+
 - Obtain three independently authored compiled extensions using only public
   annotation/SDK contracts.
 - Run both runtime-plugin languages and a second client against current and

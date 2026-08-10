@@ -95,6 +95,12 @@ Applications enable the host through an explicit blank import of
 `plugin/host/autoconfigure`; its replaceable defaults remain ordinary generated
 beans rather than runtime discovery.
 
+Optional concepts are stress-tested outside the kernel. The removable
+`experiments/compaction` module demonstrates deterministic complete-round model
+context extraction as an explicit application-owned `model.Provider` wrapper;
+it never changes authoritative history, events, or snapshots and never performs
+hidden model, tool, process, network, or interaction calls.
+
 ## Release contract
 
 `spice-release.json` is inert, canonical metadata for the centrally authorized

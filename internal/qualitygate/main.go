@@ -22,16 +22,14 @@ import (
 )
 
 const (
-	requiredGoVersion             = "go1.26.5"
-	modulePath                    = "github.com/spice-framework/spice-agent"
-	minimumCoverage               = 85.0
-	minimumPermissionCoverage     = 85.0
-	minimumSQLiteRecoveryCoverage = 85.0
-	minimumTwoWorkerCoverage      = 85.0
-	releaseWorkflowCommit         = "a8f9cc6ffd3a2744c5cae3b52c05e6e91cbc875e"
-	verifyWorkflowCommit          = "0534fe1247f892b287f624b7abb6f2347765ab22"
-	standardGateTimeout           = 15 * time.Minute
-	verifyGateTimeout             = 30 * time.Minute
+	requiredGoVersion         = "go1.26.5"
+	modulePath                = "github.com/spice-framework/spice-agent"
+	minimumCoverage           = 85.0
+	minimumExperimentCoverage = 85.0
+	releaseWorkflowCommit     = "a8f9cc6ffd3a2744c5cae3b52c05e6e91cbc875e"
+	verifyWorkflowCommit      = "0534fe1247f892b287f624b7abb6f2347765ab22"
+	standardGateTimeout       = 15 * time.Minute
+	verifyGateTimeout         = 30 * time.Minute
 )
 
 func main() {
@@ -105,13 +103,19 @@ func run(ctx context.Context, root, mode string) error {
 	twoWorkerExperiment := step{"two-worker experiment", func() error {
 		return verifyTwoWorkerExperiment(ctx, root, mode)
 	}}
+	compactionExperiment := step{"compaction experiment", func() error {
+		return verifyCompactionExperiment(ctx, root, mode)
+	}}
 	acceptanceScope := step{"acceptance endpoint scope", func() error {
 		return command(
 			ctx, root, productEnvironment,
 			"go", "test", "-tags=spice_acceptance", "-shuffle=on", "-count=1", "./daemon/endpoint",
 		)
 	}}
-	steps := []step{identity, diffHygiene, tests, permissionExperiment, sqliteRecoveryExperiment, twoWorkerExperiment}
+	steps := []step{
+		identity, diffHygiene, tests, permissionExperiment, sqliteRecoveryExperiment,
+		twoWorkerExperiment, compactionExperiment,
+	}
 	if mode == "coverage" {
 		steps = []step{identity, diffHygiene, {"coverage", func() error {
 			return coverage(ctx, root, productEnvironment)
@@ -135,6 +139,7 @@ func run(ctx context.Context, root, mode string) error {
 			permissionExperiment,
 			sqliteRecoveryExperiment,
 			twoWorkerExperiment,
+			compactionExperiment,
 			acceptanceScope,
 		}
 	}
@@ -173,18 +178,40 @@ func run(ctx context.Context, root, mode string) error {
 }
 
 func verifyPermissionExperiment(ctx context.Context, root, mode string) error {
-	return verifyNestedExperiment(ctx, root, mode, "permission", "PermissionProof", minimumPermissionCoverage)
+	return verifyNestedExperiment(ctx, root, mode, "permission", "PermissionProof")
 }
 
 func verifySQLiteRecoveryExperiment(ctx context.Context, root, mode string) error {
-	return verifyNestedExperiment(ctx, root, mode, "sqlite-recovery", "SQLiteRecoveryProof", minimumSQLiteRecoveryCoverage)
+	return verifyNestedExperiment(ctx, root, mode, "sqlite-recovery", "SQLiteRecoveryProof")
 }
 
 func verifyTwoWorkerExperiment(ctx context.Context, root, mode string) error {
-	return verifyNestedExperiment(ctx, root, mode, "two-worker", "TwoWorkerProof", minimumTwoWorkerCoverage)
+	return verifyNestedExperiment(ctx, root, mode, "two-worker", "TwoWorkerProof")
 }
 
-func verifyNestedExperiment(ctx context.Context, root, mode, name, target string, minimum float64) error {
+func verifyCompactionExperiment(ctx context.Context, root, mode string) error {
+	if err := verifyNestedExperiment(
+		ctx, root, mode, "compaction", "CompactionProof",
+	); err != nil {
+		return err
+	}
+	if mode != "verify" {
+		return nil
+	}
+	environment := map[string]string{
+		"GOFLAGS": "-mod=vendor", "GOPROXY": "off", "GOTOOLCHAIN": "local", "GOWORK": "off",
+	}
+	return command(
+		ctx, filepath.Join(root, "experiments", "compaction"), environment,
+		"go", compactionFuzzArguments()...,
+	)
+}
+
+func compactionFuzzArguments() []string {
+	return []string{"test", "-run=^$", "-fuzz=^FuzzCompact$", "-fuzztime=100x", "."}
+}
+
+func verifyNestedExperiment(ctx context.Context, root, mode, name, target string) error {
 	directory := filepath.Join(root, "experiments", name)
 	if _, err := os.Stat(filepath.Join(directory, "go.mod")); err != nil {
 		return fmt.Errorf("%s experiment module: %w", name, err)
@@ -241,24 +268,28 @@ func verifyNestedExperiment(ctx context.Context, root, mode, name, target string
 		if err != nil {
 			return err
 		}
-		return validateExperimentCoverage(name, output, minimum)
+		return validateExperimentCoverage(name, output)
 	}
 	return nil
 }
 
 func validatePermissionCoverage(output string) error {
-	return validateExperimentCoverage("permission", output, minimumPermissionCoverage)
+	return validateExperimentCoverage("permission", output)
 }
 
 func validateSQLiteRecoveryCoverage(output string) error {
-	return validateExperimentCoverage("SQLite recovery", output, minimumSQLiteRecoveryCoverage)
+	return validateExperimentCoverage("SQLite recovery", output)
 }
 
 func validateTwoWorkerCoverage(output string) error {
-	return validateExperimentCoverage("two-worker", output, minimumTwoWorkerCoverage)
+	return validateExperimentCoverage("two-worker", output)
 }
 
-func validateExperimentCoverage(name, output string, minimum float64) error {
+func validateCompactionCoverage(output string) error {
+	return validateExperimentCoverage("compaction", output)
+}
+
+func validateExperimentCoverage(name, output string) error {
 	const marker = "coverage: "
 	for line := range strings.Lines(output) {
 		_, value, found := strings.Cut(line, marker)
@@ -273,8 +304,11 @@ func validateExperimentCoverage(name, output string, minimum float64) error {
 		if err != nil {
 			return fmt.Errorf("parse %s experiment coverage: %w", name, err)
 		}
-		if coverage < minimum {
-			return fmt.Errorf("%s experiment coverage %.1f%% is below %.1f%%", name, coverage, minimum)
+		if coverage < minimumExperimentCoverage {
+			return fmt.Errorf(
+				"%s experiment coverage %.1f%% is below %.1f%%",
+				name, coverage, minimumExperimentCoverage,
+			)
 		}
 		return nil
 	}
@@ -381,6 +415,7 @@ func bootstrapDependencies(
 		{directory: filepath.Join(root, "experiments", "permission"), optional: true},
 		{directory: filepath.Join(root, "experiments", "sqlite-recovery"), optional: true},
 		{directory: filepath.Join(root, "experiments", "two-worker"), optional: true},
+		{directory: filepath.Join(root, "experiments", "compaction"), optional: true},
 	}
 	for _, graph := range graphs {
 		if err := bootstrapModuleGraph(ctx, graph, runner); err != nil {

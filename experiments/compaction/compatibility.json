@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "status": "experimental",
+  "module": "github.com/spice-framework/spice-agent/experiments/compaction",
+  "go": "1.26.0",
+  "toolchain": "go1.26.5",
+  "dependencies": {
+    "spice": {
+      "version": "v0.1.0-preview.2",
+      "sum": "h1:5pYgTlUUzC/xZISetG/U6c1L/I3f8dUQSZhuo6YqxiA=",
+      "go_mod_sum": "h1:dBZV5UZcbY6pzhfGNtvAwQIJ8YsFna+jf1SAlmukJfk="
+    },
+    "spice_agent": {
+      "version": "v0.1.0-preview.5",
+      "sum": "h1:rGND9DYx3pssliD1tZQOvPDOZ5GVfQLDc7VJQI3HLOM=",
+      "go_mod_sum": "h1:pbhYOeNgn4pCIhEmcdbjnFjJijY4ZSLM8ZHxaF2dxz0="
+    }
+  },
+  "contract": {
+    "version": "spice.agent.compaction/extractive-v1",
+    "mode": "deterministic-local-extractive",
+    "selection": "contiguous-complete-tool-rounds",
+    "provider_wrapper": "application-owned-explicit",
+    "semantic_identity": "required-for-portable-snapshot-compatibility",
+    "durable_history_modified": false,
+    "events_modified": false,
+    "snapshots_modified": false,
+    "hidden_model_calls": false,
+    "hidden_tool_calls": false,
+    "hidden_process_calls": false,
+    "hidden_network_calls": false,
+    "hidden_interactions": false
+  },
+  "replace_directives": false,
+  "promotion": "requires independent provider integrations and model-quality evidence",
+  "deletion": "remove experiments/compaction and its root ledger evidence links"
+}

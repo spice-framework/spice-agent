@@ -84,6 +84,29 @@ func TestValidateTwoWorkerCoverage(t *testing.T) {
 	}
 }
 
+func TestValidateCompactionCoverageAndDeterministicFuzzBudget(t *testing.T) {
+	t.Parallel()
+	if err := validateCompactionCoverage("ok\tcompaction\tcoverage: 85.1% of statements\n"); err != nil {
+		t.Fatal(err)
+	}
+	for _, output := range []string{
+		"ok\tcompaction\tcoverage: 84.9% of statements\n",
+		"ok\tcompaction\n",
+		"ok\tcompaction\tcoverage: invalid% of statements\n",
+	} {
+		if err := validateCompactionCoverage(output); err == nil {
+			t.Fatalf("validateCompactionCoverage(%q) succeeded", output)
+		}
+	}
+	want := []string{"test", "-run=^$", "-fuzz=^FuzzCompact$", "-fuzztime=100x", "."}
+	if got := compactionFuzzArguments(); !slices.Equal(got, want) {
+		t.Fatalf("compaction fuzz arguments = %q", got)
+	}
+	if strings.Contains(strings.Join(compactionFuzzArguments(), " "), "1s") {
+		t.Fatal("compaction fuzz smoke uses a wall-clock duration")
+	}
+}
+
 func TestKernelRuntimeBenchmarkContractIsBoundedAndFailsClosed(t *testing.T) {
 	t.Parallel()
 	wantArguments := []string{
@@ -383,6 +406,8 @@ func TestBootstrapUsesCopiedModuleGraphAndPreservesSource(t *testing.T) {
 	writeGateFile(t, root, "experiments/sqlite-recovery/go.sum", "example.com/sqlite v1.0.0 h1:test\n")
 	writeGateFile(t, root, "experiments/two-worker/go.mod", "module example.com/product/experiments/two-worker\n\ngo 1.26.0\n")
 	writeGateFile(t, root, "experiments/two-worker/go.sum", "example.com/session v1.0.0 h1:test\n")
+	writeGateFile(t, root, "experiments/compaction/go.mod", "module example.com/product/experiments/compaction\n\ngo 1.26.0\n")
+	writeGateFile(t, root, "experiments/compaction/go.sum", "example.com/model v1.0.0 h1:test\n")
 
 	var directories []string
 	err := bootstrapDependencies(
@@ -410,6 +435,7 @@ func TestBootstrapUsesCopiedModuleGraphAndPreservesSource(t *testing.T) {
 		filepath.Join(root, "experiments", "permission"),
 		filepath.Join(root, "experiments", "sqlite-recovery"),
 		filepath.Join(root, "experiments", "two-worker"),
+		filepath.Join(root, "experiments", "compaction"),
 	}) {
 		t.Fatalf("bootstrap directories = %q", directories)
 	}
