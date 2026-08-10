@@ -99,16 +99,20 @@ authority boundary:
 - both protected environments remained unapproved; and
 - no GitHub Release was created.
 
-## `v0.1.0-preview.4`: pre-tag policy authorization
+## `v0.1.0-preview.4`: published architecture-proof module
 
 Preview.4 uses separately reviewed policies and their organization-owned
 workflow pin:
 
 | Authority | Exact commit |
 | --- | --- |
+| Tag object | `c53f4bf9ffbb283320da66184c25088c8c5edf1e` |
+| Tagged commit | `27dba90347520681eadb4fc6e86b69160bf8e00f` |
 | Development renderer policy | `d0f88db000acb566b72499c736c9134909ee7912` |
 | Toolchain independent policy | `4a97e78c3495c5f61bd4e25111722855184a786c` |
 | Reusable organization workflow | `0fcd43dc8b41fad56c231d0e136ad8c762276ed5` |
+| Successful release run | [31328938331](https://github.com/spice-framework/spice-agent/actions/runs/31328938331) |
+| Published prerelease | [`v0.1.0-preview.4`](https://github.com/spice-framework/spice-agent/releases/tag/v0.1.0-preview.4) |
 
 Before changing release metadata or creating a tag, both artifact-free policy
 checks ran from clean worktrees at those exact authority commits with Go
@@ -146,9 +150,65 @@ including one trailing newline. Their SHA-256 is
 Toolchain additionally binds the canonical source URL. At the time of this
 comparison, preview.4 had no tag, GitHub Release, or release workflow run.
 
-The release metadata and caller now advance to preview.4 and the exact
-organization workflow above. Preview.1, preview.2, and preview.3 metadata and
-caller identities remain explicit negative quality-gate fixtures. The pre-tag
-comparison is policy agreement only; candidate verification, rendering,
-independent artifact verification, attestation, provenance authentication, and
-protected publication remain mandatory.
+The release metadata and caller then advanced to preview.4 and the exact
+organization workflow above. Candidate verification, rendering, independent
+artifact verification, attestation, provenance authentication, and protected
+publication all completed. The published prerelease contains the authenticated
+source archive, SPDX SBOM, release metadata, checksums, and portable Sigstore
+bundle. Preview.1, preview.2, and preview.3 metadata and caller identities
+remain explicit negative quality-gate fixtures.
+
+## `v0.1.0-preview.5`: Phase 7 pre-tag policy authorization
+
+Preview.5 carries the generic Phase 7 terminal dispatch-guard seam, the
+run-owned interaction requester, typed tool-start and tool-terminal occurrence
+facts, the v1alpha3 snapshot boundary, and the first offline kernel runtime
+baseline. These product commits remain individually reviewable beneath the
+release preparation; no product, module, dependency, generated, vendor, or
+tools byte is changed to authorize the candidate.
+
+| Authority | Exact commit or run |
+| --- | --- |
+| Product base | `d30445b1704dbb89fcd8f11277f8188f0b19084c` |
+| Development renderer policy | `a15d9406dcf33fddea29830491f5cdbcc1f4be47` |
+| Toolchain independent policy | `7d9f7d1d1659e0ddbc5c604666527e68de2f184c` |
+| Reusable organization workflow | `a8f9cc6ffd3a2744c5cae3b52c05e6e91cbc875e` |
+| Product-base CI | [31342184213](https://github.com/spice-framework/spice-agent/actions/runs/31342184213) |
+| Product-base documentation | [31342184208](https://github.com/spice-framework/spice-agent/actions/runs/31342184208) |
+
+Both artifact-free policy checks ran from clean hosted-green authority commits
+with Go 1.26.5, vendored dependencies, `GOWORK=off`, `GOPROXY=off`,
+`GOSUMDB=off`, and `GOTOOLCHAIN=local`.
+
+Development command:
+
+```text
+go run -mod=vendor ./cmd/spice-dev go-release policy-check --repo spice-agent --module github.com/spice-framework/spice-agent --version v0.1.0-preview.5 --profile go-module-v1
+```
+
+Development output:
+
+```text
+go-module-v1	spice-agent	github.com/spice-framework/spice-agent	v0.1.0-preview.5
+```
+
+Toolchain command:
+
+```text
+go run -mod=vendor ./cmd/spice-go-release-verify policy-check --repository=spice-agent --source=https://github.com/spice-framework/spice-agent --module=github.com/spice-framework/spice-agent --version=v0.1.0-preview.5 --profile=go-module-v1
+```
+
+Toolchain output:
+
+```json
+{"profile":"go-module-v1","repository":"spice-agent","module":"github.com/spice-framework/spice-agent","version":"v0.1.0-preview.5","source":"https://github.com/spice-framework/spice-agent"}
+```
+
+Normalizing the Toolchain JSON to Development's ordered tuple produces the
+same bytes, including one trailing newline. Their SHA-256 is
+`a5df29b650781e6932661cb978370d16bbb4d8f25df5f7212180ccc3cb81f453`.
+At authorization time there was no preview.5 tag, GitHub Release, or tag
+workflow run. This commit advances only canonical release metadata, the audited
+caller pin, their quality-gate constants and stale preview.4 negatives, and
+this history. The policy match and green product base do not create, approve,
+tag, attest, or publish a release.

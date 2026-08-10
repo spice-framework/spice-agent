@@ -33,6 +33,7 @@ func TestReleaseMetadataIsStrictAndCanonical(t *testing.T) {
 		{name: "superseded preview.1", content: strings.Replace(valid, releaseVersion, "v0.1.0-preview.1", 1)},
 		{name: "superseded preview.2", content: strings.Replace(valid, releaseVersion, "v0.1.0-preview.2", 1)},
 		{name: "superseded preview.3", content: strings.Replace(valid, releaseVersion, "v0.1.0-preview.3", 1)},
+		{name: "superseded preview.4", content: strings.Replace(valid, releaseVersion, "v0.1.0-preview.4", 1)},
 		{name: "wrong version", content: strings.Replace(valid, releaseVersion, "v0.2.0", 1)},
 		{name: "trailing value", content: valid + "{}\n"},
 		{name: "noncanonical", content: strings.ReplaceAll(strings.ReplaceAll(valid, "\n", ""), "  ", "")},

@@ -25,7 +25,7 @@ const (
 	requiredGoVersion     = "go1.26.5"
 	modulePath            = "github.com/spice-framework/spice-agent"
 	minimumCoverage       = 85.0
-	releaseWorkflowCommit = "0fcd43dc8b41fad56c231d0e136ad8c762276ed5"
+	releaseWorkflowCommit = "a8f9cc6ffd3a2744c5cae3b52c05e6e91cbc875e"
 	verifyWorkflowCommit  = "0534fe1247f892b287f624b7abb6f2347765ab22"
 	standardGateTimeout   = 15 * time.Minute
 	verifyGateTimeout     = 30 * time.Minute
