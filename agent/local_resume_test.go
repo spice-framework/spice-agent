@@ -375,8 +375,15 @@ func TestPreparedLocalResumeRejectsNilAndNonSuspendedRuns(t *testing.T) {
 func TestPreparedLocalResumeRejectsCancellationBeforeReservation(t *testing.T) {
 	fixture := newLocalResumeFixture(t)
 	fixture.run.Cancel()
-	if _, err := fixture.run.PrepareLocalResume(); !errors.Is(err, context.Canceled) {
-		t.Fatalf("prepare after cancellation = %v", err)
+	prepared, err := fixture.run.PrepareLocalResume()
+	if prepared != nil {
+		t.Fatal("cancelled run prepared a local resume")
+	}
+	if !errors.Is(err, context.Canceled) {
+		failure, ok := errors.AsType[*agent.UnsafeSnapshotError](err)
+		if !ok || failure.Status != agent.LifecycleCancelled {
+			t.Fatalf("prepare after cancellation = %v", err)
+		}
 	}
 	if err := fixture.run.Wait(t.Context()); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled run = %v", err)
