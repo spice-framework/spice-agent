@@ -2,9 +2,58 @@ package main
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
+
+func TestReleasedGenerationBuilderProtectsOnlyOwnedExecutables(t *testing.T) {
+	t.Parallel()
+	workspace := t.TempDir()
+	builder, err := newReleasedGenerationBuilder(t.TempDir(), workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executable := filepath.Join(workspace, "peer")
+	if err = os.WriteFile(executable, []byte("peer"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err = builder.protectExecutable(executable); err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" {
+		info, statErr := os.Stat(executable)
+		if statErr != nil {
+			t.Fatal(statErr)
+		}
+		if got := info.Mode().Perm(); got != 0o700 {
+			t.Fatalf("executable mode = %o, want 700", got)
+		}
+	}
+	outside := filepath.Join(t.TempDir(), "outside")
+	if err = os.WriteFile(outside, []byte("outside"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err = builder.protectExecutable(outside); err == nil {
+		t.Fatal("outside executable protection succeeded")
+	}
+}
+
+func TestReleasedGenerationBuilderSeparatesSourceAndExecutablePaths(t *testing.T) {
+	t.Parallel()
+	builder, err := newReleasedGenerationBuilder(t.TempDir(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, role := range []string{"previous", "current"} {
+		source := builder.sourceDirectory(role)
+		if source == builder.peerExecutable(role) || source == builder.fixtureExecutable(role) {
+			t.Fatalf("source and executable paths collide for %s", role)
+		}
+	}
+}
 
 func TestReleasedGenerationDownloadIdentityFailsClosed(t *testing.T) {
 	t.Parallel()

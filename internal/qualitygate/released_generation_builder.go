@@ -29,7 +29,7 @@ func (builder *releasedGenerationBuilder) Build(
 	ctx context.Context,
 	generation releasedGeneration,
 ) (releasedGenerationBuild, error) {
-	moduleDirectory := filepath.Join(builder.workspace, "peer-"+generation.Role)
+	moduleDirectory := builder.sourceDirectory(generation.Role)
 	if err := os.Mkdir(moduleDirectory, 0o700); err != nil {
 		return releasedGenerationBuild{}, fmt.Errorf("create released peer module: %w", err)
 	}
@@ -94,8 +94,8 @@ func (builder *releasedGenerationBuilder) Build(
 			return releasedGenerationBuild{}, fmt.Errorf("released peer go.mod contains forbidden %q", strings.TrimSpace(forbidden))
 		}
 	}
-	peer := filepath.Join(builder.workspace, "peer-"+generation.Role+builder.executableSuffix())
-	fixture := filepath.Join(builder.workspace, "plugin-fixture-"+generation.Role+builder.executableSuffix())
+	peer := builder.peerExecutable(generation.Role)
+	fixture := builder.fixtureExecutable(generation.Role)
 	offlineEnvironment := map[string]string{
 		"GOCACHE": buildCache, "GOMODCACHE": moduleCache, "GOPROXY": "off",
 		"GOSUMDB": "sum.golang.org", "GOTOOLCHAIN": "local", "GOWORK": "off", "GOFLAGS": "",
@@ -121,7 +121,36 @@ func (builder *releasedGenerationBuilder) Build(
 	); err != nil {
 		return releasedGenerationBuild{}, err
 	}
+	for _, executable := range []string{peer, fixture} {
+		if err = builder.protectExecutable(executable); err != nil {
+			return releasedGenerationBuild{}, err
+		}
+	}
 	return releasedGenerationBuild{Generation: generation, Peer: peer, Fixture: fixture}, nil
+}
+
+func (builder *releasedGenerationBuilder) protectExecutable(path string) error {
+	relative, err := filepath.Rel(builder.workspace, path)
+	if err != nil || relative == "." || filepath.IsAbs(relative) || relative == ".." ||
+		strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return errors.New("released executable path escapes the private workspace")
+	}
+	workspaceRoot, err := os.OpenRoot(builder.workspace)
+	if err != nil {
+		return fmt.Errorf("open released executable workspace: %w", err)
+	}
+	defer workspaceRoot.Close() //nolint:errcheck // the runner owns final workspace cleanup.
+	info, err := workspaceRoot.Lstat(relative)
+	if err != nil {
+		return fmt.Errorf("inspect released executable: %w", err)
+	}
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return errors.New("released executable is not a regular file")
+	}
+	if err = workspaceRoot.Chmod(relative, 0o700); err != nil { // #nosec G302 -- a private executable requires owner execute permission.
+		return fmt.Errorf("protect released executable: %w", err)
+	}
+	return nil
 }
 
 func (builder *releasedGenerationBuilder) copyPeerSource(destination string) error {
@@ -190,4 +219,16 @@ func (builder *releasedGenerationBuilder) executableSuffix() string {
 		return ".exe"
 	}
 	return ""
+}
+
+func (builder *releasedGenerationBuilder) sourceDirectory(role string) string {
+	return filepath.Join(builder.workspace, "peer-source-"+role)
+}
+
+func (builder *releasedGenerationBuilder) peerExecutable(role string) string {
+	return filepath.Join(builder.workspace, "peer-"+role+builder.executableSuffix())
+}
+
+func (builder *releasedGenerationBuilder) fixtureExecutable(role string) string {
+	return filepath.Join(builder.workspace, "plugin-fixture-"+role+builder.executableSuffix())
 }

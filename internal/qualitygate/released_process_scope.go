@@ -21,18 +21,21 @@ func newReleasedProcessScope(kind string) (*releasedProcessScope, error) {
 	if kind != "engine" && kind != "plugin" {
 		return nil, errors.New("released process kind is invalid")
 	}
-	cache, err := os.UserCacheDir()
-	if err != nil {
-		return nil, fmt.Errorf("resolve released process cache: %w", err)
+	base := ""
+	if runtime.GOOS == "windows" {
+		cache, err := os.UserCacheDir()
+		if err != nil {
+			return nil, fmt.Errorf("resolve released process cache: %w", err)
+		}
+		base = filepath.Join(cache, "spice-agent-released-matrix-tests")
+		if err = os.MkdirAll(base, 0o700); err != nil {
+			return nil, fmt.Errorf("create released process cache: %w", err)
+		}
+		if err = os.Chmod(base, 0o700); err != nil { // #nosec G302 -- a private directory requires owner execute/search permission.
+			return nil, fmt.Errorf("protect released process cache: %w", err)
+		}
 	}
-	base := filepath.Join(cache, "spice-agent-released-matrix-tests")
-	if err = os.MkdirAll(base, 0o700); err != nil {
-		return nil, fmt.Errorf("create released process cache: %w", err)
-	}
-	if err = os.Chmod(base, 0o700); err != nil { // #nosec G302 -- a private directory requires owner execute/search permission.
-		return nil, fmt.Errorf("protect released process cache: %w", err)
-	}
-	root, err := os.MkdirTemp(base, kind+"-")
+	root, err := os.MkdirTemp(base, "spice-agent-rg-"+kind+"-")
 	if err != nil {
 		return nil, fmt.Errorf("create released process scope: %w", err)
 	}

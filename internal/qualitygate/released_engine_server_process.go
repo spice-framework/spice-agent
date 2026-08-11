@@ -59,12 +59,20 @@ func (process *releasedEngineServerProcess) Configure(
 	}
 	ready, err := process.readLine(ctx)
 	if err != nil {
-		return fmt.Errorf("read released engine server readiness: %w", err)
+		return fmt.Errorf(
+			"read released engine server readiness: %w; stderr=%q",
+			err,
+			process.redactedStderr(authorization),
+		)
 	}
 	if string(ready) != "{\"ready\":true}\n" {
 		return errors.New("released engine server readiness is invalid")
 	}
 	return nil
+}
+
+func (process *releasedEngineServerProcess) redactedStderr(secret string) string {
+	return strings.ReplaceAll(process.stderr.String(), secret, "[redacted]")
 }
 
 func (process *releasedEngineServerProcess) Stop() ([]byte, error) {

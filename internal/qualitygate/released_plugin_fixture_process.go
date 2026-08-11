@@ -60,12 +60,20 @@ func (process *releasedPluginFixtureProcess) Configure(
 	}
 	ready, err := process.readLine(ctx)
 	if err != nil {
-		return fmt.Errorf("read released plugin fixture readiness: %w", err)
+		return fmt.Errorf(
+			"read released plugin fixture readiness: %w; stderr=%q",
+			err,
+			process.redactedStderr(secret),
+		)
 	}
 	if string(ready) != "{\"ready\":true}\n" {
 		return errors.New("released plugin fixture readiness is invalid")
 	}
 	return nil
+}
+
+func (process *releasedPluginFixtureProcess) redactedStderr(secret string) string {
+	return strings.ReplaceAll(process.stderr.String(), secret, "[redacted]")
 }
 
 func (process *releasedPluginFixtureProcess) Stop() ([]byte, error) {

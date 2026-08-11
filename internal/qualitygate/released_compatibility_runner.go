@@ -42,12 +42,17 @@ func (runner *releasedCompatibilityRunner) Run(ctx context.Context) (runErr erro
 	if err != nil {
 		return fmt.Errorf("create released compatibility workspace: %w", err)
 	}
+	ownedWorkspace, err := newReleasedWorkspace(workspace)
+	if err != nil {
+		_ = os.RemoveAll(workspace)
+		return err
+	}
 	defer func() {
-		if cleanupErr := os.RemoveAll(workspace); runErr == nil && cleanupErr != nil {
+		if cleanupErr := ownedWorkspace.Close(); runErr == nil && cleanupErr != nil {
 			runErr = fmt.Errorf("remove released compatibility workspace: %w", cleanupErr)
 		}
 	}()
-	builder, err := newReleasedGenerationBuilder(runner.repository, workspace)
+	builder, err := newReleasedGenerationBuilder(runner.repository, ownedWorkspace.Path())
 	if err != nil {
 		return err
 	}

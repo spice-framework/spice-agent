@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/base64"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -18,6 +20,10 @@ func TestReleasedProcessScopeOwnsBoundedSecretSafeState(t *testing.T) {
 		}
 		if scope.Address() == "" || scope.AuthorityDirectory() == "" {
 			t.Fatal("released process scope omitted owned paths")
+		}
+		if runtime.GOOS != "windows" &&
+			(!filepath.IsAbs(scope.Address()) || filepath.Clean(scope.Address()) != scope.Address() || len(scope.Address()) > 100) {
+			t.Fatalf("released Unix address is not clean, absolute, and bounded: %q", scope.Address())
 		}
 		authorization, err := scope.Authorization()
 		if err != nil {
