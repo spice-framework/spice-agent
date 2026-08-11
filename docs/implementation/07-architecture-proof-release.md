@@ -5,10 +5,10 @@
 Publish the coordinated architecture proof only after phases 0 through 5 prove
 the complete Spice-native architecture. The original recovery plan began with
 Agent core `v0.1.0-preview.4` and independently versioned preview identities.
-Subsequent protected releases published Agent `v0.1.0-preview.5` and
-`v0.1.0-preview.6`; TUI, provider, and coding tools remain independently
-versioned at `v0.1.0-preview.1`, while the distribution is
-`v0.1.0-preview.4`. These later facts qualify the historical implementation
+Subsequent protected releases published Agent `v0.1.0-preview.5`,
+`v0.1.0-preview.6`, and `v0.1.0-preview.7`; TUI, provider, and coding tools
+remain independently versioned at `v0.1.0-preview.1`, while the distribution
+is `v0.1.0-preview.4`. These later facts qualify the historical implementation
 sequence below rather than rewriting it. Every repository records the exact
 compatible tags, commits, module graph, and protocol versions used to build it.
 
@@ -125,12 +125,15 @@ and signature verification, and known limitations.
 Status is **in progress**. Keyless component and distribution prerelease paths,
 an exact tagged dependency graph, independent installed-process recovery, and
 authenticated distribution-byte startup now exist. The protected attestation
-workflows for Agent preview5, Agent preview6, and distribution preview4 later
-completed and published immutable prereleases, so protected authorization is no
-longer a blocker for those identities. Native PTY/ConPTY interaction, installed
-performance evidence, and the decisive final architecture release workflow
-remain pending. Component tags may be created only in dependency order, and no
-release may be inferred from partial phase evidence.
+workflows for Agent preview5, Agent preview6, Agent preview7, and distribution
+preview4 later completed and published immutable prereleases, so protected
+authorization is no longer a blocker for those identities. Agent preview7 is
+the latest product module, but it does not complete the independently
+versioned TUI, provider, or Coding distribution work or the decisive final
+architecture release. Native PTY/ConPTY interaction, installed performance
+evidence, and that final workflow remain pending. Component tags may be created
+only in dependency order, and no release may be inferred from partial phase
+evidence.
 
 The kernel-local portion of slice 6 now has a reproducible offline command and
 recorded comparison table in

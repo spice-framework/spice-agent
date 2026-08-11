@@ -294,7 +294,7 @@ attested subjects. Fresh proxy and SumDB resolution yields module sum
 `h1:XJKJge+xWP/FLNoL1/rXq8z8tdu/5iEkKfmu1dTgFms=` and go.mod sum
 `h1:pbhYOeNgn4pCIhEmcdbjnFjJijY4ZSLM8ZHxaF2dxz0=` at the tagged commit.
 
-## `v0.1.0-preview.7`: pre-tag current-product candidate
+## `v0.1.0-preview.7`: published current-product module
 
 Preview.7 authorizes the current Agent product after the immutable preview.6
 module. The product base completes the three clean-room public-authoring and
@@ -323,6 +323,10 @@ evidence.
 | Reusable organization workflow | `a56c451168aae0f2b3075782156d204d75fb7f69` |
 | Organization verification | [31512834950](https://github.com/spice-framework/.github/actions/runs/31512834950) |
 | Organization documentation | [31512835246](https://github.com/spice-framework/.github/actions/runs/31512835246) |
+| Tagged candidate | `831fbf259ff3896067a7c6d74d4f402310214805` |
+| Annotated tag object | `251bd3b86c6c731cf2b8f20b57430130d31fde7e` |
+| Successful release run | [31519742953](https://github.com/spice-framework/spice-agent/actions/runs/31519742953) |
+| Published prerelease | [`v0.1.0-preview.7`](https://github.com/spice-framework/spice-agent/releases/tag/v0.1.0-preview.7) |
 
 Both artifact-free policy checks ran from those exact clean authority commits
 with Go 1.26.5, vendored dependencies, `GOWORK=off`, `GOPROXY=off`,
@@ -349,3 +353,17 @@ generated, compatibility, or released-generation bytes. At authorization time
 there is no preview.7 tag, release workflow run, protected deployment, GitHub
 Release, attestation, or publication. The policy match and green authorities
 do not create, approve, tag, attest, or publish a release.
+
+The later annotated tag object
+`251bd3b86c6c731cf2b8f20b57430130d31fde7e` resolves to the exact candidate
+commit `831fbf259ff3896067a7c6d74d4f402310214805`. Unique release workflow run
+[31519742953](https://github.com/spice-framework/spice-agent/actions/runs/31519742953),
+attempt 1, completed candidate validation, deterministic rendering,
+independent verification, keyless attestation, provenance authentication, and
+protected publication. Attestation deployment `5855895060` and publish
+deployment `5855923346` both succeeded. The resulting immutable GitHub
+prerelease, release ID `368758289`, contains exactly `checksums.txt`,
+`provenance.sigstore.json`, release metadata, an SPDX SBOM, and the source
+archive. Fresh proxy and SumDB resolution yields module sum
+`h1:BQS23GwLBm5BLaRqMB9vYu+0dcEnuP6ooG6tzyjDSjY=` and go.mod sum
+`h1:WKNPxU7+jt+aPdL8v1aXovw9D32PwTYq3hE4xPug1YE=` at the tagged commit.

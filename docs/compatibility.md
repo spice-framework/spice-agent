@@ -49,6 +49,14 @@ documentation.
 
 ## Current truthful boundary
 
+- Preview7 is the latest immutable Agent product release. Annotated tag object
+  `251bd3b86c6c731cf2b8f20b57430130d31fde7e` resolves to commit
+  `831fbf259ff3896067a7c6d74d4f402310214805`. Unique release workflow run
+  `31519742953`, attempt 1, and protected attestation and publish deployments
+  `5855895060` and `5855923346` produced immutable prerelease ID `368758289`
+  with the exact five-asset module set. Fresh proxy and SumDB resolution yields
+  module sum `h1:BQS23GwLBm5BLaRqMB9vYu+0dcEnuP6ooG6tzyjDSjY=` and go.mod sum
+  `h1:WKNPxU7+jt+aPdL8v1aXovw9D32PwTYq3hE4xPug1YE=`.
 - Preview5 remains the immutable API baseline. Preview6 annotated tag object
   `ee8436262fb755c4bf4897254650cd6d84e2e9fc` resolves to commit
   `f771caa3b150d87845417c4e26938e2a889441a6`.
@@ -68,7 +76,9 @@ documentation.
   `31454312077` built preview5 and preview6 independently from the public proxy
   and SumDB and crossed their engine and plugin processes in both directions on
   Linux and Windows. The two released-generation blockers are closed; no
-  prebuilt-binary asset matrix is claimed.
+  prebuilt-binary asset matrix is claimed. Publishing preview7 does not change
+  that preview5/preview6 evidence or prove a preview6/preview7
+  cross-generation matrix.
 
 ## What remains before v1
 
