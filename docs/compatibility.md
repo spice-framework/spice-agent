@@ -66,10 +66,10 @@ documentation.
 
 ## What remains before v1
 
-The repository has proven two of three clean-room public extensions and must
-still prove one more, complete the frozen generated-source exercise through
-those isolated builds, and publish and test two supported released generations
-of both protocols. Stable kernel benchmark
+The repository has proven all three clean-room public extensions and completed
+the frozen generated-source exercise through those isolated builds. It must
+still publish and test two supported released generations of both protocols.
+Stable kernel benchmark
 ceilings and the stricter 20% time/10% allocation investigation policy are now
 machine-readable and enforced by `make verify`. See
 [RFC 0010](rfc/0010-api-and-protocol-compatibility.md).

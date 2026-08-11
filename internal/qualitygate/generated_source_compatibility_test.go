@@ -29,8 +29,8 @@ func TestGeneratedSourceCompatibilityManifestFailsClosed(t *testing.T) {
 		{name: "schema five", old: "\"manifest_schema\": 6", replacement: "\"manifest_schema\": 5"},
 		{name: "missing target", old: "      \"module\": \"github.com/spice-framework/spice-agent\",\n      \"module_root\": \".\",", replacement: "      \"module\": \"github.com/spice-framework/spice-agent/changed\",\n      \"module_root\": \".\","},
 		{name: "lost clean room exercise", old: "\"exercised\": true", replacement: "\"exercised\": false"},
-		{name: "wrong clean room count", old: "\"exercised_extensions\": 2", replacement: "\"exercised_extensions\": 1"},
-		{name: "false proof", old: "\"proven\": false", replacement: "\"proven\": true"},
+		{name: "wrong clean room count", old: "\"exercised_extensions\": 3", replacement: "\"exercised_extensions\": 2"},
+		{name: "proof regressed", old: "\"proven\": true", replacement: "\"proven\": false"},
 		{name: "noncanonical", old: "  \"schema\"", replacement: "    \"schema\""},
 	}
 	for _, test := range manifestMutations {

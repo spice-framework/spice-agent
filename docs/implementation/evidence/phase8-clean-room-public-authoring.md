@@ -80,6 +80,32 @@ passed the same operational boundary. Removing the activation import then
 regenerated eight files with zero extension-owned sources and no
 `json.inspect` identity.
 
-Two records are now complete. Phase 8 remains incomplete until one additional
-separately versioned evidence record exists. The public-authoring and
-generated-source v1 blockers therefore remain active.
+## Third proof: deterministic integer statistics tool
+
+The third separately versioned proof is
+`github.com/spice-framework/spice-agent-tool-integer@v0.1.0-preview.1`.
+Annotated tag object `d5e31ede0c8229437862760b30cdeb1421272c04`
+resolves to commit `64c17aaea6cfd22cdb054d9faa0457f1181cfdae`.
+The public Go proxy and SumDB resolve that exact source with module sum
+`h1:4Rj8Q4ZE/lgTj1SRpj5RP0YmzDsE4VoLv2zdQshRa8Y=` and go.mod sum
+`h1:zvQ0tmoLuDyRI0uqQlr0iuJrbP/bDBKI49YMOLODsJ0=`. Its non-draft GitHub
+prerelease records the same immutable identity.
+
+The module contributes one deterministic read-only `integer.stats` tool through
+explicit blank-import auto-configuration. It accepts bounded integer arrays and
+returns exact count, minimum, maximum, sum, and a reduced rational mean without
+floating-point behavior, I/O, time, or hidden capability. Hosted run
+[`31448284962`](https://github.com/spice-framework/spice-agent-tool-integer/actions/runs/31448284962)
+passed from fresh caches on Ubuntu and Windows: committed-vendor offline
+verification plus install, configure, debug, test, package, and deletion
+operations. A separate repository-external consumer fetched only the public
+proxy tag, generated a nine-file schema 6 application, disabled the network,
+and passed generation-current verification, its debugger-style test binary,
+ordinary tests, and trimpath package build. Removing the activation import then
+removed the module and sums, deleted the extension-owned generated source, and
+regenerated an eight-file application with no `integer.stats` identity.
+
+All three separately versioned records are complete. This satisfies the Phase 8
+public-authoring and generated-source clean-room thresholds without claiming
+three human authors. The corresponding two v1 blockers are closed; released
+engine and plugin N/N-1 matrices remain independent blockers.

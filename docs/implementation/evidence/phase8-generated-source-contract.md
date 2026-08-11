@@ -28,10 +28,11 @@ vendor, path-policy, or proof-state drift. Ordinary generation checks continue
 to prove current bytes and the existing acceptance suite proves deterministic
 regeneration plus manual-edit preservation.
 
-This closes the immutable-release and repository-migration portion of the v1
-criterion. It does not claim the public-authoring boundary: the same released
-generator must be exercised by three isolated clean-room extension proofs before
-`clean-room-generated-source-exercise` can be removed. The released
-`spice-agent-tool-text@v0.1.0-preview.1` and
-`spice-agent-tool-json@v0.1.0-preview.1` proofs are the first two exact
-exercises; one remains.
+This closes the immutable-release, repository-migration, and clean-room portions
+of the v1 generated-source criterion. The same released generator was exercised
+by the isolated `spice-agent-tool-text@v0.1.0-preview.1`,
+`spice-agent-tool-json@v0.1.0-preview.1`, and
+`spice-agent-tool-integer@v0.1.0-preview.1` proofs. All three use schema 6,
+committed reproducible vendor trees, public released inputs, and full
+install-to-delete exercises, so `clean-room-generated-source-exercise` is
+removed from the blocker ledger.

@@ -24,7 +24,7 @@
   },
   "generated_source": {
     "manifest": "compatibility/generated-source.json",
-    "status": "immutable-released-migrated-clean-room-partial",
+    "status": "immutable-released-migrated-clean-room-proven",
     "required_contract": "immutable-non-development-generator-and-frozen-ownership-schema"
   },
   "benchmarks": {
@@ -37,13 +37,11 @@
     "manifest": "compatibility/public-authoring.json",
     "proof_model": "clean-room-released-artifacts-only",
     "required_extensions": 3,
-    "status": "sdk-beta-proven-phase8-pending",
-    "proven_extensions": 2
+    "status": "sdk-beta-and-phase8-proven",
+    "proven_extensions": 3
   },
   "security_exceptions": "compatibility/security-exceptions.json",
   "v1_blockers": [
-    "clean-room-public-authoring-proof",
-    "clean-room-generated-source-exercise",
     "released-engine-n-minus-one",
     "released-plugin-n-minus-one"
   ]

@@ -87,7 +87,7 @@ func validateGeneratedSourceCompatibility(root string, value generatedSourceComp
 	want := expectedGeneratedSourceCompatibility()
 	if value.Schema != want.Schema || value.Module != want.Module || value.Status != want.Status ||
 		value.Generator != want.Generator || !equalGeneratedSourceContract(value.Contract, want.Contract) ||
-		!slices.Equal(value.Targets, want.Targets) || value.CleanRoom != want.CleanRoom || value.Proven {
+		!slices.Equal(value.Targets, want.Targets) || value.CleanRoom != want.CleanRoom || !value.Proven {
 		return errors.New("generated source compatibility manifest differs from the reviewed immutable contract")
 	}
 	for _, target := range value.Targets {
@@ -177,7 +177,7 @@ func readGeneratedOwnershipIdentity(root, relative string) (generatedOwnershipId
 func expectedGeneratedSourceCompatibility() generatedSourceCompatibility {
 	return generatedSourceCompatibility{
 		Schema: "spice.agent.generated-source.compatibility/v1alpha1", Module: modulePath,
-		Status: "immutable-released-migrated-clean-room-partial",
+		Status: "immutable-released-migrated-clean-room-proven",
 		Generator: generatedSourceGenerator{
 			Module: generatorModulePath, Version: generatorVersion, Sum: generatorSum, GoModSum: generatorGoModSum,
 			SourceCommit: "bab8bcaf7d0c6311237b34812c681c3ee6a6593b",
@@ -199,7 +199,8 @@ func expectedGeneratedSourceCompatibility() generatedSourceCompatibility {
 			{Module: modulePath + "/experiments/two-worker", ModuleRoot: "experiments/two-worker", Target: "twoworkerproof", Manifest: "experiments/two-worker/.spice/twoworkerproof.manifest.json"},
 		},
 		CleanRoom: generatedSourceCleanRoom{
-			Manifest: publicAuthoringCompatibilityPath, RequiredExtensions: 3, ExercisedExtensions: 2, Exercised: true,
+			Manifest: publicAuthoringCompatibilityPath, RequiredExtensions: 3, ExercisedExtensions: 3, Exercised: true,
 		},
+		Proven: true,
 	}
 }

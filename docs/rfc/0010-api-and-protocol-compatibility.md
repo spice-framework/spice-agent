@@ -97,8 +97,8 @@ Intentional API work updates the current platform digests and appends a reviewed
 break/migration record in the same commit. Historical digests and durable
 history cannot be rewritten.
 
-`v1.0` remains blocked on clean-room public authoring and generated-source
-exercise plus released engine and plugin N/N-1 matrices. Stable kernel
+The clean-room public-authoring and generated-source exercises are complete.
+`v1.0` remains blocked on released engine and plugin N/N-1 matrices. Stable kernel
 benchmark budgets are now a canonical enforced contract: five fixed samples,
 median time/byte/allocation ceilings, 20% time and 10% allocation material
 regression thresholds, and a measured-evidence requirement for budget changes.

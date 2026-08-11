@@ -95,14 +95,24 @@ func validatePublicAuthoringCompatibility(value publicAuthoringCompatibility) er
 			VerificationRun: "https://github.com/spice-framework/spice-agent-tool-json/actions/runs/31446318737",
 			Release:         "https://github.com/spice-framework/spice-agent-tool-json/releases/tag/v0.1.0-preview.1",
 		},
+		{
+			Module: "github.com/spice-framework/spice-agent-tool-integer", Version: "v0.1.0-preview.1",
+			Commit: "64c17aaea6cfd22cdb054d9faa0457f1181cfdae", TagObject: "d5e31ede0c8229437862760b30cdeb1421272c04",
+			Profile:   "compiled-tool-autoconfigure/v1alpha1-preview6",
+			ModuleSum: "h1:4Rj8Q4ZE/lgTj1SRpj5RP0YmzDsE4VoLv2zdQshRa8Y=", GoModSum: "h1:zvQ0tmoLuDyRI0uqQlr0iuJrbP/bDBKI49YMOLODsJ0=",
+			Proxy: "https://proxy.golang.org", SumDB: "sum.golang.org", GeneratedManifestSchema: 6,
+			Platforms: slices.Clone(value.Platforms), VendorOffline: true, Operations: slices.Clone(wantOperations),
+			VerificationRun: "https://github.com/spice-framework/spice-agent-tool-integer/actions/runs/31448284962",
+			Release:         "https://github.com/spice-framework/spice-agent-tool-integer/releases/tag/v0.1.0-preview.1",
+		},
 	}
 	if value.Schema != "spice.agent.public-authoring.compatibility/v1alpha1" || value.Module != modulePath ||
-		value.Status != "sdk-beta-proven-phase8-pending" || value.ProofModel != "clean-room-released-artifacts-only" ||
+		value.Status != "sdk-beta-and-phase8-proven" || value.ProofModel != "clean-room-released-artifacts-only" ||
 		value.RequiredExtensions != 3 || !value.SeparatelyVersionedModules || !value.GeneratedCompositionProof ||
 		value.GeneratedSource != wantGenerator ||
 		value.Isolation != wantIsolation || !slices.Equal(value.Platforms, []string{"linux/amd64", "windows/amd64"}) ||
 		!value.VendorOffline || !slices.Equal(value.RequiredOperations, wantOperations) ||
-		!slices.EqualFunc(value.Evidence, wantEvidence, equalPublicAuthoringEvidence) || value.Proven {
+		!slices.EqualFunc(value.Evidence, wantEvidence, equalPublicAuthoringEvidence) || !value.Proven {
 		return errors.New("public authoring compatibility manifest differs from the reviewed clean-room contract")
 	}
 	return nil

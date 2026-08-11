@@ -289,7 +289,10 @@ func validateCleanRoomEvidenceProgress(
 	if policy.PublicAuthoring.Status != publicAuthoring.Status ||
 		policy.PublicAuthoring.ProvenExtensions != len(publicAuthoring.Evidence) ||
 		generatedSource.CleanRoom.ExercisedExtensions != len(publicAuthoring.Evidence) ||
-		generatedSource.CleanRoom.Exercised != (len(publicAuthoring.Evidence) > 0) {
+		generatedSource.CleanRoom.RequiredExtensions != publicAuthoring.RequiredExtensions ||
+		publicAuthoring.Proven != (len(publicAuthoring.Evidence) == publicAuthoring.RequiredExtensions) ||
+		generatedSource.Proven != publicAuthoring.Proven ||
+		generatedSource.CleanRoom.Exercised != publicAuthoring.Proven {
 		return errors.New("compatibility manifests disagree on clean-room evidence progress")
 	}
 	return nil
@@ -316,21 +319,21 @@ func checkEngineProtocolCompatibility(root string) error {
 }
 
 func validateCompatibilityPolicy(value compatibilityPolicy) error {
-	wantBlockers := []string{"clean-room-public-authoring-proof", "clean-room-generated-source-exercise", "released-engine-n-minus-one", "released-plugin-n-minus-one"}
+	wantBlockers := []string{"released-engine-n-minus-one", "released-plugin-n-minus-one"}
 	wantBenchmarks := benchmarkPolicy{
 		Manifest: benchmarkBudgetPath, Status: "stable-enforced", Aggregation: "median-of-five",
 		BudgetChanges: "measured-evidence-and-reviewed-rationale",
 	}
 	wantPublicAuthoring := publicAuthoringPolicy{
 		Manifest: publicAuthoringCompatibilityPath, ProofModel: "clean-room-released-artifacts-only", RequiredExtensions: 3,
-		Status: "sdk-beta-proven-phase8-pending", ProvenExtensions: 2,
+		Status: "sdk-beta-and-phase8-proven", ProvenExtensions: 3,
 	}
 	if value.Schema != "spice.agent.compatibility.policy/v1alpha1" || value.Module != modulePath || value.Status != "pre-v1-enforced-not-stable" ||
 		value.GoAPI.PreV1DeprecationReleases != 1 || value.GoAPI.PreV1DeprecationDays != 30 ||
 		value.GoAPI.V1DeprecationMinorReleases != 2 || value.GoAPI.V1DeprecationDays != 180 || value.GoAPI.V1Removal != "next-module-major" ||
 		value.Protocols.SupportedReleasedGenerationsRequired != 2 || value.Protocols.SupportMinorReleases != 2 || value.Protocols.SupportDays != 180 ||
 		value.DurableState.AutomaticMigration || value.DurableState.ReinterpretExistingVersion ||
-		value.GeneratedSource.Manifest != generatedSourceCompatibilityPath || value.GeneratedSource.Status != "immutable-released-migrated-clean-room-partial" ||
+		value.GeneratedSource.Manifest != generatedSourceCompatibilityPath || value.GeneratedSource.Status != "immutable-released-migrated-clean-room-proven" ||
 		value.GeneratedSource.RequiredContract != "immutable-non-development-generator-and-frozen-ownership-schema" ||
 		value.Benchmarks != wantBenchmarks ||
 		value.PublicAuthoring != wantPublicAuthoring ||
