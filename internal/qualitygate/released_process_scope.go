@@ -21,8 +21,9 @@ func newReleasedProcessScope(kind string) (*releasedProcessScope, error) {
 	if kind != "engine" && kind != "plugin" {
 		return nil, errors.New("released process kind is invalid")
 	}
-	base := ""
-	if runtime.GOOS == "windows" {
+	var base string
+	switch runtime.GOOS {
+	case "windows":
 		cache, err := os.UserCacheDir()
 		if err != nil {
 			return nil, fmt.Errorf("resolve released process cache: %w", err)
@@ -34,6 +35,10 @@ func newReleasedProcessScope(kind string) (*releasedProcessScope, error) {
 		if err = os.Chmod(base, 0o700); err != nil { // #nosec G302 -- a private directory requires owner execute/search permission.
 			return nil, fmt.Errorf("protect released process cache: %w", err)
 		}
+	case "darwin":
+		base = "/private/tmp"
+	default:
+		base = "/tmp"
 	}
 	root, err := os.MkdirTemp(base, "spice-agent-rg-"+kind+"-")
 	if err != nil {
