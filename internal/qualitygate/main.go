@@ -22,14 +22,15 @@ import (
 )
 
 const (
-	requiredGoVersion         = "go1.26.5"
-	modulePath                = "github.com/spice-framework/spice-agent"
-	minimumCoverage           = 85.0
-	minimumExperimentCoverage = 85.0
-	releaseWorkflowCommit     = "f29b7ce16f8d220e87bfae54469057d001944b7b"
-	verifyWorkflowCommit      = "0534fe1247f892b287f624b7abb6f2347765ab22"
-	standardGateTimeout       = 15 * time.Minute
-	verifyGateTimeout         = 30 * time.Minute
+	requiredGoVersion            = "go1.26.5"
+	modulePath                   = "github.com/spice-framework/spice-agent"
+	minimumCoverage              = 85.0
+	minimumExperimentCoverage    = 85.0
+	releaseWorkflowCommit        = "f29b7ce16f8d220e87bfae54469057d001944b7b"
+	verifyWorkflowCommit         = "0534fe1247f892b287f624b7abb6f2347765ab22"
+	standardGateTimeout          = 15 * time.Minute
+	verifyGateTimeout            = 30 * time.Minute
+	releasedCompatibilityTimeout = 20 * time.Minute
 )
 
 func main() {
@@ -37,7 +38,7 @@ func main() {
 }
 
 func execute() int {
-	mode := flag.String("mode", "verify", "verification mode: tools-bootstrap, proto, api-baseline, fast, check, coverage, benchmark, or verify")
+	mode := flag.String("mode", "verify", "verification mode: tools-bootstrap, proto, api-baseline, released-compatibility, fast, check, coverage, benchmark, or verify")
 	flag.Parse()
 	ctx, cancel := context.WithTimeout(context.Background(), gateTimeout(*mode))
 	defer cancel()
@@ -53,6 +54,9 @@ func execute() int {
 }
 
 func gateTimeout(mode string) time.Duration {
+	if mode == "released-compatibility" {
+		return releasedCompatibilityTimeout
+	}
 	if mode == "verify" {
 		return verifyGateTimeout
 	}
@@ -68,15 +72,48 @@ func run(ctx context.Context, root, mode string) error {
 	if runtime.Version() != requiredGoVersion {
 		return fmt.Errorf("go version is %s; require exactly %s", runtime.Version(), requiredGoVersion)
 	}
-	if networkAllowed(mode) {
-		return bootstrapDependencies(ctx, root, networkCommand)
+	handled, err := runSpecialMode(ctx, root, mode)
+	if handled || err != nil {
+		return err
 	}
-	if mode == "proto" {
-		return generateProtocol(ctx, root, root)
+	steps, err := repositoryVerificationSteps(ctx, root, mode)
+	if err != nil {
+		return err
 	}
-	if mode == "api-baseline" {
-		return renderCurrentAPIBaseline(ctx, root)
+	return runVerificationSteps(steps)
+}
+
+func runSpecialMode(ctx context.Context, root, mode string) (bool, error) {
+	switch mode {
+	case "released-compatibility":
+		return true, runReleasedCompatibility(ctx, root)
+	case "tools-bootstrap":
+		return true, bootstrapDependencies(ctx, root, networkCommand)
+	case "proto":
+		return true, generateProtocol(ctx, root, root)
+	case "api-baseline":
+		return true, renderCurrentAPIBaseline(ctx, root)
+	default:
+		return false, nil
 	}
+}
+
+func runReleasedCompatibility(ctx context.Context, root string) error {
+	if err := checkCompatibilityManifests(root); err != nil {
+		return err
+	}
+	compatibility, _, err := readCanonicalJSON[releasedGenerationCompatibility](root, releasedGenerationCompatibilityPath)
+	if err != nil {
+		return err
+	}
+	runner, err := newReleasedCompatibilityRunner(root, compatibility, os.Stdout)
+	if err != nil {
+		return err
+	}
+	return runner.Run(ctx)
+}
+
+func repositoryVerificationSteps(ctx context.Context, root, mode string) ([]step, error) {
 	productEnvironment := map[string]string{
 		"GOFLAGS":     "-mod=vendor",
 		"GOPROXY":     "off",
@@ -132,17 +169,16 @@ func run(ctx context.Context, root, mode string) error {
 		twoWorkerExperiment, compactionExperiment, gitWorkflowExperiment, telemetryExperiment,
 		planningExperiment,
 	}
-	if mode == "coverage" {
-		steps = []step{identity, apiCompatibility, diffHygiene, {"coverage", func() error {
+	switch mode {
+	case "coverage":
+		return []step{identity, apiCompatibility, diffHygiene, {"coverage", func() error {
 			return coverage(ctx, root, productEnvironment)
-		}}}
-	}
-	if mode == "benchmark" {
-		steps = []step{identity, apiCompatibility, diffHygiene, {"kernel runtime benchmarks", func() error {
+		}}}, nil
+	case "benchmark":
+		return []step{identity, apiCompatibility, diffHygiene, {"kernel runtime benchmarks", func() error {
 			return kernelRuntimeBenchmarks(ctx, root, productEnvironment)
-		}}}
-	}
-	if mode == "check" || mode == "verify" {
+		}}}, nil
+	case "check", "verify":
 		steps = []step{
 			identity,
 			apiCompatibility,
@@ -162,32 +198,37 @@ func run(ctx context.Context, root, mode string) error {
 			planningExperiment,
 			acceptanceScope,
 		}
+	case "fast":
+		return steps, nil
+	default:
+		return nil, fmt.Errorf("unknown mode %q", mode)
 	}
-	if mode == "verify" {
-		steps = append(
-			steps,
-			step{"lint and nil safety", func() error { return lint(ctx, root) }},
-			step{"security", func() error { return security(ctx, root) }},
-			step{"race tests", func() error {
-				return command(ctx, root, productEnvironment, "go", "test", "-race", "-shuffle=on", "-count=1", "./...")
-			}},
-			step{"acceptance endpoint scope race", func() error {
-				return command(
-					ctx, root, productEnvironment,
-					"go", "test", "-race", "-tags=spice_acceptance", "-shuffle=on", "-count=1", "./daemon/endpoint",
-				)
-			}},
-			step{"kernel runtime budgets", func() error {
-				return kernelRuntimeBenchmarks(ctx, root, productEnvironment)
-			}},
-			step{"fuzz smoke", func() error { return fuzz(ctx, root, productEnvironment) }},
-			step{"coverage", func() error { return coverage(ctx, root, productEnvironment) }},
-			step{"offline vendor", func() error { return offline(ctx, root) }},
-		)
+	if mode != "verify" {
+		return steps, nil
 	}
-	if mode != "fast" && mode != "check" && mode != "coverage" && mode != "benchmark" && mode != "verify" {
-		return fmt.Errorf("unknown mode %q", mode)
-	}
+	return append(
+		steps,
+		step{"lint and nil safety", func() error { return lint(ctx, root) }},
+		step{"security", func() error { return security(ctx, root) }},
+		step{"race tests", func() error {
+			return command(ctx, root, productEnvironment, "go", "test", "-race", "-shuffle=on", "-count=1", "./...")
+		}},
+		step{"acceptance endpoint scope race", func() error {
+			return command(
+				ctx, root, productEnvironment,
+				"go", "test", "-race", "-tags=spice_acceptance", "-shuffle=on", "-count=1", "./daemon/endpoint",
+			)
+		}},
+		step{"kernel runtime budgets", func() error {
+			return kernelRuntimeBenchmarks(ctx, root, productEnvironment)
+		}},
+		step{"fuzz smoke", func() error { return fuzz(ctx, root, productEnvironment) }},
+		step{"coverage", func() error { return coverage(ctx, root, productEnvironment) }},
+		step{"offline vendor", func() error { return offline(ctx, root) }},
+	), nil
+}
+
+func runVerificationSteps(steps []step) error {
 	for _, current := range steps {
 		started := time.Now()
 		fmt.Printf("==> %s\n", current.name)
@@ -707,7 +748,10 @@ func checkRepositoryPortability(root string) error {
 	if err != nil {
 		return fmt.Errorf("read CI workflow: %w", err)
 	}
-	return checkCIWorkflow(string(workflow))
+	if err = checkCIWorkflow(string(workflow)); err != nil {
+		return err
+	}
+	return (releasedCompatibilityWorkflow{}).Validate(root)
 }
 
 func checkCIWorkflow(workflow string) error {

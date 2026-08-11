@@ -87,6 +87,11 @@ func TestCompatibilityManifestsFailClosed(t *testing.T) {
 		{name: "Go API approved break rewritten", path: goAPICompatibilityPath, old: "\"kind\": \"interface-signature\"", replacement: "\"kind\": \"addition\""},
 		{name: "durable history removed", path: durableCompatibilityPath, old: "\"status\": \"rejected-missing-workspace-authority\"", replacement: "\"status\": \"rejected\""},
 		{name: "plugin coupled to engine", path: pluginProtocolCompatibilityPath, old: "\"versioning\": \"independent-from-engine\"", replacement: "\"versioning\": \"engine-coupled\""},
+		{name: "released generation version drift", path: releasedGenerationCompatibilityPath, old: "\"version\": \"v0.1.0-preview.5\"", replacement: "\"version\": \"v0.1.0-preview.4\""},
+		{name: "released generation sum drift", path: releasedGenerationCompatibilityPath, old: "h1:XJKJge+xWP/FLNoL1/rXq8z8tdu/5iEkKfmu1dTgFms=", replacement: "h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+		{name: "released generation direction drift", path: releasedGenerationCompatibilityPath, old: "preview5-client-to-preview6-server", replacement: "preview5-client-to-preview5-server"},
+		{name: "released generation source drift", path: releasedGenerationCompatibilityPath, old: "ac1728b36cca211f853e4a9720a9ff46f39b00ca6834002a225dfb4ac6f22518", replacement: strings.Repeat("a", 64)},
+		{name: "released generation false proof", path: releasedGenerationCompatibilityPath, old: "\"proven\": false", replacement: "\"proven\": true"},
 		{name: "security downgrade", path: securityExceptionsPath, old: "\"active\": []", replacement: "\"active\": [{\"id\": \"test\", \"downgrade\": true}]"},
 	}
 	for _, test := range tests {
@@ -123,6 +128,18 @@ func copyCompatibilityFixture(t *testing.T, repository, root string) {
 		writeGateFile(t, root, relative, string(content))
 	}
 	copyGeneratedSourceInputs(t, repository, root)
+	peerSource := filepath.Join(repository, "internal", "releasedcompatibility", "testdata", "peer")
+	entries, err := os.ReadDir(peerSource)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		content, readErr := os.ReadFile(filepath.Join(peerSource, entry.Name()))
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		writeGateFile(t, root, filepath.ToSlash(filepath.Join("internal", "releasedcompatibility", "testdata", "peer", entry.Name())), string(content))
+	}
 	for _, relative := range []string{
 		"docs/migrations/v0.1.0-preview.4-to-v0.1.0-preview.5.md",
 		"docs/migrations/v0.1.0-preview.5-to-v0.1.0-preview.6.md",

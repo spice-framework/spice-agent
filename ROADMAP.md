@@ -17,7 +17,9 @@ protocol, generated-source, and security-exception policy. The immutable
 Toolchain preview2 generator contract is released and every owned Agent target
 is migrated to schema 6. All three clean-room public-authoring and
 generated-source exercises are released. This does not freeze the APIs or claim
-v1: released N/N-1 engine and plugin protocol matrices remain outstanding.
+The preview5/preview6 released-generation runner is locally green on Windows;
+its protocol blockers remain until the exact candidate is hosted-green on both
+Linux and Windows.
 Stable kernel benchmark budgets and their change policy are mandatory in the
 full verifier.
 See the canonical ledger.

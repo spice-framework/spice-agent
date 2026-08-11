@@ -44,11 +44,23 @@ telemetry runs `FuzzTranslateEnvelope`, and planning runs `FuzzParsePlan`, each
 for 100 deterministic executions.
 
 A fresh machine runs `make tools-bootstrap` once. This is the sole
-network-authorized quality-gate mode. It copies each `go.mod`/`go.sum` pair to a
+network-authorized ordinary dependency-bootstrap mode. It copies each `go.mod`/`go.sum` pair to a
 temporary modfile, downloads the exact graph from the public Go proxy with
 credentials and private-module environment removed, and verifies that no
 repository byte changed. It does not tidy, vendor, generate, or install into the
 repository.
+
+`make verify-released-compatibility` is the separate, explicit
+network-authorized release-evidence command. It does not mutate the repository
+or reuse its module graph. It creates one fresh module and build cache per
+immutable Agent generation, verifies preview5 and preview6 version, tag,
+commit, module sum, and go.mod sum through the public proxy and SumDB, then
+rebuilds the peer vendor-offline and the official plugin fixture offline from
+the verified module cache. It crosses old-client/new-server and
+new-client/old-server over real current-user local IPC. The dedicated workflow
+runs that command independently on Linux and Windows without a dependency
+cache. Ordinary `fast`, `check`, and `verify` modes remain network-disabled and
+validate the canonical manifest, peer-source digest, and workflow topology.
 
 `make proto` regenerates committed `common/v1`, `engine/v1`, and `plugin/v1` Go from local
 tool directives. `make check` runs Buf lint, compares schemas with the committed
@@ -74,6 +86,12 @@ previous-semantics and current-semantics servers over the public local IPC,
 gRPC client, and server boundaries. The decisive process matrix runs on Linux
 and Windows, checks retry/ambiguity/cancellation/cleanup behavior, and is
 explicitly not evidence of released-binary N/N-1 compatibility.
+
+The released-generation runner is a distinct stronger boundary: it compiles
+two independent processes from immutable public preview5 and preview6 sources,
+not from the checked-out tree. This proves released-generation compatibility;
+it deliberately does not claim that the module release publishes prebuilt
+daemon or plugin executables.
 
 The independent `plugin/v1/compatibility.json` manifest locks the plugin/v1
 breadth claim. Ordinary hosted

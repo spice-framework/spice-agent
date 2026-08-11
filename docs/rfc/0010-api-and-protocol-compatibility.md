@@ -62,6 +62,14 @@ tested through old-client/new-server and new-client/old-server combinations.
 The repository does not manufacture a generation or call two source builds a
 released matrix.
 
+Preview5 and preview6 now supply those immutable public module generations. A
+dedicated candidate runner downloads each through the public proxy and SumDB
+into separate fresh caches, builds the same reviewed peer against each release,
+and crosses both engine and plugin process directions. This is a
+released-generation proof, not a claim that the module release publishes
+prebuilt executable assets. The policy blockers remain until the exact runner
+is hosted-green on Linux and Windows and its evidence is recorded canonically.
+
 ### Durable identities
 
 Version identifiers are semantic authority, not labels which may be reused.

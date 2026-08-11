@@ -113,3 +113,9 @@ released daemon binary is invoked, so the repository makes no released-binary
 N/N-1 claim. The plugin protocol has a separate lifecycle, framing, and
 compatibility policy. This slice does not add a second released plugin-protocol
 generation, stabilize a Go API, or claim native Python Host containment.
+
+The later preview5/preview6 public-module generation proof is deliberately
+separate and recorded in
+[`phase8-released-generation-compatibility.md`](phase8-released-generation-compatibility.md).
+It does not rewrite this source-built semantic history or invent prebuilt
+binary assets.

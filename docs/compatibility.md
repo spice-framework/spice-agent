@@ -12,6 +12,7 @@ reviewable; it is not a stability promise.
 | durable state identities and hard cuts | `compatibility/durable.json` |
 | generated-source ownership and generator identity | `compatibility/generated-source.json` |
 | clean-room public authoring | `compatibility/public-authoring.json` |
+| released engine/plugin generations | `compatibility/released-generation.json` |
 | security exceptions | `compatibility/security-exceptions.json` |
 | engine protocol | `engine/v1/compatibility.json` |
 | plugin protocol | `plugin/v1/compatibility.json` |
@@ -61,14 +62,20 @@ documentation.
 - Fresh proxy and SumDB resolution yields module sum
   `h1:XJKJge+xWP/FLNoL1/rXq8z8tdu/5iEkKfmu1dTgFms=` and go.mod sum
   `h1:pbhYOeNgn4pCIhEmcdbjnFjJijY4ZSLM8ZHxaF2dxz0=`.
-- Engine 1.2/1.3 and plugin 1.0 evidence is source-built. No released-binary
-  N/N-1 matrix is claimed.
+- Engine 1.2/1.3 and plugin 1.0 semantic evidence remains source-built. A
+  separate candidate runner now builds preview5 and preview6 independently
+  from the public proxy and SumDB, crosses their engine and plugin processes in
+  both directions, and retains the honest distinction that no prebuilt-binary
+  asset matrix is claimed. Its v1 blockers remain until the exact runner is
+  hosted-green on Linux and Windows.
 
 ## What remains before v1
 
 The repository has proven all three clean-room public extensions and completed
-the frozen generated-source exercise through those isolated builds. It must
-still publish and test two supported released generations of both protocols.
+the frozen generated-source exercise through those isolated builds. Preview5
+and preview6 are the two immutable supported generations; their candidate
+cross-generation runner is locally green on Windows and still requires hosted
+Linux and Windows evidence before the protocol blockers close.
 Stable kernel benchmark
 ceilings and the stricter 20% time/10% allocation investigation policy are now
 machine-readable and enforced by `make verify`. See

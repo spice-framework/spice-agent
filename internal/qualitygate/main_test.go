@@ -29,6 +29,9 @@ func TestVerificationTimeoutIsModeAware(t *testing.T) {
 	if timeout := gateTimeout("verify"); timeout != 30*time.Minute {
 		t.Fatalf("verify timeout = %s", timeout)
 	}
+	if timeout := gateTimeout("released-compatibility"); timeout != 20*time.Minute {
+		t.Fatalf("released compatibility timeout = %s", timeout)
+	}
 	for _, mode := range []string{"tools-bootstrap", "proto", "fast", "check", "coverage", "benchmark", "unknown"} {
 		if timeout := gateTimeout(mode); timeout != 15*time.Minute {
 			t.Fatalf("%s timeout = %s", mode, timeout)
@@ -209,6 +212,7 @@ func TestRepositoryPortabilityRequiresLFAndExplicitToolBootstrap(t *testing.T) {
 	root := t.TempDir()
 	writeGateFile(t, root, ".gitattributes", "* text=auto eol=lf\n*.pb -text\n*.png -text\n")
 	writeGateFile(t, root, ".github/workflows/ci.yml", validCIWorkflow())
+	writeGateFile(t, root, ".github/workflows/released-compatibility.yml", (releasedCompatibilityWorkflow{}).Expected())
 	if err := checkRepositoryPortability(root); err != nil {
 		t.Fatal(err)
 	}

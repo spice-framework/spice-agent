@@ -13,13 +13,14 @@ import (
 )
 
 const (
-	compatibilityPolicyPath          = "compatibility/policy.json"
-	durableCompatibilityPath         = "compatibility/durable.json"
-	engineProtocolCompatibilityPath  = "engine/v1/compatibility.json"
-	generatedSourceCompatibilityPath = "compatibility/generated-source.json"
-	pluginProtocolCompatibilityPath  = "plugin/v1/compatibility.json"
-	publicAuthoringCompatibilityPath = "compatibility/public-authoring.json"
-	securityExceptionsPath           = "compatibility/security-exceptions.json"
+	compatibilityPolicyPath             = "compatibility/policy.json"
+	durableCompatibilityPath            = "compatibility/durable.json"
+	engineProtocolCompatibilityPath     = "engine/v1/compatibility.json"
+	generatedSourceCompatibilityPath    = "compatibility/generated-source.json"
+	pluginProtocolCompatibilityPath     = "plugin/v1/compatibility.json"
+	publicAuthoringCompatibilityPath    = "compatibility/public-authoring.json"
+	releasedGenerationCompatibilityPath = "compatibility/released-generation.json"
+	securityExceptionsPath              = "compatibility/security-exceptions.json"
 )
 
 type compatibilityPolicy struct {
@@ -87,6 +88,7 @@ type engineProtocolCompatibility struct {
 	InitializationModes         []protocolInitializationMode     `json:"initialization_modes"`
 	SourceBuiltMatrix           []protocolSourceBuiltMatrixEntry `json:"source_built_matrix"`
 	RequiredCases               []string                         `json:"required_cases"`
+	ReleasedGenerationMatrix    releasedGenerationReference      `json:"released_generation_matrix"`
 	ReleasedBinaryMatrix        releasedBinaryMatrix             `json:"released_binary_matrix"`
 	History                     []engineProtocolHistory          `json:"history"`
 	PluginCompatibilityManifest string                           `json:"plugin_compatibility_manifest"`
@@ -127,16 +129,17 @@ type engineProtocolHistory struct {
 }
 
 type pluginProtocolCompatibility struct {
-	Schema               string                     `json:"schema"`
-	Protocol             string                     `json:"protocol"`
-	ProductionRange      protocolCompatibilityRange `json:"production_range"`
-	Versioning           string                     `json:"versioning"`
-	Transcripts          []pluginTranscript         `json:"transcripts"`
-	SourceBuiltMatrix    pluginSourceBuiltMatrix    `json:"source_built_matrix"`
-	History              []pluginProtocolHistory    `json:"history"`
-	ProductionHostLaunch pluginProductionHostLaunch `json:"production_host_launch"`
-	ReleasedBinaryMatrix releasedBinaryMatrix       `json:"released_binary_matrix"`
-	V1Stable             bool                       `json:"v1_stable"`
+	Schema                   string                      `json:"schema"`
+	Protocol                 string                      `json:"protocol"`
+	ProductionRange          protocolCompatibilityRange  `json:"production_range"`
+	Versioning               string                      `json:"versioning"`
+	Transcripts              []pluginTranscript          `json:"transcripts"`
+	SourceBuiltMatrix        pluginSourceBuiltMatrix     `json:"source_built_matrix"`
+	History                  []pluginProtocolHistory     `json:"history"`
+	ProductionHostLaunch     pluginProductionHostLaunch  `json:"production_host_launch"`
+	ReleasedGenerationMatrix releasedGenerationReference `json:"released_generation_matrix"`
+	ReleasedBinaryMatrix     releasedBinaryMatrix        `json:"released_binary_matrix"`
+	V1Stable                 bool                        `json:"v1_stable"`
 }
 
 type pluginTranscript struct {
@@ -216,69 +219,11 @@ type securityException struct {
 }
 
 func checkCompatibilityManifests(root string) error {
-	policy, _, err := readCanonicalJSON[compatibilityPolicy](root, compatibilityPolicyPath)
+	manifests, err := newCompatibilityManifestSet(root)
 	if err != nil {
 		return err
 	}
-	engine, _, err := readCanonicalJSON[engineProtocolCompatibility](root, engineProtocolCompatibilityPath)
-	if err != nil {
-		return err
-	}
-	plugin, _, err := readCanonicalJSON[pluginProtocolCompatibility](root, pluginProtocolCompatibilityPath)
-	if err != nil {
-		return err
-	}
-	durable, _, err := readCanonicalJSON[durableCompatibility](root, durableCompatibilityPath)
-	if err != nil {
-		return err
-	}
-	security, _, err := readCanonicalJSON[securityExceptions](root, securityExceptionsPath)
-	if err != nil {
-		return err
-	}
-	publicAuthoring, _, err := readCanonicalJSON[publicAuthoringCompatibility](root, publicAuthoringCompatibilityPath)
-	if err != nil {
-		return err
-	}
-	generatedSource, _, err := readCanonicalJSON[generatedSourceCompatibility](root, generatedSourceCompatibilityPath)
-	if err != nil {
-		return err
-	}
-	goAPI, _, err := readCanonicalJSON[goAPICompatibility](root, goAPICompatibilityPath)
-	if err != nil {
-		return err
-	}
-	if err := validateCompatibilityPolicy(policy); err != nil {
-		return err
-	}
-	if err := validateEngineProtocolCompatibility(engine); err != nil {
-		return err
-	}
-	if err := validatePluginProtocolCompatibility(plugin); err != nil {
-		return err
-	}
-	if err := validateDurableCompatibility(durable); err != nil {
-		return err
-	}
-	if err := validateSecurityExceptions(security); err != nil {
-		return err
-	}
-	if err := validatePublicAuthoringCompatibility(publicAuthoring); err != nil {
-		return err
-	}
-	if err := validateGeneratedSourceCompatibility(root, generatedSource); err != nil {
-		return err
-	}
-	if err := validateGoAPICompatibility(goAPI, root); err != nil {
-		return err
-	}
-	if _, err := loadKernelRuntimeBenchmarkBudgets(root); err != nil {
-		return err
-	}
-	if !compatibilityReferencesAreCanonical(policy, engine) {
-		return errors.New("compatibility manifests do not cross-reference the canonical contracts")
-	}
-	return validateCleanRoomEvidenceProgress(policy, publicAuthoring, generatedSource)
+	return manifests.Validate(root)
 }
 
 func validateCleanRoomEvidenceProgress(
@@ -298,7 +243,11 @@ func validateCleanRoomEvidenceProgress(
 	return nil
 }
 
-func compatibilityReferencesAreCanonical(policy compatibilityPolicy, engine engineProtocolCompatibility) bool {
+func compatibilityReferencesAreCanonical(
+	policy compatibilityPolicy,
+	engine engineProtocolCompatibility,
+	plugin pluginProtocolCompatibility,
+) bool {
 	return policy.GoAPI.Manifest == goAPICompatibilityPath &&
 		policy.Protocols.Engine == engineProtocolCompatibilityPath &&
 		policy.Protocols.Plugin == pluginProtocolCompatibilityPath &&
@@ -307,7 +256,9 @@ func compatibilityReferencesAreCanonical(policy compatibilityPolicy, engine engi
 		policy.Benchmarks.Manifest == benchmarkBudgetPath &&
 		policy.PublicAuthoring.Manifest == publicAuthoringCompatibilityPath &&
 		policy.SecurityExceptions == securityExceptionsPath &&
-		engine.PluginCompatibilityManifest == pluginProtocolCompatibilityPath
+		engine.PluginCompatibilityManifest == pluginProtocolCompatibilityPath &&
+		engine.ReleasedGenerationMatrix == (releasedGenerationReference{Manifest: releasedGenerationCompatibilityPath}) &&
+		plugin.ReleasedGenerationMatrix == (releasedGenerationReference{Manifest: releasedGenerationCompatibilityPath})
 }
 
 func checkEngineProtocolCompatibility(root string) error {
@@ -347,7 +298,7 @@ func validateEngineProtocolCompatibility(value engineProtocolCompatibility) erro
 	want := expectedEngineProtocolCompatibility()
 	if value.Schema != want.Schema || value.Protocol != want.Protocol || value.ProductionRange != want.ProductionRange ||
 		!slices.Equal(value.InitializationModes, want.InitializationModes) || !slices.EqualFunc(value.SourceBuiltMatrix, want.SourceBuiltMatrix, equalSourceBuiltMatrix) ||
-		!slices.Equal(value.RequiredCases, want.RequiredCases) || value.ReleasedBinaryMatrix != want.ReleasedBinaryMatrix ||
+		!slices.Equal(value.RequiredCases, want.RequiredCases) || value.ReleasedGenerationMatrix != want.ReleasedGenerationMatrix || value.ReleasedBinaryMatrix != want.ReleasedBinaryMatrix ||
 		value.PluginCompatibilityManifest != want.PluginCompatibilityManifest || value.V1Stable || len(value.History) < len(want.History) ||
 		!slices.Equal(value.History[:len(want.History)], want.History) {
 		return errors.New("engine protocol compatibility manifest differs from the reviewed contract")
@@ -362,7 +313,7 @@ func equalSourceBuiltMatrix(left, right protocolSourceBuiltMatrixEntry) bool {
 func expectedEngineProtocolCompatibility() engineProtocolCompatibility {
 	platforms := []string{"linux/amd64", "windows/amd64"}
 	return engineProtocolCompatibility{
-		Schema: "spice.agent.engine.compatibility/v1alpha2", Protocol: "spice.agent.engine.v1",
+		Schema: "spice.agent.engine.compatibility/v1alpha3", Protocol: "spice.agent.engine.v1",
 		ProductionRange: protocolCompatibilityRange{Minimum: "1.0.0", Maximum: "1.3.0"},
 		InitializationModes: []protocolInitializationMode{
 			{Name: "legacy", Minimum: "1.0.0", Maximum: "1.2.0", AttemptID: "forbidden", AmbiguousOutcome: "non-retryable"},
@@ -372,8 +323,9 @@ func expectedEngineProtocolCompatibility() engineProtocolCompatibility {
 			{Peer: "previous-semantics", ServerRange: "1.0.0-1.2.0", ClientMode: "legacy", Platforms: slices.Clone(platforms)},
 			{Peer: "current", ServerRange: "1.0.0-1.3.0", ClientMode: "exact-replay", Platforms: slices.Clone(platforms)},
 		},
-		RequiredCases:        []string{"exact-legacy-1.2", "adaptive-current-1.3", "explicit-proven-downgrade", "authentication-definitive", "current-exact-replay-after-response-loss", "legacy-ambiguity-never-retries", "cancellation-conflict-exact-recovery", "process-cleanup"},
-		ReleasedBinaryMatrix: releasedBinaryMatrix{Claim: "not-claimed"},
+		RequiredCases:            []string{"exact-legacy-1.2", "adaptive-current-1.3", "explicit-proven-downgrade", "authentication-definitive", "current-exact-replay-after-response-loss", "legacy-ambiguity-never-retries", "cancellation-conflict-exact-recovery", "process-cleanup"},
+		ReleasedGenerationMatrix: releasedGenerationReference{Manifest: releasedGenerationCompatibilityPath},
+		ReleasedBinaryMatrix:     releasedBinaryMatrix{Claim: "not-claimed"},
 		History: []engineProtocolHistory{
 			{Version: "1.2.0", Profile: "legacy", Evidence: "source-built-only"},
 			{Version: "1.3.0", Profile: "exact-replay", Evidence: "source-built-current"},
@@ -383,13 +335,14 @@ func expectedEngineProtocolCompatibility() engineProtocolCompatibility {
 }
 
 func validatePluginProtocolCompatibility(value pluginProtocolCompatibility) error {
-	if value.Schema != "spice.agent.plugin.compatibility/v1alpha1" || value.Protocol != "spice.agent.plugin.v1" ||
+	if value.Schema != "spice.agent.plugin.compatibility/v1alpha2" || value.Protocol != "spice.agent.plugin.v1" ||
 		value.ProductionRange != (protocolCompatibilityRange{Minimum: "1.0.0", Maximum: "1.0.0"}) || value.Versioning != "independent-from-engine" ||
 		!slices.Equal(value.Transcripts, []pluginTranscript{{Version: 1, Domain: "spice-agent/plugin/v1/initialize", Protocol: "1.0.0"}}) ||
 		value.SourceBuiltMatrix.Bridge != "real-process-plugin-v1-to-immutable-run-leased-tool-plan" || !slices.Equal(value.SourceBuiltMatrix.EngineModes, []string{"1.2.0", "1.3.0"}) ||
 		!slices.Equal(value.SourceBuiltMatrix.Languages, []string{"go", "python"}) || !sortedUnique(value.SourceBuiltMatrix.RequiredCases) ||
 		len(value.History) < 1 || value.History[0] != (pluginProtocolHistory{Version: "1.0.0", Transcript: 1, Evidence: "source-built-go-and-python"}) ||
 		value.ProductionHostLaunch != (pluginProductionHostLaunch{Go: "separately-proven", Python: "future-pinned-native-artifact-required"}) ||
+		value.ReleasedGenerationMatrix != (releasedGenerationReference{Manifest: releasedGenerationCompatibilityPath}) ||
 		value.ReleasedBinaryMatrix != (releasedBinaryMatrix{Claim: "not-claimed"}) || value.V1Stable {
 		return errors.New("plugin protocol compatibility manifest differs from the reviewed independent contract")
 	}
@@ -484,5 +437,5 @@ func sortedUnique(values []string) bool {
 }
 
 func compatibilityManifestPaths() []string {
-	return []string{compatibilityPolicyPath, durableCompatibilityPath, generatedSourceCompatibilityPath, goAPICompatibilityPath, benchmarkBudgetPath, publicAuthoringCompatibilityPath, securityExceptionsPath, engineProtocolCompatibilityPath, pluginProtocolCompatibilityPath}
+	return []string{compatibilityPolicyPath, durableCompatibilityPath, generatedSourceCompatibilityPath, goAPICompatibilityPath, benchmarkBudgetPath, publicAuthoringCompatibilityPath, releasedGenerationCompatibilityPath, securityExceptionsPath, engineProtocolCompatibilityPath, pluginProtocolCompatibilityPath}
 }

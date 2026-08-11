@@ -1,5 +1,5 @@
 {
-  "schema": "spice.agent.plugin.compatibility/v1alpha1",
+  "schema": "spice.agent.plugin.compatibility/v1alpha2",
   "protocol": "spice.agent.plugin.v1",
   "production_range": {
     "minimum": "1.0.0",
@@ -41,6 +41,10 @@
   "production_host_launch": {
     "go": "separately-proven",
     "python": "future-pinned-native-artifact-required"
+  },
+  "released_generation_matrix": {
+    "manifest": "compatibility/released-generation.json",
+    "proven": false
   },
   "released_binary_matrix": {
     "proven": false,

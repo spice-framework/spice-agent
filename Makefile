@@ -1,6 +1,6 @@
 PYTHON_FIXTURE_DIR := testdata/runtimeplugin/python
 
-.PHONY: tools-bootstrap proto fast check coverage benchmark verify verify-python verify-release
+.PHONY: tools-bootstrap proto fast check coverage benchmark verify verify-python verify-released-compatibility verify-release
 
 tools-bootstrap:
 	go run ./internal/qualitygate -mode=tools-bootstrap
@@ -32,5 +32,8 @@ verify-python:
 	uv run --frozen --offline --directory $(PYTHON_FIXTURE_DIR) python -m compileall -q src tests generate_protocol.py
 	go test ./internal/pluginconformanceacceptance -run TestIndependentPythonFixturePassesPublicConformance -count=1
 	go test ./internal/pluginconformanceacceptance -run 'TestRuntimePluginLanguagesBehindExactEngineModes/python' -count=1
+
+verify-released-compatibility:
+	go run ./internal/qualitygate -mode=released-compatibility
 
 verify-release: verify

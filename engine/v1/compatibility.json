@@ -1,5 +1,5 @@
 {
-  "schema": "spice.agent.engine.compatibility/v1alpha2",
+  "schema": "spice.agent.engine.compatibility/v1alpha3",
   "protocol": "spice.agent.engine.v1",
   "production_range": {
     "minimum": "1.0.0",
@@ -53,6 +53,10 @@
     "cancellation-conflict-exact-recovery",
     "process-cleanup"
   ],
+  "released_generation_matrix": {
+    "manifest": "compatibility/released-generation.json",
+    "proven": false
+  },
   "released_binary_matrix": {
     "proven": false,
     "claim": "not-claimed"
