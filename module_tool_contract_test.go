@@ -25,7 +25,7 @@ func TestModulePinsAndAuthorizesCompositionTools(t *testing.T) {
 		}
 	}
 	for modulePath, wantVersion := range map[string]string{
-		"github.com/spice-framework/spice":     "v0.1.0-preview.2",
+		"github.com/spice-framework/spice":     "v0.1.0-preview.2.0.20260811041952-0e79bc4f3b29",
 		"github.com/spice-framework/toolchain": "v0.1.0-preview.2",
 		"google.golang.org/grpc":               "v1.83.0",
 		"google.golang.org/protobuf":           "v1.36.11",

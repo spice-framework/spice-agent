@@ -276,8 +276,8 @@ func validateGoAPICompatibility(value goAPICompatibility, root string) error {
 	if value.Baseline != (goAPIRelease{Release: "v0.1.0-preview.5", Commit: "3e8fe6406171a7e7f1765311a4fa7fc3b878e425", Go: requiredGoVersion}) {
 		return errors.New("go API compatibility baseline differs from preview5")
 	}
-	if len(value.PublicPackages) != 26 || !sortedUnique(value.PublicPackages) {
-		return errors.New("go API compatibility manifest must contain the sorted exact 26-package inventory")
+	if len(value.PublicPackages) != 28 || !sortedUnique(value.PublicPackages) {
+		return errors.New("go API compatibility manifest must contain the sorted exact 28-package inventory")
 	}
 	if err := validateGoAPIPlatforms(value.Platforms); err != nil {
 		return err

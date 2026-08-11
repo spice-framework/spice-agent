@@ -77,6 +77,46 @@ func TestObserversHaveDistinctBackpressureContracts(t *testing.T) {
 	}
 }
 
+func TestBestEffortObserverFiltersBeforeCapacity(t *testing.T) {
+	t.Parallel()
+	filter, err := event.NewBestEffortFilter(event.ModelDelta, event.ToolProgress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mailbox, err := event.NewFilteredBestEffortObserver(1, filter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sequencer, err := event.NewSequencer("run", time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delta, _ := sequencer.Next(event.ModelDelta, map[string]string{"secret": "excluded"})
+	started, _ := sequencer.Next(event.RunStarted, nil)
+	completed, _ := sequencer.Next(event.RunCompleted, nil)
+	if mailbox.TryPublish(delta) || mailbox.Filtered() != 1 || mailbox.Dropped() != 0 {
+		t.Fatalf("filtered=%d dropped=%d", mailbox.Filtered(), mailbox.Dropped())
+	}
+	if !mailbox.TryPublish(started) || mailbox.TryPublish(completed) ||
+		mailbox.Filtered() != 1 || mailbox.Dropped() != 1 {
+		t.Fatalf("filtered=%d dropped=%d", mailbox.Filtered(), mailbox.Dropped())
+	}
+	if got := <-mailbox.Events(); got.Kind() != event.RunStarted {
+		t.Fatalf("event kind = %q", got.Kind())
+	}
+	mailbox.Close()
+}
+
+func TestBestEffortFilterRejectsInvalidOrDuplicateKinds(t *testing.T) {
+	t.Parallel()
+	if _, err := event.NewBestEffortFilter("unknown"); err == nil {
+		t.Fatal("unknown kind succeeded")
+	}
+	if _, err := event.NewBestEffortFilter(event.RunStarted, event.RunStarted); err == nil {
+		t.Fatal("duplicate kind succeeded")
+	}
+}
+
 func TestSequencerRejectsInvalidInput(t *testing.T) {
 	if _, err := event.NewSequencer("", time.Now); err == nil {
 		t.Fatal("empty run ID succeeded")

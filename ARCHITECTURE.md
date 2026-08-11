@@ -69,6 +69,20 @@ adapter as normal named fallback beans. Application-owned exact beans replace
 defaults through the same compile-time graph rules. No kernel, stage, protocol,
 or host implementation package imports the adapter.
 
+Agent diagnostic logging is an equally explicit compiled extension.
+`logging/autoconfigure` contributes one bounded filtered
+`event.BestEffortObserver`, one lifecycle-owned `logging.Processor`, and an
+optional fixed-code health source as ordinary fallback beans. The processor
+emits fixed `agent.<event-kind>` records directly through the exact injected
+Spice `*logging.Logger`; it owns no exporter, secondary queue, global logger,
+file, network client, reflection, or registry. Model deltas never enter its
+mailbox, tool progress is opt-in metadata-only trace output, and generic event
+payloads are never decoded. Only the public safe typed tool occurrences may
+contribute effect, replay, capability, execution-state, and retry fields. Run
+and call identities become 128-bit process-local HMAC pseudonyms. Generated
+reverse cleanup must shut the engine down before this processor closes and
+drains its mailbox.
+
 `annotation/agent` exposes `@Stage`, `@Tool`, and `@ModelProvider`. Their typed
 handlers return only Spice's generic provider and bean-metadata contributions.
 Factory signatures remain ordinary Go and the generic compiler owns exact type

@@ -85,7 +85,7 @@ only after its contract passes and a dependency/security review is approved.
 ## Phase 8 ecosystem breadth
 
 Status: **in progress**. The bounded compatibility slices commit an exact
-machine-readable policy for the 26-package cross-platform Go API, durable
+machine-readable policy for the 28-package cross-platform Go API, durable
 identities, engine and plugin protocol histories, generated-source readiness,
 and security exceptions. They prove source-built previous (1.2) and
 current (1.3) semantics through real authenticated local processes on Linux and
@@ -126,17 +126,14 @@ identity plus pre/post SHA-256 checks are explicitly experimental and promotion
 is blocked until a released Agent version supplies `VerifiedLauncher`. See
 [the Git workflow evidence](evidence/phase8-git-workflow-experiment.md).
 
-The best-effort telemetry projection proof is complete as the removable
-`experiments/telemetry` nested module. It pins preview5 without a replacement,
-uses one Agent-owned bounded mailbox and one consumer, emits only immutable
-closed-schema values, and never exports generic event payloads. Process-local
-HMAC pseudonyms and the public typed tool occurrence decoders provide safe run
-and tool correlation; slow exporters produce exact accounted drops without
-backpressure or retry. Generated construction proves real engine shutdown
-precedes mailbox close, accepted-event drain, and exporter shutdown. This is an
-exporter-neutral diagnostic projection, not durable history, OpenTelemetry, or
-distributed trace continuity. See
-[the telemetry evidence](evidence/phase8-telemetry-experiment.md).
+The best-effort telemetry proof has been promoted into the production
+`logging` and `logging/autoconfigure` packages and the removable nested module
+has been retired. The production boundary uses the Spice-native logger
+directly, retaining one filtered Agent-owned mailbox, one consumer, HMAC
+pseudonyms, safe typed tool facts, exact drop accounting, cancellation, panic,
+race, and deterministic-output coverage. Metrics, spans, batching, exporters,
+local files, OpenTelemetry, and distributed trace claims were intentionally not
+promoted. See [the promotion evidence](evidence/phase8-telemetry-experiment.md).
 
 The deterministic planning proof is complete as the removable
 `experiments/planning` nested module. It injects an application-owned named

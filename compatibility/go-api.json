@@ -24,6 +24,8 @@
     "github.com/spice-framework/spice-agent/engine/v1",
     "github.com/spice-framework/spice-agent/event",
     "github.com/spice-framework/spice-agent/interaction",
+    "github.com/spice-framework/spice-agent/logging",
+    "github.com/spice-framework/spice-agent/logging/autoconfigure",
     "github.com/spice-framework/spice-agent/message",
     "github.com/spice-framework/spice-agent/model",
     "github.com/spice-framework/spice-agent/plugin/conformance",
@@ -41,24 +43,24 @@
       "goarch": "arm64",
       "baseline_package_sha256": "4911815649911c1ef13cc4a6f00b5cbbef03cdd93388824c66b1646d10abe9c0",
       "baseline_declaration_sha256": "e70ab391059d657839a3722ac9d700853d6e432c3776f17231ee04de36e712e8",
-      "current_package_sha256": "4911815649911c1ef13cc4a6f00b5cbbef03cdd93388824c66b1646d10abe9c0",
-      "current_declaration_sha256": "eea8d3b00be40ea014f2240afad64f49fbc71cda985cd36bac758ab5add8e069"
+      "current_package_sha256": "c1e947a15f75835018975e5f8645d3133197662be884d2132b052dc04e16aa2a",
+      "current_declaration_sha256": "d5d23ac3634bef28b6cd339486fb95fd38f5426eeec808d8322575cb292aa01b"
     },
     {
       "goos": "linux",
       "goarch": "amd64",
       "baseline_package_sha256": "4911815649911c1ef13cc4a6f00b5cbbef03cdd93388824c66b1646d10abe9c0",
       "baseline_declaration_sha256": "e70ab391059d657839a3722ac9d700853d6e432c3776f17231ee04de36e712e8",
-      "current_package_sha256": "4911815649911c1ef13cc4a6f00b5cbbef03cdd93388824c66b1646d10abe9c0",
-      "current_declaration_sha256": "eea8d3b00be40ea014f2240afad64f49fbc71cda985cd36bac758ab5add8e069"
+      "current_package_sha256": "c1e947a15f75835018975e5f8645d3133197662be884d2132b052dc04e16aa2a",
+      "current_declaration_sha256": "d5d23ac3634bef28b6cd339486fb95fd38f5426eeec808d8322575cb292aa01b"
     },
     {
       "goos": "windows",
       "goarch": "amd64",
       "baseline_package_sha256": "4911815649911c1ef13cc4a6f00b5cbbef03cdd93388824c66b1646d10abe9c0",
       "baseline_declaration_sha256": "a2b46e29ad086be6e6d48c235b0c6fab27a9480b64ac33de8a3f91fe122a4a72",
-      "current_package_sha256": "4911815649911c1ef13cc4a6f00b5cbbef03cdd93388824c66b1646d10abe9c0",
-      "current_declaration_sha256": "2117c792423e2186d53afa09ab852de087b806db095f769e4bc4f660e88a5ec7"
+      "current_package_sha256": "c1e947a15f75835018975e5f8645d3133197662be884d2132b052dc04e16aa2a",
+      "current_declaration_sha256": "7db09e41f124c67fd143460e8d91efa5ab6bff6d5acd47e0cd45574d6834df2c"
     }
   ],
   "approved_breaks": [

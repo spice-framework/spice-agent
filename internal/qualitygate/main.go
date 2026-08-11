@@ -152,9 +152,6 @@ func repositoryVerificationSteps(ctx context.Context, root, mode string) ([]step
 	gitWorkflowExperiment := step{"Git workflow experiment", func() error {
 		return verifyGitWorkflowExperiment(ctx, root, mode)
 	}}
-	telemetryExperiment := step{"telemetry experiment", func() error {
-		return verifyTelemetryExperiment(ctx, root, mode)
-	}}
 	planningExperiment := step{"planning experiment", func() error {
 		return verifyPlanningExperiment(ctx, root, mode)
 	}}
@@ -166,7 +163,7 @@ func repositoryVerificationSteps(ctx context.Context, root, mode string) ([]step
 	}}
 	steps := []step{
 		identity, apiCompatibility, diffHygiene, tests, permissionExperiment, sqliteRecoveryExperiment,
-		twoWorkerExperiment, compactionExperiment, gitWorkflowExperiment, telemetryExperiment,
+		twoWorkerExperiment, compactionExperiment, gitWorkflowExperiment,
 		planningExperiment,
 	}
 	switch mode {
@@ -194,7 +191,6 @@ func repositoryVerificationSteps(ctx context.Context, root, mode string) ([]step
 			twoWorkerExperiment,
 			compactionExperiment,
 			gitWorkflowExperiment,
-			telemetryExperiment,
 			planningExperiment,
 			acceptanceScope,
 		}
@@ -295,28 +291,6 @@ func verifyGitWorkflowExperiment(ctx context.Context, root, mode string) error {
 
 func gitWorkflowFuzzArguments() []string {
 	return []string{"test", "-run=^$", "-fuzz=^FuzzDecodeCommitArguments$", "-fuzztime=100x", "."}
-}
-
-func verifyTelemetryExperiment(ctx context.Context, root, mode string) error {
-	if err := verifyNestedExperiment(
-		ctx, root, mode, "telemetry", "TelemetryProof",
-	); err != nil {
-		return err
-	}
-	if mode != "verify" {
-		return nil
-	}
-	environment := map[string]string{
-		"GOFLAGS": "-mod=vendor", "GOPROXY": "off", "GOTOOLCHAIN": "local", "GOWORK": "off",
-	}
-	return command(
-		ctx, filepath.Join(root, "experiments", "telemetry"), environment,
-		"go", telemetryFuzzArguments()...,
-	)
-}
-
-func telemetryFuzzArguments() []string {
-	return []string{"test", "-run=^$", "-fuzz=^FuzzTranslateEnvelope$", "-fuzztime=100x", "."}
 }
 
 func verifyPlanningExperiment(ctx context.Context, root, mode string) error {
@@ -421,10 +395,6 @@ func validateCompactionCoverage(output string) error {
 
 func validateGitWorkflowCoverage(output string) error {
 	return validateExperimentCoverage("Git workflow", output)
-}
-
-func validateTelemetryCoverage(output string) error {
-	return validateExperimentCoverage("telemetry", output)
 }
 
 func validatePlanningCoverage(output string) error {
@@ -547,7 +517,6 @@ func bootstrapDependencies(
 		{directory: filepath.Join(root, "experiments", "two-worker"), optional: true},
 		{directory: filepath.Join(root, "experiments", "compaction"), optional: true},
 		{directory: filepath.Join(root, "experiments", "git-workflow"), optional: true},
-		{directory: filepath.Join(root, "experiments", "telemetry"), optional: true},
 		{directory: filepath.Join(root, "experiments", "planning"), optional: true},
 	}
 	for _, graph := range graphs {
@@ -1075,6 +1044,7 @@ func fuzzTargets() []fuzzTarget {
 		{"./agent", "FuzzParseSnapshot"},
 		{"./agent", "FuzzDecodeToolStartedOccurrence"},
 		{"./agent", "FuzzDecodeToolTerminalOccurrence"},
+		{"./logging", "FuzzToolOccurrenceProjection"},
 		{"./annotation/agent", "FuzzToolHandler"},
 		{"./common/v1", "FuzzCommonEnvelope"},
 		{"./engine/v1", "FuzzEngineEnvelope"},

@@ -195,7 +195,6 @@ func expectedGeneratedSourceCompatibility() generatedSourceCompatibility {
 			{Module: modulePath + "/experiments/permission", ModuleRoot: "experiments/permission", Target: "permissionproof", Manifest: "experiments/permission/.spice/permissionproof.manifest.json"},
 			{Module: modulePath + "/experiments/planning", ModuleRoot: "experiments/planning", Target: "planningproof", Manifest: "experiments/planning/.spice/planningproof.manifest.json"},
 			{Module: modulePath + "/experiments/sqlite-recovery", ModuleRoot: "experiments/sqlite-recovery", Target: "sqliterecoveryproof", Manifest: "experiments/sqlite-recovery/.spice/sqliterecoveryproof.manifest.json"},
-			{Module: modulePath + "/experiments/telemetry", ModuleRoot: "experiments/telemetry", Target: "telemetryproof", Manifest: "experiments/telemetry/.spice/telemetryproof.manifest.json"},
 			{Module: modulePath + "/experiments/two-worker", ModuleRoot: "experiments/two-worker", Target: "twoworkerproof", Manifest: "experiments/two-worker/.spice/twoworkerproof.manifest.json"},
 		},
 		CleanRoom: generatedSourceCleanRoom{

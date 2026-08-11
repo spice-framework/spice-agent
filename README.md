@@ -109,12 +109,15 @@ and guard injection. It excludes arbitrary Git/network/repository mutation
 operations and documents preview5's non-atomic executable verification as a
 promotion blocker rather than hiding or duplicating a future core seam.
 
-The removable `experiments/telemetry` module proves a bounded best-effort,
-secret-safe event projection through one generated mailbox and consumer. It
-uses process-local HMAC correlation and only the public typed tool occurrence
-decoders; it is explicitly not durable history, distributed tracing, or an
-OpenTelemetry implementation. A caller-owned local JSONL exporter performs no
-path discovery or network I/O.
+The production `logging` package projects Agent events directly through an
+injected Spice-native structured logger. One bounded best-effort mailbox
+filters model deltas and, by default, tool progress before enqueue; overflow
+and filtering remain distinct accounting. Records use fixed messages,
+process-local HMAC correlation, and only public typed tool occurrence facts.
+Generic payloads, raw identities, errors, paths, provider content, and secrets
+are never logged. Applications opt in to Agent event subscription by
+blank-importing `logging/autoconfigure`; no OpenTelemetry, file, batching,
+exporter, network, global logger, or runtime registry is installed.
 
 The removable `experiments/planning` module proves an explicit application-owned
 `Prepare` then `StartPrepared` workflow. A generated typed planner stage emits

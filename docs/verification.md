@@ -35,13 +35,14 @@ arguments, preventing corpus discovery or minimization near a time boundary
 from turning a successful smoke run into a deadline failure.
 
 Every ordinary gate also enters the isolated permission, SQLite recovery,
-two-worker, compaction, Git workflow, telemetry, and planning modules with `GOWORK=off`, `GOPROXY=off`, and
+two-worker, compaction, Git workflow, and planning modules with `GOWORK=off`, `GOPROXY=off`, and
 `-mod=vendor`. Check and verify modes reproduce each nested vendor tree, verify
 its generated Spice target, run vet and shuffled tests, and verify additionally
 runs race plus an 85% handwritten package coverage floor. The compaction proof
 also runs its exact `FuzzCompact` target, Git runs `FuzzDecodeCommitArguments`,
-telemetry runs `FuzzTranslateEnvelope`, and planning runs `FuzzParsePlan`, each
-for 100 deterministic executions.
+and planning runs `FuzzParsePlan`, each for 100 deterministic executions. The
+root fuzz matrix runs `logging.FuzzToolOccurrenceProjection` for the promoted
+Agent logging boundary.
 
 A fresh machine runs `make tools-bootstrap` once. This is the sole
 network-authorized ordinary dependency-bootstrap mode. It copies each `go.mod`/`go.sum` pair to a
@@ -74,7 +75,7 @@ formatting and coverage-denominator checks because their source schemas and
 deterministic freshness are separately enforced.
 
 Every quality-gate mode validates all strict canonical compatibility manifests,
-their cross-references, append-only histories, and the exact 26-package public
+their cross-references, append-only histories, and the exact 28-package public
 Go surface. The API gate evaluates `darwin/arm64`, `linux/amd64`, and
 `windows/amd64` separately with offline `go list`; generated protocol exports
 are included and mutually exclusive platform files are never unioned. The
