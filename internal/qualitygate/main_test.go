@@ -349,6 +349,15 @@ func TestReleaseWorkflowRequiresExactKeylessBoundary(t *testing.T) {
 			wantErr: "uses:",
 		},
 		{
+			name: "superseded preview.6 caller",
+			workflow: strings.ReplaceAll(
+				validReleaseWorkflow(),
+				releaseWorkflowCommit,
+				"f29b7ce16f8d220e87bfae54469057d001944b7b",
+			),
+			wantErr: "uses:",
+		},
+		{
 			name: "wrong attested workflow pin",
 			workflow: strings.Replace(
 				validReleaseWorkflow(),

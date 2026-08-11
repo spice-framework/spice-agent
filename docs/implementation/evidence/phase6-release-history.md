@@ -293,3 +293,59 @@ and the source archive. The checksum file closes over exactly the three
 attested subjects. Fresh proxy and SumDB resolution yields module sum
 `h1:XJKJge+xWP/FLNoL1/rXq8z8tdu/5iEkKfmu1dTgFms=` and go.mod sum
 `h1:pbhYOeNgn4pCIhEmcdbjnFjJijY4ZSLM8ZHxaF2dxz0=` at the tagged commit.
+
+## `v0.1.0-preview.7`: pre-tag current-product candidate
+
+Preview.7 authorizes the current Agent product after the immutable preview.6
+module. The product base completes the three clean-room public-authoring and
+generated-source proofs, records the hosted preview.5/preview.6 released-
+generation matrix, closes the enumerated pre-v1 blockers, hardens cancellation
+and safe Agent event logging, reconciles the live Responses-compatible provider
+evidence, and selects the published Spice preview.4 foundation. The separate
+released-binary matrix remains unproven and explicitly `not-claimed`; this
+candidate does not declare a v1 API freeze or rewrite the immutable preview.6
+evidence.
+
+| Authority | Exact commit or run |
+| --- | --- |
+| Product base | `8d63158f21ef08b97c92d6071c6571436908c24a` |
+| Product-base CI | [31506665679](https://github.com/spice-framework/spice-agent/actions/runs/31506665679) |
+| Product-base documentation | [31506665316](https://github.com/spice-framework/spice-agent/actions/runs/31506665316) |
+| Product-base dependency graph | [31506667860](https://github.com/spice-framework/spice-agent/actions/runs/31506667860) |
+| Product-base released compatibility | [31506664958](https://github.com/spice-framework/spice-agent/actions/runs/31506664958) |
+| Development renderer policy | `73ec26480db3247cd93c8325080058e118b845c9` |
+| Development verification | [31508802487](https://github.com/spice-framework/development/actions/runs/31508802487) |
+| Development documentation | [31508802393](https://github.com/spice-framework/development/actions/runs/31508802393) |
+| Toolchain independent policy | `aeb2b789fedf5b7a45f0d0869043c8568161edad` |
+| Toolchain verification | [31511135874](https://github.com/spice-framework/toolchain/actions/runs/31511135874) |
+| Toolchain documentation | [31511136548](https://github.com/spice-framework/toolchain/actions/runs/31511136548) |
+| Toolchain cross-producer acceptance | [31511135865](https://github.com/spice-framework/toolchain/actions/runs/31511135865) |
+| Reusable organization workflow | `a56c451168aae0f2b3075782156d204d75fb7f69` |
+| Organization verification | [31512834950](https://github.com/spice-framework/.github/actions/runs/31512834950) |
+| Organization documentation | [31512835246](https://github.com/spice-framework/.github/actions/runs/31512835246) |
+
+Both artifact-free policy checks ran from those exact clean authority commits
+with Go 1.26.5, vendored dependencies, `GOWORK=off`, `GOPROXY=off`,
+`GOSUMDB=off`, and `GOTOOLCHAIN=local`.
+
+The separately reviewed Development and Toolchain authorities authorize the
+same ordered policy tuple:
+
+```text
+go-module-v1	spice-agent	github.com/spice-framework/spice-agent	v0.1.0-preview.7
+```
+
+Toolchain independently validates the canonical source URL and emits those same
+ordered bytes, including one trailing newline. Their SHA-256 is
+`927dbcbca26e44fe5f8fc010823336712272382b8a29d0e1a739bda2d1c1d1e5`.
+The Agent preview.7 policy requires the published Spice preview.4 foundation
+and Toolchain preview.2 module while preserving every provider, coding-tools,
+TUI, Coding distribution, and extension-profile selection.
+
+This preparation advances only canonical release metadata, the audited
+organization caller identity, their strict stale-preview.6 regressions, and
+this append-only history. It does not modify product, module, vendor,
+generated, compatibility, or released-generation bytes. At authorization time
+there is no preview.7 tag, release workflow run, protected deployment, GitHub
+Release, attestation, or publication. The policy match and green authorities
+do not create, approve, tag, attest, or publish a release.
