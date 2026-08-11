@@ -3,12 +3,14 @@
 ## Objective and prerequisites
 
 Publish the coordinated architecture proof only after phases 0 through 5 prove
-the complete Spice-native architecture. The Agent core recovery is
-`v0.1.0-preview.4`; TUI, provider, coding tools, and the distribution retain
-their independently versioned `v0.1.0-preview.1` release identities. The
-release graph must first replace every foundation and sibling pseudo-version
-with an immutable preview tag. Every repository records the exact compatible
-tags, commits, module graph, and protocol versions used to build it.
+the complete Spice-native architecture. The original recovery plan began with
+Agent core `v0.1.0-preview.4` and independently versioned preview identities.
+Subsequent protected releases published Agent `v0.1.0-preview.5` and
+`v0.1.0-preview.6`; TUI, provider, and coding tools remain independently
+versioned at `v0.1.0-preview.1`, while the distribution is
+`v0.1.0-preview.4`. These later facts qualify the historical implementation
+sequence below rather than rewriting it. Every repository records the exact
+compatible tags, commits, module graph, and protocol versions used to build it.
 
 Component module tags are dependency inputs, not proof that this phase is
 complete. A component may be tagged after its exact candidate passes local and
@@ -30,8 +32,9 @@ failed tag as a different candidate.
 ## Decisive workflow
 
 From a clean installation, `spice-agent` starts or attaches to the user-local
-daemon and opens the generated Bubble Tea client. One run streams an OpenAI
-response, executes a compiled read/replace/shell tool through the canonical
+daemon and opens the generated Bubble Tea client. One run streams a live
+Responses-compatible provider response, executes a compiled read/replace/shell
+tool through the canonical
 dispatcher, executes a digest-pinned runtime-plugin tool, continues the model
 turn, and renders the final response.
 
@@ -86,8 +89,10 @@ notes.
 This preview is an SDK architecture proof and reference application. It does
 not promise compatibility stability, remote daemon support, a default sandbox,
 automatic approval policy, persistence recovery, MCP, Git automation, indexing,
-telemetry, planning, or production subagent orchestration. Release notes state
-these limitations prominently.
+OpenTelemetry/exporter telemetry, planning, or production subagent
+orchestration. Release notes state these limitations prominently. The later
+production Agent logging package is a bounded Spice-native diagnostic surface,
+not a reversal of the telemetry exclusion.
 
 ## Preview migration note
 
@@ -107,8 +112,10 @@ before leasing a tool generation; v1alpha2 remains unsupported.
 All repository `make verify` gates run on exact release commits. The catalog
 runs dependency-ordered full verification and rejects dirty worktrees or version
 drift. Windows and Linux execute real end-to-end behavior; macOS performs native
-archive smoke and protocol verification. The opt-in live OpenAI test records no
-response content and publishes only redacted pass/fail/timing evidence.
+archive smoke and protocol verification. The opt-in live provider test records
+no response content and publishes only redacted result identity and bounded
+execution metadata. The completed OpenRouter proof is Responses-compatible
+provider evidence, not first-party OpenAI service evidence.
 
 Release evidence contains commit/tag/module hashes, Go/tool versions, generated
 source ownership hashes, benchmark tables, supported OS/architecture matrix,
@@ -117,11 +124,11 @@ and signature verification, and known limitations.
 
 Status is **in progress**. Keyless component and distribution prerelease paths,
 an exact tagged dependency graph, independent installed-process recovery, and
-authenticated distribution-byte startup now exist. The Agent preview 5 and
-distribution preview 4 workflows remain stopped at their separate protected
-attestation environments; that boundary requires explicit human authorization
-and is not an implicit completion step. Native PTY/ConPTY interaction, installed
-performance evidence, and the decisive final architecture release workflow also
+authenticated distribution-byte startup now exist. The protected attestation
+workflows for Agent preview5, Agent preview6, and distribution preview4 later
+completed and published immutable prereleases, so protected authorization is no
+longer a blocker for those identities. Native PTY/ConPTY interaction, installed
+performance evidence, and the decisive final architecture release workflow
 remain pending. Component tags may be created only in dependency order, and no
 release may be inferred from partial phase evidence.
 

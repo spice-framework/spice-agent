@@ -8,7 +8,7 @@ Repository roadmaps link here and must not duplicate status.
 | 0 — product and repositories | Complete for preview | five public Apache-2.0 modules, exact catalog/toolchain, cross-platform hosted gates, reproducible vendor-offline execution, and zero open vulnerable manifests |
 | 1 — Spice-native composition | Complete for preview | generated static DI, auto-configuration, cross-repository continuation |
 | 2 — deterministic kernel | Complete for preview | `841edd3`; deterministic lifecycle, interaction, snapshot, race/fuzz proof |
-| 3 — provider and coding tools | In progress | generated cross-repository continuation and opt-in live acceptance |
+| 3 — provider and coding tools | Complete for preview | generated cross-repository continuation plus one bounded live Responses-compatible provider request; first-party OpenAI service acceptance remains optional and is not claimed |
 | 4 — daemon and TUI | In progress | generated targets, installed Windows/Linux daemon/Bubble Tea process recovery, and authenticated preview 2 release-byte startup are proven; native PTY/ConPTY resize and reconnect presentation remain |
 | 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, bounded recovery/health, generated activation, real-process cancellation, one real `spice dev` last-known-good proof, and installed daemon/TUI recovery are complete; the simultaneous two-supervisor edit/reconnect proof remains |
 | 6 — architecture proof | In progress | dependency-ordered keyless module releases, then independently attested preview distribution; [Agent preview.1/preview.2/preview.3 failure history](evidence/phase6-release-history.md) |
@@ -71,7 +71,10 @@ The former telemetry experiment is promoted into production `logging` and
 one consumer, exact separate filtering/overflow accounting, HMAC pseudonyms,
 typed tool occurrence facts, deterministic Spice records, final drain, and
 fixed-code health. Exporters, batches, metrics, spans, and local JSONL were
-retired. Exact scope is in
+retired. That deletion reduced the current repository-owned generated-target
+set from the historically migrated eight targets to seven; it did not remove or
+substitute for any of the three independent clean-room public-authoring proofs.
+Exact scope is in
 [`phase8-telemetry-experiment.md`](evidence/phase8-telemetry-experiment.md).
 
 The isolated `experiments/planning` module proves a generated exact-interface
@@ -243,24 +246,35 @@ and asserted core output are recorded in
 Phase 1 for the preview; pre-1.0 contract changes remain governed by the later
 stress and clean-room public-authoring phases.
 
-## Current Phase 3 boundary
+## Phase 3 preview completion
 
 The provider and coding-tool repositories, including the opt-in live test path,
-are implemented and independently repinned. The generated cross-repository architecture proof is green at
+are implemented and independently repinned. Provider commit
+`f1e2b7a78bd199b96598a441acb29be5461b8bb7` completed the canonical live
+acceptance with one bounded request to OpenRouter's OpenAI Responses-compatible
+endpoint using exact zero-price route `poolside/laguna-s-2.1:free`. The proof
+required explicit opt-in, base URL, model, and credential; disabled retries,
+tools, and transcript persistence; and committed only secret-safe metadata. It
+proves the adapter against a live Responses-compatible provider. It is not a
+claim about the first-party OpenAI service, whose separate live mode remains
+optional. Exact evidence and exclusions are recorded in
+[`phase3-live-provider-acceptance.md`](evidence/phase3-live-provider-acceptance.md).
+
+The earlier generated cross-repository architecture proof is green at
 `spice-agent-coding` commit `16244f5`: Windows `make fast` was 15.2 seconds,
 `make check` was 18.2 seconds, and `make verify` was 65 seconds at 86.0%
 coverage. A clean WSL2 Linux/amd64 clone at that commit ran Go 1.26.5,
 `make tools-bootstrap` in 1.35 seconds, and full `make verify` in approximately
 75 seconds with zero lint findings, no reachable vulnerabilities, race tests,
-and vendor-offline acceptance; the worktree remained clean. Phase 3 is not
-complete because opt-in live OpenAI acceptance has not been run with supplied
-credentials. Distribution commit `4cfd19a` (including follow-up `1dbef3d` and
+and vendor-offline acceptance; the worktree remained clean. Distribution
+commit `4cfd19a` (including follow-up `1dbef3d` and
 exact provider `4beed383` / coding-tools `17cbef3b`) proves real provider HTTP-request
 cancellation, exact model/turn/run terminal events, and secret scans across
 events, generated source, and manifests; `make verify` passed in 73.8 seconds
 at 86.4% coverage with zero lint findings, no reachable vulnerabilities, race,
-and vendor-offline checks. Offline scripted acceptance remains the mandatory
-default.
+and vendor-offline checks. Together with the later bounded live provider proof,
+this closes Phase 3 for the preview. Offline scripted acceptance remains the
+mandatory default.
 
 ## Current Phase 4 boundary
 
@@ -602,6 +616,10 @@ shuffled/race jobs supersede the earlier compile-only limitation.
 - Current Phase 3 distribution proof: `spice-agent-coding` `4cfd19a` (provider
   `4beed383`, coding tools `17cbef3b`);
   `make verify` 73.8s, 86.4% coverage.
+- Live Responses-compatible provider proof: `spice-agent-provider-openai`
+  `f1e2b7a78bd199b96598a441acb29be5461b8bb7`; one bounded OpenRouter request
+  through exact zero-price route `poolside/laguna-s-2.1:free`, without a
+  first-party OpenAI service claim.
 - Process lookup/launch ownership contracts: `spice-agent` `5d2fd63`;
   `make verify` 152.5s, 85.2% coverage.
 - Generated explicit-serve daemon and managed process boundary:

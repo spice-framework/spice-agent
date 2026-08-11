@@ -85,11 +85,15 @@ the current snapshot and plan hard cuts are recorded explicitly.
 Toolchain `v0.1.0-preview.2` is the immutable non-development generator. Its
 module sums, source commit, schema 6 ownership rules, migration range, path
 policy, manual-edit behavior, and determinism are locked by
-`compatibility/generated-source.json`. Every root and nested Agent target is
-migrated from schema 5/`0.1.0-dev` to that contract. The remaining acceptance
-boundary is exercising the same released generator through the clean-room
-public-authoring contract; repository-context experiments do not substitute for
-that proof.
+`compatibility/generated-source.json`. The original migration covered the root
+and seven nested Agent targets at schema 5/`0.1.0-dev`. After the optional
+telemetry experiment was promoted into production logging, that nested target
+was retired and the current manifest covers the root plus six nested targets.
+The historical eight-target migration remains recorded rather than rewritten.
+The same released generator is also exercised by all three independent
+clean-room public-authoring modules, so both the generated-source and
+public-authoring criteria are complete; repository-context experiments did not
+substitute for those proofs.
 
 ### Security exceptions
 

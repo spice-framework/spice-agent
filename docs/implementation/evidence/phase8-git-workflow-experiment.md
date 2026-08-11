@@ -34,15 +34,22 @@ only around the guarded continuation.
 - generated freshness, offline vendor, compatibility, deterministic fuzz,
   race, coverage, and provisional benchmark paths are root-owned gates.
 
-## Deliberate promotion block
+## Historical promotion boundary
 
 Agent preview5 exposes `process.Launcher` but not the later public
 `process.VerifiedLauncher`. Held identity plus strict pre/post digest checks
 detect substitution but cannot atomically bind the verified file handle to
 child creation. This is explicit experimental evidence, not a claim of
-TOCTOU-resistant execution. Promotion is blocked until the module pins an
-immutable Agent release containing that generic seam and migrates without
-duplicating it or weakening behavior.
+TOCTOU-resistant execution. At the time of this proof, promotion was blocked
+until the module could pin an immutable Agent release containing that generic
+seam and migrate without duplicating it or weakening behavior.
+
+Agent `v0.1.0-preview.6` later published that immutable generic seam. The
+release-availability prerequisite is therefore closed, while this experiment's
+preview5 pin and historical proof remain unchanged. Promotion would still
+require an explicit preview6-or-later repin, migration to the public lease and
+launcher, and a complete rerun of the experiment's security and compatibility
+evidence; it is not implied by the later release alone.
 
 ## Verification and deletion
 

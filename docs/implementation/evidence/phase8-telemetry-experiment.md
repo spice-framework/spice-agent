@@ -7,6 +7,13 @@ now implemented by the root production `logging` package and explicit
 `logging/autoconfigure` adapter. The experiment directory, generated target,
 vendor graph, local JSONL exporter, and quality-gate entry are retired.
 
+The retired target remains part of the historical eight-target immutable
+schema 6 migration evidence. Its removal leaves seven current root/nested
+targets and does not revoke that proven migration. The three clean-room
+public-authoring/generated-source proofs are separately released text, JSON,
+and integer modules; none depended on or was replaced by this optional
+experiment.
+
 Production projects Agent events through one bounded best-effort mailbox and
 one consumer directly into the injected Spice-native structured logger. It is
 diagnostic-only and does not claim OpenTelemetry or distributed trace parity.

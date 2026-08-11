@@ -96,12 +96,13 @@ released-binary N/N-1 claim nor a native Python Host-launch claim. See
 [the engine compatibility evidence](evidence/phase8-engine-protocol-compatibility.md)
 and [RFC 0010](../rfc/0010-api-and-protocol-compatibility.md).
 
-The MCP experiment remains blocked before implementation. The immutable
-preview5 module predates the public verified-child launcher required to start a
-digest-pinned MCP server without a pathname race. The experiment will not use a
-pseudo-version, `replace`, workspace source, duplicated launcher, or an
-interpreter fallback; it resumes only after an immutable Agent release contains
-that generic seam.
+The MCP experiment remains optional and unimplemented, but its former release
+prerequisite is closed: immutable Agent preview6 publishes the public
+`process.VerifiedLauncher` and `process.ExecutableLease` seam needed to avoid a
+pathname-only launch race. Any MCP slice still requires its own bounded design,
+dependency/security review, generated composition, and failure evidence. It may
+not use a pseudo-version, `replace`, workspace source, duplicated launcher, or
+an interpreter fallback.
 
 The first optional-extension proof is also complete as the removable
 `experiments/compaction` nested module. It pins released preview5 without a
@@ -120,10 +121,12 @@ and contributes only fixed `git.inspect` and interaction-guarded
 exact staged index and run plan; hooks, signing, credentials, arbitrary
 arguments, repository mutation helpers, and network Git operations are absent.
 Executable/repository/config identities, bounded output, cancellation,
-uncertainty, and real Windows/Unix process-tree containment are proven. Because
-preview5 lacks the later generic atomic verified-child seam, strict held-
-identity plus pre/post SHA-256 checks are explicitly experimental and promotion
-is blocked until a released Agent version supplies `VerifiedLauncher`. See
+uncertainty, and real Windows/Unix process-tree containment are proven. The
+experiment remains pinned to preview5, so its strict held-identity plus
+pre/post SHA-256 checks are still explicitly experimental. Preview6 later
+published `VerifiedLauncher`; promotion is therefore no longer waiting for a
+release, but still requires an explicit repin and migration to that seam with
+the full promotion evidence. See
 [the Git workflow evidence](evidence/phase8-git-workflow-experiment.md).
 
 The best-effort telemetry proof has been promoted into the production
@@ -155,8 +158,10 @@ plan-recommended mutation, proving the plan has no authority. See
   previous compatible protocols. The plugin-language half is complete. The
   alternate semantic shell proves the second client contract independently,
   while its version-skew matrix remains a separate slice.
-- Add optional MCP, Git workflow, indexing/LSP, telemetry, compaction, planning,
-  sandbox, and subagent extensions as separately versioned modules.
+- Keep MCP, Git workflow, indexing/LSP, compaction, planning, sandbox, and
+  subagent work behind separately reviewed optional boundaries. The former
+  telemetry experiment instead promoted a bounded logging subset into core and
+  retired its nested module; it is not a general telemetry-platform claim.
 - Publish scaffolding, authoring guides, protocol schemas, GoDoc, compatibility
   matrices, migrations, examples, threat models, and conformance kits.
 - Measure API usage and remove accidental surface before v1 rather than keeping
@@ -200,10 +205,13 @@ cost when it is not imported.
 
 Status is **complete for Phase 7 experiments**. Permission, SQLite recovery,
 alternate semantic client, and two-worker extension proofs are implemented.
-Broader optional-extension proofs and released protocol matrices remain Phase 8 work;
-none of the experimental APIs are stabilized by the clean-room completion. The non-native
-parallel static extension design remains rejected history and may not be revived
-as a shortcut during experimentation.
+The preview5/preview6 released-generation engine and plugin matrices are also
+complete and hosted-green; the separate released-binary matrix remains
+explicitly unproven and unclaimed. Broader optional-extension work remains
+Phase 8 work, and none of the experimental APIs are stabilized by clean-room or
+released-generation completion. The non-native parallel static extension
+design remains rejected history and may not be revived as a shortcut during
+experimentation.
 
 Criterion 5 is now satisfied for the kernel runtime boundary. The canonical
 budget manifest fixes exact benchmark identities, five-sample median

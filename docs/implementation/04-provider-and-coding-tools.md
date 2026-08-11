@@ -61,8 +61,9 @@ provider errors, capability-aware dispatch, and phase 1 auto-configuration.
 1. Implement fake-source provider translation and exhaustive offline tests.
 2. Add redacted typed configuration, starter manifest, and explicit
    `/autoconfigure` package.
-3. Add an opt-in live test requiring an explicit environment switch and secret;
-   ordinary verification must neither run it nor contact the network.
+3. Add an opt-in live test requiring an explicit environment switch, base URL,
+   model, and secret; ordinary verification must neither run it nor contact the
+   network.
 4. Implement anchored read, atomic replacement, and process tools with immutable
    definitions and fallback beans.
 5. Add dependency, license, maintenance, retry, observability, and security
@@ -99,7 +100,11 @@ Local adapter translation targets sub-millisecond per event outside SDK/network
 latency. Cooperative process cancellation targets p95 below 50 ms before the
 configured grace interval; forced tree cleanup has an explicit bounded deadline.
 
-Status is **in progress**. The hardened core is pinned for active provider and
-coding-tool implementations. This phase closes only after both repositories
-push green standalone commits and the generated cross-repository vertical flow
-passes.
+Status is **complete for preview**. The hardened core is pinned for active
+provider and coding-tool implementations, both repositories have green
+standalone commits, and the generated cross-repository vertical flow passes.
+Provider commit `f1e2b7a78bd199b96598a441acb29be5461b8bb7` additionally proves
+one bounded request against a live OpenAI Responses-compatible provider. That
+proof completes the canonical live-provider criterion without claiming the
+first-party OpenAI service. See
+[`evidence/phase3-live-provider-acceptance.md`](evidence/phase3-live-provider-acceptance.md).

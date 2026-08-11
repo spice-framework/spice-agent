@@ -23,6 +23,14 @@ The generator reported zero generated Go writes and zero stale removals for all
 eight targets: the migration changed ownership identity, not application
 construction behavior.
 
+That count records the exact repository state when the immutable migration was
+proved. Commit `8fd9ba5f8a9034364f2c9ac2dec1e6479dd7700a` later promoted the
+optional telemetry safety model into production Agent logging and retired the
+telemetry nested module, its generated target, and its vendor graph. The current
+manifest therefore lists seven root/nested targets. This append-only lifecycle
+change does not invalidate the historical eight-target migration and does not
+remove or replace any clean-room public-authoring proof.
+
 The quality gate rejects generator, sum, schema, target, module-root, manifest,
 vendor, path-policy, or proof-state drift. Ordinary generation checks continue
 to prove current bytes and the existing acceptance suite proves deterministic

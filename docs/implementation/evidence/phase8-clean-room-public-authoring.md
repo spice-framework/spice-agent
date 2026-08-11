@@ -107,5 +107,8 @@ regenerated an eight-file application with no `integer.stats` identity.
 
 All three separately versioned records are complete. This satisfies the Phase 8
 public-authoring and generated-source clean-room thresholds without claiming
-three human authors. The corresponding two v1 blockers are closed; released
-engine and plugin N/N-1 matrices remain independent blockers.
+three human authors. The corresponding two v1 blockers are closed. At the time
+of this proof, released engine and plugin N/N-1 matrices remained independent
+blockers; the later preview5/preview6 public-module matrix closed both, as
+recorded in
+[`phase8-released-generation-compatibility.md`](phase8-released-generation-compatibility.md).
