@@ -80,7 +80,7 @@
   "clean_room": {
     "manifest": "compatibility/public-authoring.json",
     "required_extensions": 3,
-    "exercised_extensions": 1,
+    "exercised_extensions": 2,
     "exercised": true
   },
   "proven": false

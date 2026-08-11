@@ -323,7 +323,7 @@ func validateCompatibilityPolicy(value compatibilityPolicy) error {
 	}
 	wantPublicAuthoring := publicAuthoringPolicy{
 		Manifest: publicAuthoringCompatibilityPath, ProofModel: "clean-room-released-artifacts-only", RequiredExtensions: 3,
-		Status: "sdk-beta-proven-phase8-pending", ProvenExtensions: 1,
+		Status: "sdk-beta-proven-phase8-pending", ProvenExtensions: 2,
 	}
 	if value.Schema != "spice.agent.compatibility.policy/v1alpha1" || value.Module != modulePath || value.Status != "pre-v1-enforced-not-stable" ||
 		value.GoAPI.PreV1DeprecationReleases != 1 || value.GoAPI.PreV1DeprecationDays != 30 ||

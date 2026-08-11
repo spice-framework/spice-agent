@@ -38,7 +38,7 @@
     "proof_model": "clean-room-released-artifacts-only",
     "required_extensions": 3,
     "status": "sdk-beta-proven-phase8-pending",
-    "proven_extensions": 1
+    "proven_extensions": 2
   },
   "security_exceptions": "compatibility/security-exceptions.json",
   "v1_blockers": [

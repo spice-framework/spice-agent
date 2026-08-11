@@ -199,7 +199,7 @@ func expectedGeneratedSourceCompatibility() generatedSourceCompatibility {
 			{Module: modulePath + "/experiments/two-worker", ModuleRoot: "experiments/two-worker", Target: "twoworkerproof", Manifest: "experiments/two-worker/.spice/twoworkerproof.manifest.json"},
 		},
 		CleanRoom: generatedSourceCleanRoom{
-			Manifest: publicAuthoringCompatibilityPath, RequiredExtensions: 3, ExercisedExtensions: 1, Exercised: true,
+			Manifest: publicAuthoringCompatibilityPath, RequiredExtensions: 3, ExercisedExtensions: 2, Exercised: true,
 		},
 	}
 }

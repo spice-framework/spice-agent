@@ -66,8 +66,8 @@ documentation.
 
 ## What remains before v1
 
-The repository has proven one of three clean-room public extensions and must
-still prove two more, complete the frozen generated-source exercise through
+The repository has proven two of three clean-room public extensions and must
+still prove one more, complete the frozen generated-source exercise through
 those isolated builds, and publish and test two supported released generations
 of both protocols. Stable kernel benchmark
 ceilings and the stricter 20% time/10% allocation investigation policy are now

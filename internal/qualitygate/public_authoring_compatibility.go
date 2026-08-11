@@ -85,6 +85,16 @@ func validatePublicAuthoringCompatibility(value publicAuthoringCompatibility) er
 			VerificationRun: "https://github.com/spice-framework/spice-agent-tool-text/actions/runs/31442525658",
 			Release:         "https://github.com/spice-framework/spice-agent-tool-text/releases/tag/v0.1.0-preview.1",
 		},
+		{
+			Module: "github.com/spice-framework/spice-agent-tool-json", Version: "v0.1.0-preview.1",
+			Commit: "78bd51b100ca697d369f594c7f78c0d0b8c2b817", TagObject: "639fb4fd1253f21c69ecbde00c2d9d12803ceab2",
+			Profile:   "compiled-tool-autoconfigure/v1alpha1-preview6",
+			ModuleSum: "h1:F5ngOkwjx2AhGAbPQGxGCh+OxZy6YveU3q3Ec7q2gw4=", GoModSum: "h1:Li2OFEzHQY46FVWJU3dXqdxHD12yRnlsp2UBrHgBqKE=",
+			Proxy: "https://proxy.golang.org", SumDB: "sum.golang.org", GeneratedManifestSchema: 6,
+			Platforms: slices.Clone(value.Platforms), VendorOffline: true, Operations: slices.Clone(wantOperations),
+			VerificationRun: "https://github.com/spice-framework/spice-agent-tool-json/actions/runs/31446318737",
+			Release:         "https://github.com/spice-framework/spice-agent-tool-json/releases/tag/v0.1.0-preview.1",
+		},
 	}
 	if value.Schema != "spice.agent.public-authoring.compatibility/v1alpha1" || value.Module != modulePath ||
 		value.Status != "sdk-beta-proven-phase8-pending" || value.ProofModel != "clean-room-released-artifacts-only" ||

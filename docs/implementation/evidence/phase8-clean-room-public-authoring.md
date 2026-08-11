@@ -54,6 +54,32 @@ passed the same operational boundary; deletion removed the activation import
 and regenerated without `text.inspect` ownership.
 
 This one record satisfies the public-authoring portion of the SDK beta
-criterion. Phase 8 remains incomplete until two additional separately
-versioned evidence records exist. The public-authoring and generated-source v1
-blockers therefore remain active.
+criterion.
+
+## Second proof: deterministic JSON tool
+
+The second separately versioned proof is
+`github.com/spice-framework/spice-agent-tool-json@v0.1.0-preview.1`. Annotated
+tag object `639fb4fd1253f21c69ecbde00c2d9d12803ceab2` resolves to commit
+`78bd51b100ca697d369f594c7f78c0d0b8c2b817`. The public Go proxy and SumDB
+resolve that exact source with module sum
+`h1:F5ngOkwjx2AhGAbPQGxGCh+OxZy6YveU3q3Ec7q2gw4=` and go.mod sum
+`h1:Li2OFEzHQY46FVWJU3dXqdxHD12yRnlsp2UBrHgBqKE=`. Its non-draft GitHub
+prerelease records the same immutable identity.
+
+The module contributes one deterministic read-only `json.inspect` tool through
+explicit blank-import auto-configuration. It rejects duplicate keys and
+bounded-depth/node violations without returning the source document. Hosted
+run
+[`31446318737`](https://github.com/spice-framework/spice-agent-tool-json/actions/runs/31446318737)
+passed from fresh caches on Ubuntu and Windows: committed-vendor offline
+verification plus install, configure, debug, test, package, and deletion
+operations. A separate repository-external consumer fetched only the public
+proxy tag, generated a nine-file schema 6 application, disabled the proxy, and
+passed the same operational boundary. Removing the activation import then
+regenerated eight files with zero extension-owned sources and no
+`json.inspect` identity.
+
+Two records are now complete. Phase 8 remains incomplete until one additional
+separately versioned evidence record exists. The public-authoring and
+generated-source v1 blockers therefore remain active.

@@ -63,6 +63,33 @@
       ],
       "verification_run": "https://github.com/spice-framework/spice-agent-tool-text/actions/runs/31442525658",
       "release": "https://github.com/spice-framework/spice-agent-tool-text/releases/tag/v0.1.0-preview.1"
+    },
+    {
+      "module": "github.com/spice-framework/spice-agent-tool-json",
+      "version": "v0.1.0-preview.1",
+      "commit": "78bd51b100ca697d369f594c7f78c0d0b8c2b817",
+      "tag_object": "639fb4fd1253f21c69ecbde00c2d9d12803ceab2",
+      "profile": "compiled-tool-autoconfigure/v1alpha1-preview6",
+      "module_sum": "h1:F5ngOkwjx2AhGAbPQGxGCh+OxZy6YveU3q3Ec7q2gw4=",
+      "go_mod_sum": "h1:Li2OFEzHQY46FVWJU3dXqdxHD12yRnlsp2UBrHgBqKE=",
+      "proxy": "https://proxy.golang.org",
+      "sumdb": "sum.golang.org",
+      "generated_manifest_schema": 6,
+      "platforms": [
+        "linux/amd64",
+        "windows/amd64"
+      ],
+      "vendor_offline": true,
+      "operations": [
+        "install",
+        "configure",
+        "debug",
+        "test",
+        "package",
+        "delete"
+      ],
+      "verification_run": "https://github.com/spice-framework/spice-agent-tool-json/actions/runs/31446318737",
+      "release": "https://github.com/spice-framework/spice-agent-tool-json/releases/tag/v0.1.0-preview.1"
     }
   ],
   "proven": false

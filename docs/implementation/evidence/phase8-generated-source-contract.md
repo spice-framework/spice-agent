@@ -32,5 +32,6 @@ This closes the immutable-release and repository-migration portion of the v1
 criterion. It does not claim the public-authoring boundary: the same released
 generator must be exercised by three isolated clean-room extension proofs before
 `clean-room-generated-source-exercise` can be removed. The released
-`spice-agent-tool-text@v0.1.0-preview.1` proof is the first exact exercise; two
-remain.
+`spice-agent-tool-text@v0.1.0-preview.1` and
+`spice-agent-tool-json@v0.1.0-preview.1` proofs are the first two exact
+exercises; one remains.
