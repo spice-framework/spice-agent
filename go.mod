@@ -12,7 +12,7 @@ tool (
 
 require (
 	github.com/Microsoft/go-winio v0.6.2
-	github.com/spice-framework/spice v0.1.0-preview.2.0.20260811041952-0e79bc4f3b29
+	github.com/spice-framework/spice v0.1.0-preview.4
 	golang.org/x/sys v0.47.0
 	google.golang.org/grpc v1.83.0
 	google.golang.org/protobuf v1.36.11
