@@ -44,7 +44,7 @@
   },
   "released_generation_matrix": {
     "manifest": "compatibility/released-generation.json",
-    "proven": false
+    "proven": true
   },
   "released_binary_matrix": {
     "proven": false,

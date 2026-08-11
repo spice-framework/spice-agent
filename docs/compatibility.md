@@ -62,21 +62,21 @@ documentation.
 - Fresh proxy and SumDB resolution yields module sum
   `h1:XJKJge+xWP/FLNoL1/rXq8z8tdu/5iEkKfmu1dTgFms=` and go.mod sum
   `h1:pbhYOeNgn4pCIhEmcdbjnFjJijY4ZSLM8ZHxaF2dxz0=`.
-- Engine 1.2/1.3 and plugin 1.0 semantic evidence remains source-built. A
-  separate candidate runner now builds preview5 and preview6 independently
-  from the public proxy and SumDB, crosses their engine and plugin processes in
-  both directions, and retains the honest distinction that no prebuilt-binary
-  asset matrix is claimed. Its v1 blockers remain until the exact runner is
-  hosted-green on Linux and Windows.
+- Engine 1.2/1.3 and plugin 1.0 semantic evidence is complemented by the
+  released-generation matrix at commit
+  `609f74f0abc7e3eba9f8a9ceab3c68ac17208ca2`. Dedicated workflow run
+  `31454312077` built preview5 and preview6 independently from the public proxy
+  and SumDB and crossed their engine and plugin processes in both directions on
+  Linux and Windows. The two released-generation blockers are closed; no
+  prebuilt-binary asset matrix is claimed.
 
 ## What remains before v1
 
-The repository has proven all three clean-room public extensions and completed
-the frozen generated-source exercise through those isolated builds. Preview5
-and preview6 are the two immutable supported generations; their candidate
-cross-generation runner is locally green on Windows and still requires hosted
-Linux and Windows evidence before the protocol blockers close.
-Stable kernel benchmark
-ceilings and the stricter 20% time/10% allocation investigation policy are now
-machine-readable and enforced by `make verify`. See
-[RFC 0010](rfc/0010-api-and-protocol-compatibility.md).
+The repository has proven all three clean-room public extensions, completed
+the frozen generated-source exercise, and proven preview5/preview6 engine and
+plugin compatibility on hosted Linux and Windows. The compatibility policy has
+no enumerated v1 blockers, but it remains explicitly
+`pre-v1-enforced-not-stable`: a future v1 declaration is a separate reviewed
+decision. Stable kernel benchmark ceilings and the stricter 20% time/10%
+allocation investigation policy are machine-readable and enforced by
+`make verify`. See [RFC 0010](rfc/0010-api-and-protocol-compatibility.md).

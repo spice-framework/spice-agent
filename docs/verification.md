@@ -91,7 +91,11 @@ The released-generation runner is a distinct stronger boundary: it compiles
 two independent processes from immutable public preview5 and preview6 sources,
 not from the checked-out tree. This proves released-generation compatibility;
 it deliberately does not claim that the module release publishes prebuilt
-daemon or plugin executables.
+daemon or plugin executables. Dedicated workflow run
+[`31454312077`](https://github.com/spice-framework/spice-agent/actions/runs/31454312077)
+is the canonical hosted proof at commit
+`609f74f0abc7e3eba9f8a9ceab3c68ac17208ca2`: its Linux, Windows, and required
+jobs are all successful.
 
 The independent `plugin/v1/compatibility.json` manifest locks the plugin/v1
 breadth claim. Ordinary hosted

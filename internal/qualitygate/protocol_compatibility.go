@@ -243,6 +243,23 @@ func validateCleanRoomEvidenceProgress(
 	return nil
 }
 
+func validateReleasedGenerationEvidenceProgress(
+	policy compatibilityPolicy,
+	released releasedGenerationCompatibility,
+	engine engineProtocolCompatibility,
+	plugin pluginProtocolCompatibility,
+) error {
+	engineBlocked := slices.Contains(policy.V1Blockers, "released-engine-n-minus-one")
+	pluginBlocked := slices.Contains(policy.V1Blockers, "released-plugin-n-minus-one")
+	if released.Proven != engine.ReleasedGenerationMatrix.Proven ||
+		released.Proven != plugin.ReleasedGenerationMatrix.Proven ||
+		engineBlocked != !engine.ReleasedGenerationMatrix.Proven ||
+		pluginBlocked != !plugin.ReleasedGenerationMatrix.Proven {
+		return errors.New("compatibility manifests disagree on released-generation evidence progress")
+	}
+	return nil
+}
+
 func compatibilityReferencesAreCanonical(
 	policy compatibilityPolicy,
 	engine engineProtocolCompatibility,
@@ -257,8 +274,8 @@ func compatibilityReferencesAreCanonical(
 		policy.PublicAuthoring.Manifest == publicAuthoringCompatibilityPath &&
 		policy.SecurityExceptions == securityExceptionsPath &&
 		engine.PluginCompatibilityManifest == pluginProtocolCompatibilityPath &&
-		engine.ReleasedGenerationMatrix == (releasedGenerationReference{Manifest: releasedGenerationCompatibilityPath}) &&
-		plugin.ReleasedGenerationMatrix == (releasedGenerationReference{Manifest: releasedGenerationCompatibilityPath})
+		engine.ReleasedGenerationMatrix.Manifest == releasedGenerationCompatibilityPath &&
+		plugin.ReleasedGenerationMatrix.Manifest == releasedGenerationCompatibilityPath
 }
 
 func checkEngineProtocolCompatibility(root string) error {
@@ -270,7 +287,7 @@ func checkEngineProtocolCompatibility(root string) error {
 }
 
 func validateCompatibilityPolicy(value compatibilityPolicy) error {
-	wantBlockers := []string{"released-engine-n-minus-one", "released-plugin-n-minus-one"}
+	wantBlockers := []string{}
 	wantBenchmarks := benchmarkPolicy{
 		Manifest: benchmarkBudgetPath, Status: "stable-enforced", Aggregation: "median-of-five",
 		BudgetChanges: "measured-evidence-and-reviewed-rationale",
@@ -288,10 +305,14 @@ func validateCompatibilityPolicy(value compatibilityPolicy) error {
 		value.GeneratedSource.RequiredContract != "immutable-non-development-generator-and-frozen-ownership-schema" ||
 		value.Benchmarks != wantBenchmarks ||
 		value.PublicAuthoring != wantPublicAuthoring ||
-		!slices.Equal(value.V1Blockers, wantBlockers) {
+		!reviewedV1Blockers(value.V1Blockers, wantBlockers) {
 		return errors.New("compatibility policy differs from the reviewed pre-v1 contract")
 	}
 	return nil
+}
+
+func reviewedV1Blockers(actual, expected []string) bool {
+	return actual != nil && slices.Equal(actual, expected)
 }
 
 func validateEngineProtocolCompatibility(value engineProtocolCompatibility) error {
@@ -324,7 +345,7 @@ func expectedEngineProtocolCompatibility() engineProtocolCompatibility {
 			{Peer: "current", ServerRange: "1.0.0-1.3.0", ClientMode: "exact-replay", Platforms: slices.Clone(platforms)},
 		},
 		RequiredCases:            []string{"exact-legacy-1.2", "adaptive-current-1.3", "explicit-proven-downgrade", "authentication-definitive", "current-exact-replay-after-response-loss", "legacy-ambiguity-never-retries", "cancellation-conflict-exact-recovery", "process-cleanup"},
-		ReleasedGenerationMatrix: releasedGenerationReference{Manifest: releasedGenerationCompatibilityPath},
+		ReleasedGenerationMatrix: releasedGenerationReference{Manifest: releasedGenerationCompatibilityPath, Proven: true},
 		ReleasedBinaryMatrix:     releasedBinaryMatrix{Claim: "not-claimed"},
 		History: []engineProtocolHistory{
 			{Version: "1.2.0", Profile: "legacy", Evidence: "source-built-only"},
@@ -342,7 +363,7 @@ func validatePluginProtocolCompatibility(value pluginProtocolCompatibility) erro
 		!slices.Equal(value.SourceBuiltMatrix.Languages, []string{"go", "python"}) || !sortedUnique(value.SourceBuiltMatrix.RequiredCases) ||
 		len(value.History) < 1 || value.History[0] != (pluginProtocolHistory{Version: "1.0.0", Transcript: 1, Evidence: "source-built-go-and-python"}) ||
 		value.ProductionHostLaunch != (pluginProductionHostLaunch{Go: "separately-proven", Python: "future-pinned-native-artifact-required"}) ||
-		value.ReleasedGenerationMatrix != (releasedGenerationReference{Manifest: releasedGenerationCompatibilityPath}) ||
+		value.ReleasedGenerationMatrix != (releasedGenerationReference{Manifest: releasedGenerationCompatibilityPath, Proven: true}) ||
 		value.ReleasedBinaryMatrix != (releasedBinaryMatrix{Claim: "not-claimed"}) || value.V1Stable {
 		return errors.New("plugin protocol compatibility manifest differs from the reviewed independent contract")
 	}

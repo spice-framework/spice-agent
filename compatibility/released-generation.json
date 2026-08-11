@@ -1,7 +1,7 @@
 {
   "schema": "spice.agent.released-generation.compatibility/v1alpha1",
   "module": "github.com/spice-framework/spice-agent",
-  "status": "candidate-hosted-evidence-pending",
+  "status": "hosted-linux-windows-proven",
   "go": "go1.26.5",
   "build_source": "public-proxy-and-sumdb",
   "isolation": {
@@ -85,9 +85,9 @@
   "runner_source": "internal/releasedcompatibility/testdata/peer",
   "runner_source_sha256": "ac1728b36cca211f853e4a9720a9ff46f39b00ca6834002a225dfb4ac6f22518",
   "evidence": {
-    "workflow": "",
-    "run": 0,
-    "commit": ""
+    "workflow": "https://github.com/spice-framework/spice-agent/actions/workflows/released-compatibility.yml",
+    "run": 31454312077,
+    "commit": "609f74f0abc7e3eba9f8a9ceab3c68ac17208ca2"
   },
-  "proven": false
+  "proven": true
 }

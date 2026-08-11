@@ -1,6 +1,6 @@
 # RFC 0010: API and protocol compatibility before v1
 
-Status: Accepted for pre-v1 enforcement; v1 criteria remain blocked
+Status: Accepted for pre-v1 enforcement; released-generation criteria proven
 
 ## Context
 
@@ -63,12 +63,14 @@ The repository does not manufacture a generation or call two source builds a
 released matrix.
 
 Preview5 and preview6 now supply those immutable public module generations. A
-dedicated candidate runner downloads each through the public proxy and SumDB
+dedicated runner downloads each through the public proxy and SumDB
 into separate fresh caches, builds the same reviewed peer against each release,
 and crosses both engine and plugin process directions. This is a
 released-generation proof, not a claim that the module release publishes
-prebuilt executable assets. The policy blockers remain until the exact runner
-is hosted-green on Linux and Windows and its evidence is recorded canonically.
+prebuilt executable assets. Workflow run `31454312077` proves the exact matrix
+on Linux and Windows at commit
+`609f74f0abc7e3eba9f8a9ceab3c68ac17208ca2`; the evidence is recorded
+canonically and both released-generation blockers are closed.
 
 ### Durable identities
 
@@ -105,9 +107,10 @@ Intentional API work updates the current platform digests and appends a reviewed
 break/migration record in the same commit. Historical digests and durable
 history cannot be rewritten.
 
-The clean-room public-authoring and generated-source exercises are complete.
-`v1.0` remains blocked on released engine and plugin N/N-1 matrices. Stable kernel
-benchmark budgets are now a canonical enforced contract: five fixed samples,
+The clean-room public-authoring, generated-source, and released-generation
+criteria are complete. The policy has no enumerated v1 blockers, but it remains
+explicitly pre-v1 and does not itself declare v1. Stable kernel benchmark
+budgets are now a canonical enforced contract: five fixed samples,
 median time/byte/allocation ceilings, 20% time and 10% allocation material
 regression thresholds, and a measured-evidence requirement for budget changes.
 The remaining facts cannot be satisfied by documentation alone.

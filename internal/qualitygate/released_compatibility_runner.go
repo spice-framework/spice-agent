@@ -26,7 +26,7 @@ func newReleasedCompatibilityRunner(
 	if output == nil {
 		return nil, errors.New("released compatibility output is required")
 	}
-	if err := compatibility.ValidateCandidate(); err != nil {
+	if err := compatibility.ValidateProven(); err != nil {
 		return nil, err
 	}
 	if err := compatibility.ValidateSource(repository); err != nil {

@@ -64,7 +64,7 @@ func (manifests compatibilityManifestSet) Validate(root string) error {
 		func() error { return validateDurableCompatibility(manifests.durable) },
 		func() error { return validateSecurityExceptions(manifests.security) },
 		func() error { return validatePublicAuthoringCompatibility(manifests.publicAuthoring) },
-		manifests.releasedGeneration.ValidateCandidate,
+		manifests.releasedGeneration.ValidateProven,
 		func() error { return manifests.releasedGeneration.ValidateSource(root) },
 		func() error { return validateGeneratedSourceCompatibility(root, manifests.generatedSource) },
 		func() error { return validateGoAPICompatibility(manifests.goAPI, root) },
@@ -81,9 +81,17 @@ func (manifests compatibilityManifestSet) Validate(root string) error {
 	if !compatibilityReferencesAreCanonical(manifests.policy, manifests.engine, manifests.plugin) {
 		return errors.New("compatibility manifests do not cross-reference the canonical contracts")
 	}
-	return validateCleanRoomEvidenceProgress(
+	if err := validateCleanRoomEvidenceProgress(
 		manifests.policy,
 		manifests.publicAuthoring,
 		manifests.generatedSource,
+	); err != nil {
+		return err
+	}
+	return validateReleasedGenerationEvidenceProgress(
+		manifests.policy,
+		manifests.releasedGeneration,
+		manifests.engine,
+		manifests.plugin,
 	)
 }

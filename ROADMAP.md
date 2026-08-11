@@ -16,10 +16,10 @@ Phase 8 now enforces the written pre-v1 Go API, durable-state, engine/plugin
 protocol, generated-source, and security-exception policy. The immutable
 Toolchain preview2 generator contract is released and every owned Agent target
 is migrated to schema 6. All three clean-room public-authoring and
-generated-source exercises are released. This does not freeze the APIs or claim
-The preview5/preview6 released-generation runner is locally green on Windows;
-its protocol blockers remain until the exact candidate is hosted-green on both
-Linux and Windows.
+generated-source exercises are released. The preview5/preview6
+released-generation matrix is hosted-green on Linux and Windows, closing its
+two enumerated protocol blockers. This does not freeze the APIs, declare v1, or
+claim a released-binary asset matrix.
 Stable kernel benchmark budgets and their change policy are mandatory in the
 full verifier.
 See the canonical ledger.

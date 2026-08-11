@@ -13,7 +13,7 @@ Repository roadmaps link here and must not duplicate status.
 | 5 — runtime plugins | In progress | frozen plugin/v1, Go/Python conformance, authenticated host, atomic generations, exact leases, graceful lifecycle, bounded recovery/health, generated activation, real-process cancellation, one real `spice dev` last-known-good proof, and installed daemon/TUI recovery are complete; the simultaneous two-supervisor edit/reconnect proof remains |
 | 6 — architecture proof | In progress | dependency-ordered keyless module releases, then independently attested preview distribution; [Agent preview.1/preview.2/preview.3 failure history](evidence/phase6-release-history.md) |
 | 7 — stress prototypes | Complete | permission, SQLite recovery, alternate semantic shell, and two-worker extension proven without stabilizing their APIs |
-| 8 — stabilization | In progress | enforced pre-v1 API/protocol/durable/security/benchmark/public-authoring policy, immutable schema 6 generator migration, plus removable deterministic compaction, guarded Git, safe telemetry projection, and advisory planning extensions proven; all three clean-room public extensions are released, and the preview5/preview6 released-generation runner is locally green while hosted Linux/Windows proof remains |
+| 8 — stabilization | In progress | enforced pre-v1 API/protocol/durable/security/benchmark/public-authoring policy, immutable schema 6 generator migration, plus removable deterministic compaction, guarded Git, safe telemetry projection, and advisory planning extensions proven; all three clean-room public extensions are released, and the preview5/preview6 released-generation matrix is hosted-green on Linux and Windows |
 
 Exact commits and command output are recorded only after the corresponding gate
 has run. A phase is not complete because code exists; every exit criterion in its
@@ -29,10 +29,10 @@ the complete range. This is not a released-binary N/N-1 claim, and plugin
 generation compatibility remains independently versioned. The strict pre-v1
 policy now also records the exact 26-package Go API on three platforms, reviewed
 break migrations, durable format history, plugin/v1 history, security
-exceptions, and the still-blocked v1 criteria. Exact scope and tests are recorded in
+exceptions, and the reviewed pre-v1 declaration boundary. Exact scope and tests are recorded in
 [`phase8-engine-protocol-compatibility.md`](evidence/phase8-engine-protocol-compatibility.md).
-The public-release cross-generation candidate and its still-pending hosted
-boundary are recorded separately in
+The public-release cross-generation matrix and its hosted Linux/Windows
+evidence are recorded separately in
 [`phase8-released-generation-compatibility.md`](evidence/phase8-released-generation-compatibility.md).
 
 The generated-source contract now pins released Toolchain preview2 and exact

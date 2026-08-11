@@ -2,7 +2,7 @@
 
 ## Bounded outcome
 
-This slice adds the candidate proof for the two immutable Agent generations
+This slice proves the two immutable Agent generations
 required by RFC 0010. It does not relabel two checked-out source profiles as
 releases and does not claim a prebuilt executable asset that the module release
 does not publish.
@@ -48,7 +48,7 @@ cancellation, drain, shutdown, and clean fixture exit.
 
 ## Verification boundary
 
-The initial repository-owned Windows execution passed:
+The repository-owned Windows and Linux executions passed:
 
 ```text
 make verify-released-compatibility
@@ -56,13 +56,19 @@ make verify-released-compatibility
 
 Both engine directions negotiated `1.3.0`, both plugin directions completed
 the full `1.0.0` conformance suite, and all four processes exited cleanly. The
-dedicated `.github/workflows/released-compatibility.yml` workflow repeats the
-same uncached command on `ubuntu-latest` and `windows-latest`.
+dedicated `.github/workflows/released-compatibility.yml` workflow repeated the
+same uncached command on `ubuntu-latest` and `windows-latest`. Exact commit
+`609f74f0abc7e3eba9f8a9ceab3c68ac17208ca2` is terminal green in run
+[`31454312077`](https://github.com/spice-framework/spice-agent/actions/runs/31454312077):
 
-At this candidate boundary the machine manifest remains `proven: false`, the
-hosted evidence is empty, and both v1 protocol blockers remain. They may be
-removed only by a follow-up commit after the exact runner and peer-source digest
-are terminal green on both hosted platforms.
+- Linux job `93664865457` succeeded;
+- Windows job `93664865507` succeeded; and
+- required aggregate job `93665670967` succeeded.
+
+Normal CI run `31454312261`, including macOS, and Documentation run
+`31454312310` are also terminal green at the same exact commit. The machine
+manifest is therefore `proven: true`; engine and plugin references agree, and
+the two released-generation blockers are removed.
 
 ## Deletion and truthful limit
 

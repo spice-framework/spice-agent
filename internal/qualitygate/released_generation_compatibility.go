@@ -29,7 +29,7 @@ type releasedGenerationCompatibility struct {
 	Proven             bool                             `json:"proven"`
 }
 
-func (compatibility releasedGenerationCompatibility) ValidateCandidate() error {
+func (compatibility releasedGenerationCompatibility) ValidateProven() error {
 	wantGenerations := []releasedGeneration{
 		{
 			Role: "previous", Version: "v0.1.0-preview.5", Commit: "3e8fe6406171a7e7f1765311a4fa7fc3b878e425",
@@ -61,14 +61,18 @@ func (compatibility releasedGenerationCompatibility) ValidateCandidate() error {
 		RequiredCases: []string{"authenticated-transcript", "cancellation-and-drain", "exact-manifest", "malformed-and-oversized-refusal", "process-cleanup", "shutdown", "typed-failure"},
 	}
 	if compatibility.Schema != "spice.agent.released-generation.compatibility/v1alpha1" ||
-		compatibility.Module != modulePath || compatibility.Status != "candidate-hosted-evidence-pending" ||
+		compatibility.Module != modulePath || compatibility.Status != "hosted-linux-windows-proven" ||
 		compatibility.Go != requiredGoVersion || compatibility.BuildSource != "public-proxy-and-sumdb" ||
 		compatibility.Isolation != wantIsolation || !slices.Equal(compatibility.Generations, wantGenerations) ||
 		!slices.Equal(compatibility.Platforms, []string{"linux/amd64", "windows/amd64"}) ||
 		!compatibility.Engine.Equal(wantEngine) || !compatibility.Plugin.Equal(wantPlugin) ||
 		compatibility.RunnerSource != "internal/releasedcompatibility/testdata/peer" || len(compatibility.RunnerSourceSHA256) != 64 ||
-		compatibility.Evidence != (releasedGenerationEvidence{}) || compatibility.Proven {
-		return errors.New("released-generation compatibility manifest differs from the reviewed candidate contract")
+		compatibility.Evidence != (releasedGenerationEvidence{
+			Workflow: "https://github.com/spice-framework/spice-agent/actions/workflows/released-compatibility.yml",
+			Run:      31454312077,
+			Commit:   "609f74f0abc7e3eba9f8a9ceab3c68ac17208ca2",
+		}) || !compatibility.Proven {
+		return errors.New("released-generation compatibility manifest differs from the reviewed hosted proof")
 	}
 	return nil
 }

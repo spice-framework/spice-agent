@@ -41,8 +41,5 @@
     "proven_extensions": 3
   },
   "security_exceptions": "compatibility/security-exceptions.json",
-  "v1_blockers": [
-    "released-engine-n-minus-one",
-    "released-plugin-n-minus-one"
-  ]
+  "v1_blockers": []
 }
