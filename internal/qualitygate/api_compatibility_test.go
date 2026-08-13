@@ -19,7 +19,8 @@ func TestPublicGoAPIBaselineIsPlatformTruthful(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(packages) != 28 || !slices.Contains(packages, modulePath+"/common/v1") ||
+	if len(packages) != 29 || !slices.Contains(packages, modulePath+"/client/conformance") ||
+		!slices.Contains(packages, modulePath+"/common/v1") ||
 		!slices.Contains(packages, modulePath+"/engine/v1") || !slices.Contains(packages, modulePath+"/plugin/v1") {
 		t.Fatalf("public package inventory = %v", packages)
 	}

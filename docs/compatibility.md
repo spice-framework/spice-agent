@@ -84,8 +84,9 @@ documentation.
 
 The repository has proven all three clean-room public extensions, completed
 the frozen generated-source exercise, and proven preview5/preview6 engine and
-plugin compatibility on hosted Linux and Windows. The compatibility policy has
-no enumerated v1 blockers, but it remains explicitly
+plugin compatibility on hosted Linux and Windows. Those released-generation
+blockers remain closed. The policy records one separate v1 evidence blocker for
+the independent Coding consumer of the public client conformance suite, and it remains explicitly
 `pre-v1-enforced-not-stable`: a future v1 declaration is a separate reviewed
 decision. Stable kernel benchmark ceilings and the stricter 20% time/10%
 allocation investigation policy are machine-readable and enforced by

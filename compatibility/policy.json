@@ -41,5 +41,10 @@
     "proven_extensions": 3
   },
   "security_exceptions": "compatibility/security-exceptions.json",
-  "v1_blockers": []
+  "api_usage": "compatibility/api-usage.json",
+  "security_process": "compatibility/security-process.json",
+  "kernel_concepts": "compatibility/kernel-concepts.json",
+  "v1_blockers": [
+    "semantic-client-session-second-conformance-consumer"
+  ]
 }

@@ -8,11 +8,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/spice-framework/spice-agent/agent"
 	"github.com/spice-framework/spice-agent/client"
+	clientconformance "github.com/spice-framework/spice-agent/client/conformance"
 	commonv1 "github.com/spice-framework/spice-agent/common/v1"
 	"github.com/spice-framework/spice-agent/daemon"
 	"github.com/spice-framework/spice-agent/daemon/endpoint"
@@ -23,6 +25,18 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 )
+
+func TestConnectorPassesPublicClientConformance(t *testing.T) {
+	t.Parallel()
+	fixture := newDaemonFixture(t)
+	if err := clientconformance.Run(t.Context(), fixture.connector, clientconformance.Config{
+		Initialize:       fixture.initializeRequest(t, nil),
+		Waiting:          fixture.waitingRequest(t),
+		OperationTimeout: 5 * time.Second,
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestConnectorAcceptanceAgainstDaemonGRPCServer(t *testing.T) {
 	t.Parallel()
@@ -208,7 +222,7 @@ func newDaemonFixture(t *testing.T) *daemonFixture {
 		t.Fatal(err)
 	}
 	engine, err := agent.NewEngine(
-		completedProvider{}, dispatcher, &agent.AtomicIDSource{}, time.Now, nil, nil,
+		&completedProvider{}, dispatcher, &agent.AtomicIDSource{}, time.Now, nil, nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -354,15 +368,48 @@ func (fixture *daemonFixture) initializeRequest(
 	return request
 }
 
-type completedProvider struct{}
+func (fixture *daemonFixture) waitingRequest(t *testing.T) client.StartRequest {
+	t.Helper()
+	operation, err := client.NewOperationID("conformance-waiting-operation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reference, err := client.NewDefinitionRef("acceptance", "revision-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	input, err := client.NewInput("conformance-waiting-message", "wait for cancellation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err := client.NewStartRequest(operation, reference, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return request
+}
 
-func (completedProvider) Stream(context.Context, model.Request) (model.Stream, error) {
+type completedProvider struct{ calls atomic.Uint32 }
+
+func (provider *completedProvider) Stream(context.Context, model.Request) (model.Stream, error) {
+	if provider.calls.Add(1) == 2 {
+		return blockingStream{}, nil
+	}
 	completed, err := model.Completed(model.NewUsage(1, 1))
 	if err != nil {
 		return nil, err
 	}
 	return &completedStream{completed: completed}, nil
 }
+
+type blockingStream struct{}
+
+func (blockingStream) Recv(ctx context.Context) (model.StreamEvent, error) {
+	<-ctx.Done()
+	return model.StreamEvent{}, ctx.Err()
+}
+
+func (blockingStream) Close() error { return nil }
 
 type completedStream struct {
 	completed model.StreamEvent

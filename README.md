@@ -12,6 +12,12 @@ This project is pre-1.0. See [the implementation ledger](docs/implementation/REA
 [compatibility policy](docs/compatibility.md), and [architecture](ARCHITECTURE.md)
 before adopting its APIs.
 
+Extension and client authors should start with the
+[compiled-extension guide](docs/authoring/extensions.md),
+[protocol guide](docs/authoring/protocols.md), [released examples](docs/examples.md),
+and [threat model](docs/threat-model.md). Public API usage, security process,
+and kernel-concept evidence remain machine-readable under `compatibility/`.
+
 ```text
 make tools-bootstrap # explicit fresh-cache dependency download
 make proto           # regenerate committed Protobuf Go with local tools

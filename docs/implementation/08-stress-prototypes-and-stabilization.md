@@ -156,8 +156,10 @@ plan-recommended mutation, proving the plan has no authority. See
   `spice-agent-tool-integer@v0.1.0-preview.1` are complete.
 - Run both runtime-plugin languages and a second client against current and
   previous compatible protocols. The plugin-language half is complete. The
-  alternate semantic shell proves the second client contract independently,
-  while its version-skew matrix remains a separate slice.
+  alternate semantic shell proves the second client contract independently.
+  TUI commit `95d0bf4622a7dc6b38a30735b280a8e6b47fbd56` also source-builds
+  TUI preview1/preview2 against Agent preview5/preview6 in all eight hosted
+  Linux/Windows lanes; it deliberately makes no prebuilt-executable claim.
 - Keep MCP, Git workflow, indexing/LSP, compaction, planning, sandbox, and
   subagent work behind separately reviewed optional boundaries. The former
   telemetry experiment instead promoted a bounded logging subset into core and
@@ -165,7 +167,11 @@ plan-recommended mutation, proving the plan has no authority. See
 - Publish scaffolding, authoring guides, protocol schemas, GoDoc, compatibility
   matrices, migrations, examples, threat models, and conformance kits.
 - Measure API usage and remove accidental surface before v1 rather than keeping
-  it indefinitely.
+  it indefinitely. The exact package-level usage dispositions, public client
+  conformance suite, authoring/protocol/example/threat-model publication,
+  supported security/dependency process, and kernel-concept inventory are
+  complete. The Coding consumer of the public conformance package remains open
+  and is not hidden by the completed TUI released-module matrix.
 
 ## Stabilization criteria
 
@@ -219,3 +225,13 @@ aggregation, stable time/byte/allocation ceilings, 20% time and 10% allocation
 material-regression thresholds, and the evidence required to change a budget.
 `make benchmark` and `make verify` both enforce it; optional-extension and
 installed-distribution budgets remain owned by their separate evidence.
+
+Criterion 4 is now machine-readable and enforced through
+`compatibility/security-process.json` and
+criterion 6 has one explicit remaining conformance consumer in
+`compatibility/kernel-concepts.json`. Criterion 3 remains satisfied by the
+immutable preview5/preview6 released-generation matrix. This does not declare
+v1 or claim a released-binary matrix. TUI released-client matrix run
+`31747559805`, ordinary CI `31747560151`, and documentation run `31747560119`
+are terminal-success evidence for the separate public-module source-build
+matrix at the exact TUI commit above.

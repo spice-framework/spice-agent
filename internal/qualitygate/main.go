@@ -583,10 +583,17 @@ func checkIdentity(root string) error {
 	if strings.Contains(text, "\nreplace ") || strings.Contains(text, "\nreplace (") {
 		return errors.New("committed go.mod must not contain replace directives")
 	}
-	if err := checkRepositoryPortability(root); err != nil {
+	if portabilityErr := checkRepositoryPortability(root); portabilityErr != nil {
+		return portabilityErr
+	}
+	if compatibilityErr := checkCompatibilityManifests(root); compatibilityErr != nil {
+		return compatibilityErr
+	}
+	goAPI, _, err := readCanonicalJSON[goAPICompatibility](root, goAPICompatibilityPath)
+	if err != nil {
 		return err
 	}
-	if err := checkCompatibilityManifests(root); err != nil {
+	if err = checkDocumentationContract(root, goAPI.PublicPackages); err != nil {
 		return err
 	}
 	return checkReleaseWorkflow(root)

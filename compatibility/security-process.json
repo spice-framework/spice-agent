@@ -1,0 +1,40 @@
+{
+  "schema": "spice.agent.security-process/v1alpha1",
+  "module": "github.com/spice-framework/spice-agent",
+  "status": "supported-pre-v1",
+  "supported_versions": {
+    "policy": "current-and-previous-preview-when-fix-is-technically-safe",
+    "current": "v0.1.0-preview.7",
+    "previous": "v0.1.0-preview.6",
+    "withdrawn_versions_must_fail_closed": true
+  },
+  "reporting": {
+    "channel": "github-private-security-advisory",
+    "public_issue_forbidden": true,
+    "acknowledgement_target_days": 3,
+    "triage_target_days": 7
+  },
+  "response": {
+    "coordinated_disclosure": true,
+    "fixed_release_or_withdrawal_required": true,
+    "backport_requires_identical_security_contract": true,
+    "security_exception_manifest": "compatibility/security-exceptions.json"
+  },
+  "dependency_updates": {
+    "owner": "spice-framework-maintainers",
+    "routine_review_days": 30,
+    "critical_review_days": 1,
+    "required_gates": [
+      "go-mod-tidy-diff",
+      "gosec",
+      "govulncheck",
+      "license-review",
+      "vendor-reproducibility"
+    ],
+    "hidden_network_access": "forbidden"
+  },
+  "github_controls": [
+    "dependabot-security-updates",
+    "private-vulnerability-reporting"
+  ]
+}

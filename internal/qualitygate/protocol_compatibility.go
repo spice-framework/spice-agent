@@ -34,6 +34,9 @@ type compatibilityPolicy struct {
 	Benchmarks         benchmarkPolicy       `json:"benchmarks"`
 	PublicAuthoring    publicAuthoringPolicy `json:"public_authoring"`
 	SecurityExceptions string                `json:"security_exceptions"`
+	APIUsage           string                `json:"api_usage"`
+	SecurityProcess    string                `json:"security_process"`
+	KernelConcepts     string                `json:"kernel_concepts"`
 	V1Blockers         []string              `json:"v1_blockers"`
 }
 
@@ -273,6 +276,9 @@ func compatibilityReferencesAreCanonical(
 		policy.Benchmarks.Manifest == benchmarkBudgetPath &&
 		policy.PublicAuthoring.Manifest == publicAuthoringCompatibilityPath &&
 		policy.SecurityExceptions == securityExceptionsPath &&
+		policy.APIUsage == apiUsagePath &&
+		policy.SecurityProcess == securityProcessPath &&
+		policy.KernelConcepts == kernelConceptsPath &&
 		engine.PluginCompatibilityManifest == pluginProtocolCompatibilityPath &&
 		engine.ReleasedGenerationMatrix.Manifest == releasedGenerationCompatibilityPath &&
 		plugin.ReleasedGenerationMatrix.Manifest == releasedGenerationCompatibilityPath
@@ -287,7 +293,7 @@ func checkEngineProtocolCompatibility(root string) error {
 }
 
 func validateCompatibilityPolicy(value compatibilityPolicy) error {
-	wantBlockers := []string{}
+	wantBlockers := []string{"semantic-client-session-second-conformance-consumer"}
 	wantBenchmarks := benchmarkPolicy{
 		Manifest: benchmarkBudgetPath, Status: "stable-enforced", Aggregation: "median-of-five",
 		BudgetChanges: "measured-evidence-and-reviewed-rationale",
@@ -458,5 +464,5 @@ func sortedUnique(values []string) bool {
 }
 
 func compatibilityManifestPaths() []string {
-	return []string{compatibilityPolicyPath, durableCompatibilityPath, generatedSourceCompatibilityPath, goAPICompatibilityPath, benchmarkBudgetPath, publicAuthoringCompatibilityPath, releasedGenerationCompatibilityPath, securityExceptionsPath, engineProtocolCompatibilityPath, pluginProtocolCompatibilityPath}
+	return []string{compatibilityPolicyPath, durableCompatibilityPath, generatedSourceCompatibilityPath, goAPICompatibilityPath, apiUsagePath, benchmarkBudgetPath, publicAuthoringCompatibilityPath, releasedGenerationCompatibilityPath, securityExceptionsPath, securityProcessPath, kernelConceptsPath, engineProtocolCompatibilityPath, pluginProtocolCompatibilityPath}
 }

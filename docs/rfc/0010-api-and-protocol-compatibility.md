@@ -112,7 +112,8 @@ break/migration record in the same commit. Historical digests and durable
 history cannot be rewritten.
 
 The clean-room public-authoring, generated-source, and released-generation
-criteria are complete. The policy has no enumerated v1 blockers, but it remains
+criteria are complete. The policy's released-generation blockers are closed;
+one separate independent-client conformance-consumer blocker remains, and it remains
 explicitly pre-v1 and does not itself declare v1. Stable kernel benchmark
 budgets are now a canonical enforced contract: five fixed samples,
 median time/byte/allocation ceilings, 20% time and 10% allocation material

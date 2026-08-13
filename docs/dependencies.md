@@ -22,3 +22,19 @@ accepted only at the process boundary; repository architecture checks prevent
 it from entering the kernel. `govulncheck`, license review, vendor
 reproducibility, cancellation tests, and upgrade/breaking review remain release
 requirements. No dependency in this review authorizes hidden network access.
+
+## Update process
+
+Spice Framework maintainers own dependency review. Dependabot security updates
+and private vulnerability reporting remain enabled as repository controls.
+Critical reports are reviewed within one day; the complete dependency graph is
+reviewed at least every 30 days.
+
+Every change must preserve exact module selection, run `go mod tidy -diff`,
+prove vendor reproducibility, recheck license and attribution, and pass gosec,
+govulncheck, offline tests, and the full verifier. A breaking or behaviorally
+material update also requires protocol/API review, cancellation and failure
+evidence, and migration guidance. A security fix is released or the affected
+version is withdrawn; dependency changes never authorize hidden network access.
+The closed machine-readable process is
+`compatibility/security-process.json`.

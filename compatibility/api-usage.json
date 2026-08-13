@@ -1,0 +1,242 @@
+{
+  "schema": "spice.agent.api-usage/v1alpha1",
+  "module": "github.com/spice-framework/spice-agent",
+  "surface": "public-package-inventory",
+  "status": "reviewed-pre-v1",
+  "disposition_policy": "retain-requires-concrete-consumer-or-contract-evidence",
+  "packages": [
+    {
+      "path": "github.com/spice-framework/spice-agent",
+      "disposition": "retain",
+      "evidence": [
+        "internal/compositionfixture",
+        "spice-agent-coding"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/agent",
+      "disposition": "retain",
+      "evidence": [
+        "daemon",
+        "spice-agent-coding"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/annotation/agent",
+      "disposition": "retain",
+      "evidence": [
+        "cmd/spice-agent-annotations",
+        "internal/compositionfixture"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/annotation/agenttool",
+      "disposition": "retain",
+      "evidence": [
+        "cmd/spice-agent-annotations",
+        "toolchain-catalog"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/client",
+      "disposition": "retain",
+      "evidence": [
+        "client/grpcclient",
+        "spice-agent-tui"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/client/conformance",
+      "disposition": "retain",
+      "evidence": [
+        "client/grpcclient",
+        "spice-agent-coding-pending"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/client/grpcclient",
+      "disposition": "retain",
+      "evidence": [
+        "client/localclient",
+        "daemon/grpcserver-protocol-matrix"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/client/localclient",
+      "disposition": "retain",
+      "evidence": [
+        "client/managed",
+        "spice-agent-coding"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/client/managed",
+      "disposition": "retain",
+      "evidence": [
+        "installed-distribution-acceptance",
+        "spice-agent-coding"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/common/v1",
+      "disposition": "retain",
+      "evidence": [
+        "engine/v1",
+        "plugin/v1"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/daemon",
+      "disposition": "retain",
+      "evidence": [
+        "daemon/grpcserver",
+        "spice-agent-coding"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/daemon/endpoint",
+      "disposition": "retain",
+      "evidence": [
+        "client/localclient",
+        "spice-agent-coding"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/daemon/grpcserver",
+      "disposition": "retain",
+      "evidence": [
+        "internal/releasedcompatibility",
+        "spice-agent-coding"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/daemon/localipc",
+      "disposition": "retain",
+      "evidence": [
+        "client/localclient",
+        "daemon/grpcserver"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/engine/v1",
+      "disposition": "retain",
+      "evidence": [
+        "client/grpcclient",
+        "daemon/grpcserver"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/event",
+      "disposition": "retain",
+      "evidence": [
+        "agent",
+        "logging"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/interaction",
+      "disposition": "retain",
+      "evidence": [
+        "agent",
+        "daemon"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/logging",
+      "disposition": "retain",
+      "evidence": [
+        "logging/autoconfigure",
+        "spice-agent-coding"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/logging/autoconfigure",
+      "disposition": "retain",
+      "evidence": [
+        "internal/compositionfixture",
+        "spice-agent-coding"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/message",
+      "disposition": "retain",
+      "evidence": [
+        "agent",
+        "model"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/model",
+      "disposition": "retain",
+      "evidence": [
+        "agent",
+        "provider-openai"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/plugin/conformance",
+      "disposition": "retain",
+      "evidence": [
+        "internal/pluginconformanceacceptance-go",
+        "internal/pluginconformanceacceptance-python"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/plugin/host",
+      "disposition": "retain",
+      "evidence": [
+        "plugin/host/autoconfigure",
+        "spice-agent-coding"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/plugin/host/autoconfigure",
+      "disposition": "retain",
+      "evidence": [
+        "internal/compositionfixture",
+        "spice-agent-coding"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/plugin/host/localendpoint",
+      "disposition": "retain",
+      "evidence": [
+        "plugin/host",
+        "spice-agent-coding"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/plugin/v1",
+      "disposition": "retain",
+      "evidence": [
+        "plugin/conformance",
+        "plugin/host"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/process",
+      "disposition": "retain",
+      "evidence": [
+        "experiments/git-workflow",
+        "spice-agent-coding"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/stage",
+      "disposition": "retain",
+      "evidence": [
+        "agent",
+        "plugin/host"
+      ]
+    },
+    {
+      "path": "github.com/spice-framework/spice-agent/tool",
+      "disposition": "retain",
+      "evidence": [
+        "agent",
+        "three-clean-room-tools"
+      ]
+    }
+  ],
+  "unresolved": []
+}

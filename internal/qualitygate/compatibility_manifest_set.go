@@ -12,6 +12,9 @@ type compatibilityManifestSet struct {
 	releasedGeneration releasedGenerationCompatibility
 	generatedSource    generatedSourceCompatibility
 	goAPI              goAPICompatibility
+	apiUsage           apiUsageManifest
+	securityProcess    securityProcessManifest
+	kernelConcepts     kernelConceptManifest
 }
 
 func newCompatibilityManifestSet(root string) (compatibilityManifestSet, error) {
@@ -53,6 +56,18 @@ func newCompatibilityManifestSet(root string) (compatibilityManifestSet, error) 
 	if err != nil {
 		return compatibilityManifestSet{}, err
 	}
+	manifests.apiUsage, _, err = readCanonicalJSON[apiUsageManifest](root, apiUsagePath)
+	if err != nil {
+		return compatibilityManifestSet{}, err
+	}
+	manifests.securityProcess, _, err = readCanonicalJSON[securityProcessManifest](root, securityProcessPath)
+	if err != nil {
+		return compatibilityManifestSet{}, err
+	}
+	manifests.kernelConcepts, _, err = readCanonicalJSON[kernelConceptManifest](root, kernelConceptsPath)
+	if err != nil {
+		return compatibilityManifestSet{}, err
+	}
 	return manifests, nil
 }
 
@@ -68,6 +83,9 @@ func (manifests compatibilityManifestSet) Validate(root string) error {
 		func() error { return manifests.releasedGeneration.ValidateSource(root) },
 		func() error { return validateGeneratedSourceCompatibility(root, manifests.generatedSource) },
 		func() error { return validateGoAPICompatibility(manifests.goAPI, root) },
+		func() error { return validateAPIUsage(manifests.apiUsage, manifests.goAPI) },
+		func() error { return validateSecurityProcess(manifests.securityProcess) },
+		func() error { return validateKernelConcepts(manifests.kernelConcepts) },
 		func() error {
 			_, err := loadKernelRuntimeBenchmarkBudgets(root)
 			return err

@@ -1,0 +1,66 @@
+{
+  "schema": "spice.agent.kernel-concepts/v1alpha1",
+  "module": "github.com/spice-framework/spice-agent",
+  "status": "reviewed-one-pending-independent-consumer",
+  "concepts": [
+    {
+      "name": "compiled-extension-composition",
+      "disposition": "multi-consumer-proven",
+      "consumers": [
+        "spice-agent-coding",
+        "three-clean-room-tools"
+      ]
+    },
+    {
+      "name": "event-observer",
+      "disposition": "multi-consumer-proven",
+      "consumers": [
+        "kernel-tests",
+        "logging"
+      ]
+    },
+    {
+      "name": "process-launch-boundary",
+      "disposition": "multi-consumer-proven",
+      "consumers": [
+        "git-workflow-experiment",
+        "spice-agent-coding"
+      ]
+    },
+    {
+      "name": "runtime-tool-plan",
+      "disposition": "multi-consumer-proven",
+      "consumers": [
+        "plugin-host",
+        "static-compiled-tools"
+      ]
+    },
+    {
+      "name": "semantic-client-session",
+      "disposition": "multi-consumer-proven",
+      "consumers": [
+        "spice-agent-coding",
+        "spice-agent-tui"
+      ]
+    },
+    {
+      "name": "tool-dispatch-guard",
+      "disposition": "multi-consumer-proven",
+      "consumers": [
+        "permission-experiment",
+        "spice-agent-coding-terminal-policy"
+      ]
+    }
+  ],
+  "optional_no_kernel_surface": [
+    "compaction",
+    "git-workflow",
+    "mcp",
+    "planning",
+    "sandbox",
+    "subagents"
+  ],
+  "unresolved": [
+    "semantic-client-session-second-conformance-consumer"
+  ]
+}
