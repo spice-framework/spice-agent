@@ -348,7 +348,6 @@ type fixtureEventStream struct {
 	closed   bool
 	read     bool
 	closeErr error
-	nextErr  error
 }
 
 func (stream *fixtureEventStream) Next(ctx context.Context) (client.EventFrame, error) {
