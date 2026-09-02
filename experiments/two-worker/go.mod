@@ -13,7 +13,7 @@ tool (
 require (
 	github.com/spice-framework/spice v0.1.0-preview.2
 	github.com/spice-framework/spice-agent v0.1.0-preview.5
-	google.golang.org/grpc v1.83.0
+	google.golang.org/grpc v1.83.1
 )
 
 require (
